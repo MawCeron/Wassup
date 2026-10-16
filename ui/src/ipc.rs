@@ -16,8 +16,51 @@ pub fn socket_path() -> io::Result<PathBuf> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "XDG_RUNTIME_DIR is not set"))
 }
 
-pub fn connect() -> io::Result<UnixStream> {
-    UnixStream::connect(socket_path()?)
+/// A connection to the daemon. Requests are written from the GTK main
+/// thread; events are read on a separate thread and handed back over a
+/// channel so a blocking read never freezes the UI.
+pub struct Connection {
+    stream: UnixStream,
+    next_id: std::cell::Cell<u64>,
+}
+
+impl Connection {
+    pub fn open() -> io::Result<(Self, async_channel::Receiver<io::Result<Event>>)> {
+        let stream = UnixStream::connect(socket_path()?)?;
+        let mut reader = stream.try_clone()?;
+        let (tx, rx) = async_channel::unbounded();
+        std::thread::spawn(move || {
+            loop {
+                let event = read_frame::<Event>(&mut reader);
+                let failed = event.is_err();
+                if tx.send_blocking(event).is_err() || failed {
+                    break;
+                }
+            }
+        });
+        let conn = Self {
+            stream,
+            next_id: std::cell::Cell::new(0),
+        };
+        Ok((conn, rx))
+    }
+
+    pub fn send(&self, kind: request::Kind) -> io::Result<()> {
+        let id = self.next_id.get() + 1;
+        self.next_id.set(id);
+        let req = Request {
+            id,
+            kind: Some(kind),
+        };
+        write_frame(&mut &self.stream, &req)
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        // Unblocks the reader thread so it can exit.
+        self.stream.shutdown(std::net::Shutdown::Both).ok();
+    }
 }
 
 pub fn write_frame(w: &mut impl Write, msg: &impl prost::Message) -> io::Result<()> {
