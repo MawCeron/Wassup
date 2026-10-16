@@ -3,9 +3,10 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,12 +16,57 @@ import (
 )
 
 func main() {
+	debug := flag.Bool("debug", false, "log every request")
+	flag.Parse()
+	level := slog.LevelInfo
+	if *debug {
+		level = slog.LevelDebug
+	}
+	// stderr is collected by journald when run as a systemd unit.
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+
+	if err := run(); err != nil {
+		slog.Error("startup failed", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	data, err := xdgDir("XDG_DATA_HOME", ".local/share")
+	if err != nil {
+		return err
+	}
+	cache, err := xdgDir("XDG_CACHE_HOME", ".cache")
+	if err != nil {
+		return err
+	}
 	ln, err := listen()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	log.Printf("listening on %s", ln.Addr())
+	slog.Info("started", "socket", ln.Addr(), "data", data, "cache", cache)
 	serve(ln)
+	return nil
+}
+
+// xdgDir returns and creates the wassup directory under an XDG base
+// directory. It is owner-only because it will hold account keys.
+func xdgDir(env, fallback string) (string, error) {
+	base := os.Getenv(env)
+	// The XDG spec says relative paths are invalid and must be ignored.
+	if !filepath.IsAbs(base) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		base = filepath.Join(home, fallback)
+	}
+	dir := filepath.Join(base, "wassup")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	// MkdirAll leaves an existing directory's mode alone.
+	return dir, os.Chmod(dir, 0o700)
 }
 
 func socketPath() (string, error) {
@@ -62,7 +108,7 @@ func serve(ln net.Listener) {
 		conn, err := ln.Accept()
 		if err != nil {
 			if !errors.Is(err, net.ErrClosed) {
-				log.Print(err)
+				slog.Error("accept", "err", err)
 			}
 			return
 		}
@@ -77,12 +123,13 @@ func handle(conn net.Conn) {
 		var req ipc.Request
 		if err := protodelim.UnmarshalFrom(r, &req); err != nil {
 			if !errors.Is(err, io.EOF) {
-				log.Printf("read request: %v", err)
+				slog.Warn("read request", "err", err)
 			}
 			return
 		}
+		slog.Debug("request", "id", req.GetId(), "kind", fmt.Sprintf("%T", req.Kind))
 		if _, err := protodelim.MarshalTo(conn, reply(&req)); err != nil {
-			log.Printf("write event: %v", err)
+			slog.Warn("write event", "err", err)
 			return
 		}
 	}

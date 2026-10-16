@@ -19,6 +19,7 @@ Run from `daemon/`:
 | Task | Command |
 |---|---|
 | Build | `go build ./...` |
+| Run with request logging | `go run . -debug` |
 | Format | `gofmt -w .` |
 | Check formatting | `test -z "$(gofmt -l .)"` |
 | Static analysis | `go vet ./...` |

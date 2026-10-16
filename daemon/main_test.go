@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
@@ -43,5 +44,29 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if ev.GetRequestId() != 7 || ev.GetAccounts() == nil {
 		t.Fatalf("unexpected event: %v", &ev)
+	}
+}
+
+func TestXDGDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	t.Setenv("XDG_DATA_HOME", "relative/path")
+	got, err := xdgDir("XDG_DATA_HOME", ".local/share")
+	if want := filepath.Join(home, ".local/share/wassup"); err != nil || got != want {
+		t.Fatalf("relative env: got %q, %v; want %q", got, err, want)
+	}
+
+	base := t.TempDir()
+	if err := os.Mkdir(filepath.Join(base, "wassup"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_HOME", base)
+	got, err = xdgDir("XDG_DATA_HOME", ".local/share")
+	if want := filepath.Join(base, "wassup"); err != nil || got != want {
+		t.Fatalf("absolute env: got %q, %v; want %q", got, err, want)
+	}
+	if fi, _ := os.Stat(got); fi.Mode().Perm() != 0o700 {
+		t.Fatalf("existing dir kept mode %v", fi.Mode().Perm())
 	}
 }
