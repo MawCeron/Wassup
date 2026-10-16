@@ -22,6 +22,7 @@ type account struct {
 	id     string
 	db     *sql.DB
 	client *whatsmeow.Client
+	log    *slog.Logger
 }
 
 // openAccounts opens every account under dataDir/accounts.
@@ -66,9 +67,13 @@ func openAccount(ctx context.Context, dir, id string) (*account, error) {
 	if err != nil {
 		return nil, err
 	}
-	log := waLogger{slog.With("account", id)}
+	l := slog.With("account", id)
+	log := waLogger{l}
 	container := sqlstore.NewWithDB(db, "sqlite3", log.Sub("store"))
 	if err := container.Upgrade(ctx); err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
+	if _, err := db.ExecContext(ctx, schema); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
 	// Returns a fresh, unlinked device when the store is empty.
@@ -76,7 +81,7 @@ func openAccount(ctx context.Context, dir, id string) (*account, error) {
 	if err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
-	return &account{id: id, db: db, client: whatsmeow.NewClient(device, log.Sub("client"))}, nil
+	return &account{id: id, db: db, client: whatsmeow.NewClient(device, log.Sub("client")), log: l}, nil
 }
 
 func closeAccounts(accounts []*account) {

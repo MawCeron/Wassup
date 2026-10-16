@@ -135,9 +135,17 @@ func newDaemon(accounts []*account) *daemon {
 	d := &daemon{accounts: accounts, conns: map[net.Conn]struct{}{}}
 	for _, a := range accounts {
 		a.client.AddEventHandler(func(evt any) {
-			switch evt.(type) {
+			switch e := evt.(type) {
 			case *events.Connected, *events.Disconnected, *events.LoggedOut, *events.StreamReplaced:
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
+			case *events.Message:
+				msg, chat, err := a.saveMessage(context.Background(), e)
+				if err != nil {
+					a.log.Error("save message", "id", e.Info.ID, "err", err)
+				} else if msg != nil {
+					d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageReceived{MessageReceived: msg}})
+					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+				}
 			}
 		})
 	}
@@ -220,6 +228,25 @@ func (d *daemon) reply(req *ipc.Request) *ipc.Event {
 			list.Accounts = append(list.Accounts, a.info())
 		}
 		ev.Kind = &ipc.Event_Accounts{Accounts: list}
+	case *ipc.Request_ListChats:
+		a := d.find(k.ListChats.GetAccountId())
+		if a == nil {
+			fail(errors.New("unknown account"))
+		} else if chats, err := a.listChats(context.Background()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Chats{Chats: &ipc.ChatList{Chats: chats}}
+		}
+	case *ipc.Request_ListMessages:
+		r := k.ListMessages
+		a := d.find(r.GetAccountId())
+		if a == nil {
+			fail(errors.New("unknown account"))
+		} else if msgs, err := a.listMessages(context.Background(), r.GetChatJid(), r.GetBeforeId(), r.GetLimit()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Messages{Messages: &ipc.MessageList{Messages: msgs}}
+		}
 	case *ipc.Request_LinkAccount:
 		a := d.find(k.LinkAccount.GetAccountId())
 		if a == nil {
