@@ -6,4 +6,6 @@ An **unofficial** WhatsApp client for Linux (GNOME), with a native protocol impl
 
 **Warning:** since this is an unofficial client, Meta could restrict accounts that use it. Try it with a secondary number first.
 
+Development setup: [`docs/development.md`](docs/development.md).
+
 License: [MIT](LICENSE).
