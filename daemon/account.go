@@ -89,14 +89,66 @@ func closeAccounts(accounts []*account) {
 }
 
 func (a *account) info() *ipc.Account {
-	info := &ipc.Account{Id: a.id, State: ipc.ConnectionState_CONNECTION_STATE_DISCONNECTED}
+	info := &ipc.Account{Id: a.id, PushName: a.client.Store.PushName}
 	if jid := a.client.Store.ID; jid != nil {
 		info.Jid = jid.String()
-	} else {
-		info.State = ipc.ConnectionState_CONNECTION_STATE_LOGGED_OUT
 	}
-	info.PushName = a.client.Store.PushName
+	switch {
+	case a.client.IsLoggedIn():
+		info.State = ipc.ConnectionState_CONNECTION_STATE_CONNECTED
+	case a.client.IsConnected():
+		info.State = ipc.ConnectionState_CONNECTION_STATE_CONNECTING
+	case a.client.Store.ID == nil:
+		info.State = ipc.ConnectionState_CONNECTION_STATE_LOGGED_OUT
+	default:
+		info.State = ipc.ConnectionState_CONNECTION_STATE_DISCONNECTED
+	}
 	return info
+}
+
+// link connects an unlinked account and pushes QR codes until it is
+// scanned or linking fails. Success is reported by the Connected event.
+func (d *daemon) link(a *account) error {
+	if a.client.Store.ID != nil {
+		return errors.New("account is already linked")
+	}
+	if a.client.IsConnected() {
+		return errors.New("account is already linking")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	qr, err := a.client.GetQRChannel(ctx)
+	if err != nil {
+		cancel()
+		return err
+	}
+	if err := a.client.Connect(); err != nil {
+		cancel()
+		return err
+	}
+	go func() {
+		defer cancel()
+		for item := range qr {
+			reason := item.Event
+			switch item.Event {
+			case whatsmeow.QRChannelEventCode:
+				d.broadcast(&ipc.Event{Kind: &ipc.Event_QrCode{QrCode: &ipc.QrCode{
+					AccountId: a.id, Code: item.Code, TimeoutMs: uint32(item.Timeout.Milliseconds()),
+				}}})
+				continue
+			case whatsmeow.QRChannelSuccess.Event, whatsmeow.QRChannelEventPasskeyResponse,
+				whatsmeow.QRChannelScannedWithoutMultidevice.Event:
+				continue
+			case whatsmeow.QRChannelEventPasskeyRequest:
+				reason = "passkey pairing is not supported"
+				cancel()
+			case whatsmeow.QRChannelEventError:
+				reason = item.Error.Error()
+			}
+			a.client.Disconnect()
+			d.broadcast(&ipc.Event{Kind: &ipc.Event_LinkFailed{LinkFailed: &ipc.LinkFailed{AccountId: a.id, Reason: reason}}})
+		}
+	}()
+	return nil
 }
 
 // waLogger routes whatsmeow's logs into slog.

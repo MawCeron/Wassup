@@ -18,7 +18,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	go serve(ln, nil)
+	go newDaemon(nil).serve(ln)
 
 	path, _ := socketPath()
 	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o600 {
@@ -68,5 +68,52 @@ func TestXDGDir(t *testing.T) {
 	}
 	if fi, _ := os.Stat(got); fi.Mode().Perm() != 0o700 {
 		t.Fatalf("existing dir kept mode %v", fi.Mode().Perm())
+	}
+}
+
+func TestBroadcastAndLinkErrors(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	ln, err := listen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	d := newDaemon(nil)
+	go d.serve(ln)
+	path, _ := socketPath()
+
+	call := func(conn net.Conn, r *bufio.Reader, req *ipc.Request) *ipc.Event {
+		t.Helper()
+		if _, err := protodelim.MarshalTo(conn, req); err != nil {
+			t.Fatal(err)
+		}
+		var ev ipc.Event
+		if err := protodelim.UnmarshalFrom(r, &ev); err != nil {
+			t.Fatal(err)
+		}
+		return &ev
+	}
+	var readers []*bufio.Reader
+	for range 2 {
+		conn, err := net.Dial("unix", path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		r := bufio.NewReader(conn)
+		// A reply proves the daemon has registered the connection.
+		ev := call(conn, r, &ipc.Request{Id: 1, Kind: &ipc.Request_LinkAccount{LinkAccount: &ipc.LinkAccount{AccountId: "nope"}}})
+		if ev.GetError() == nil {
+			t.Fatalf("linking an unknown account: %v", ev)
+		}
+		readers = append(readers, r)
+	}
+
+	d.broadcast(&ipc.Event{Kind: &ipc.Event_LinkFailed{LinkFailed: &ipc.LinkFailed{AccountId: "a"}}})
+	for i, r := range readers {
+		var ev ipc.Event
+		if err := protodelim.UnmarshalFrom(r, &ev); err != nil || ev.GetLinkFailed() == nil || ev.GetRequestId() != 0 {
+			t.Fatalf("client %d got %v, %v", i, &ev, err)
+		}
 	}
 }

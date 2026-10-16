@@ -11,8 +11,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
+	"go.mau.fi/whatsmeow/types/events"
 	"google.golang.org/protobuf/encoding/protodelim"
 )
 
@@ -52,8 +55,17 @@ func run() error {
 		return err
 	}
 	defer closeAccounts(accounts)
+	d := newDaemon(accounts)
+	for _, a := range accounts {
+		if a.client.Store.ID != nil {
+			// ponytail: a failed first connect is only logged; whatsmeow retries only after one success.
+			if err := a.client.Connect(); err != nil {
+				slog.Warn("connect", "account", a.id, "err", err)
+			}
+		}
+	}
 	slog.Info("started", "socket", ln.Addr(), "data", data, "cache", cache, "accounts", len(accounts))
-	serve(ln, accounts)
+	d.serve(ln)
 	return nil
 }
 
@@ -111,7 +123,28 @@ func listen() (net.Listener, error) {
 	return ln, nil
 }
 
-func serve(ln net.Listener, accounts []*account) {
+// daemon serves the IPC clients and pushes account events to all of them.
+type daemon struct {
+	accounts []*account
+	// ponytail: one lock for every socket write; per-connection queues if a slow UI ever stalls the others.
+	mu    sync.Mutex
+	conns map[net.Conn]struct{}
+}
+
+func newDaemon(accounts []*account) *daemon {
+	d := &daemon{accounts: accounts, conns: map[net.Conn]struct{}{}}
+	for _, a := range accounts {
+		a.client.AddEventHandler(func(evt any) {
+			switch evt.(type) {
+			case *events.Connected, *events.Disconnected, *events.LoggedOut, *events.StreamReplaced:
+				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
+			}
+		})
+	}
+	return d
+}
+
+func (d *daemon) serve(ln net.Listener) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -120,40 +153,93 @@ func serve(ln net.Listener, accounts []*account) {
 			}
 			return
 		}
-		go handle(conn, accounts)
+		d.mu.Lock()
+		d.conns[conn] = struct{}{}
+		d.mu.Unlock()
+		go d.handle(conn)
 	}
 }
 
-func handle(conn net.Conn, accounts []*account) {
-	defer conn.Close()
+func (d *daemon) handle(conn net.Conn) {
+	defer func() {
+		d.mu.Lock()
+		delete(d.conns, conn)
+		d.mu.Unlock()
+		conn.Close()
+	}()
 	r := bufio.NewReader(conn)
 	for {
 		var req ipc.Request
 		if err := protodelim.UnmarshalFrom(r, &req); err != nil {
-			if !errors.Is(err, io.EOF) {
+			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
 				slog.Warn("read request", "err", err)
 			}
 			return
 		}
 		slog.Debug("request", "id", req.GetId(), "kind", fmt.Sprintf("%T", req.Kind))
-		if _, err := protodelim.MarshalTo(conn, reply(&req, accounts)); err != nil {
+		ev := d.reply(&req) // Outside the lock: it may connect and trigger broadcasts.
+		d.mu.Lock()
+		err := write(conn, ev)
+		d.mu.Unlock()
+		if err != nil {
 			slog.Warn("write event", "err", err)
 			return
 		}
 	}
 }
 
-func reply(req *ipc.Request, accounts []*account) *ipc.Event {
+// broadcast sends an unsolicited event to every connected UI.
+func (d *daemon) broadcast(ev *ipc.Event) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for conn := range d.conns {
+		if err := write(conn, ev); err != nil {
+			slog.Warn("broadcast", "err", err)
+			conn.Close() // handle() notices and forgets it.
+		}
+	}
+}
+
+// write must be called with d.mu held.
+func write(conn net.Conn, ev *ipc.Event) error {
+	// A UI that stops reading must not block the daemon forever.
+	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	_, err := protodelim.MarshalTo(conn, ev)
+	return err
+}
+
+func (d *daemon) reply(req *ipc.Request) *ipc.Event {
 	ev := &ipc.Event{RequestId: req.GetId()}
-	switch req.Kind.(type) {
+	fail := func(err error) {
+		ev.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
+	}
+	switch k := req.Kind.(type) {
 	case *ipc.Request_ListAccounts:
 		list := &ipc.AccountList{}
-		for _, a := range accounts {
+		for _, a := range d.accounts {
 			list.Accounts = append(list.Accounts, a.info())
 		}
 		ev.Kind = &ipc.Event_Accounts{Accounts: list}
+	case *ipc.Request_LinkAccount:
+		a := d.find(k.LinkAccount.GetAccountId())
+		if a == nil {
+			fail(errors.New("unknown account"))
+		} else if err := d.link(a); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_AccountChanged{AccountChanged: a.info()}
+		}
 	default:
-		ev.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: "not implemented"}}
+		fail(errors.New("not implemented"))
 	}
 	return ev
+}
+
+func (d *daemon) find(id string) *account {
+	for _, a := range d.accounts {
+		if a.id == id {
+			return a
+		}
+	}
+	return nil
 }
