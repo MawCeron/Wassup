@@ -50,3 +50,23 @@ Formatting and lint rules are the tools' defaults; no config files.
 - **Rust:** `ui/build.rs` regenerates the types on every `cargo build`
   that sees a schema change; nothing is committed. It needs `protoc` in
   `PATH`.
+
+## Test client
+
+`wassupctl` talks to a running daemon over IPC, so an account can be
+linked and used before the UI exists. Run from `daemon/`:
+
+```sh
+go run . -debug                            # terminal 1: the daemon
+go run ./cmd/wassupctl accounts            # terminal 2: note the account id
+go run ./cmd/wassupctl link <account>      # scan the QR with the phone
+go run ./cmd/wassupctl watch               # print incoming messages
+go run ./cmd/wassupctl send <account> 5215550000000 hello
+go run ./cmd/wassupctl chats <account>
+go run ./cmd/wassupctl messages <account> 5215550000000
+```
+
+`link` draws the QR in the terminal when `qrencode` is installed
+(`sudo dnf install qrencode`); otherwise it prints the text to encode.
+
+Use a secondary number: this is an unofficial client.
