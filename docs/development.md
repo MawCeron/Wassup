@@ -22,6 +22,7 @@ Run from `daemon/`:
 | Format | `gofmt -w .` |
 | Check formatting | `test -z "$(gofmt -l .)"` |
 | Static analysis | `go vet ./...` |
+| Tests | `go test -race ./...` |
 
 ## UI (Rust)
 
@@ -32,7 +33,9 @@ Run from `ui/`:
 | Build | `cargo build` |
 | Format | `cargo fmt` |
 | Check formatting | `cargo fmt --check` |
-| Static analysis | `cargo clippy -- -D warnings` |
+| Static analysis | `cargo clippy --all-targets -- -D warnings` |
+| Tests | `cargo test` |
+| Tests against the Go daemon | `cargo test -- --include-ignored` |
 
 Formatting and lint rules are the tools' defaults; no config files.
 
