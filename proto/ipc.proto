@@ -16,6 +16,7 @@ message Request {
     ListMessages list_messages = 4;
     SendText send_text = 5;
     LinkAccount link_account = 6;
+    MarkRead mark_read = 7;
   }
 }
 
@@ -74,6 +75,13 @@ message QrCode {
 message LinkFailed {
   string account_id = 1;
   string reason = 2;
+}
+
+// Clears a chat's unread count and sends read receipts. Answered with
+// chat_changed or error.
+message MarkRead {
+  string account_id = 1;
+  string chat_jid = 2;
 }
 
 message Error {

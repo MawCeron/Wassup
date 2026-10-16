@@ -60,18 +60,23 @@ func TestSaveAndListMessages(t *testing.T) {
 		t.Fatalf("chat after two incoming: %v", c)
 	}
 
+	chat2, err := a.markRead(ctx, chat.String())
+	if err != nil || chat2.UnreadCount != 0 {
+		t.Fatalf("mark read: %v, %v", chat2, err)
+	}
+	save(text("E", 5, false))
 	save(text("D", 4, true))
 	if chats, _ = a.listChats(ctx); chats[0].UnreadCount != 0 {
 		t.Fatalf("reply did not clear unread: %v", chats[0])
 	}
 
 	page, err := a.listMessages(ctx, chat.String(), "", 2)
-	if err != nil || len(page) != 2 || page[0].Id != "D" || page[1].Id != "B" {
+	if err != nil || len(page) != 2 || page[0].Id != "E" || page[1].Id != "D" {
 		t.Fatalf("first page: %v, %v", page, err)
 	}
-	page, err = a.listMessages(ctx, chat.String(), "B", 0)
-	if err != nil || len(page) != 1 || page[0].Id != "A" {
-		t.Fatalf("page before B: %v, %v", page, err)
+	page, err = a.listMessages(ctx, chat.String(), "D", 0)
+	if err != nil || len(page) != 2 || page[0].Id != "B" || page[1].Id != "A" {
+		t.Fatalf("page before D: %v, %v", page, err)
 	}
 
 	if _, _, err := a.sendText(ctx, chat.String(), ""); err == nil {

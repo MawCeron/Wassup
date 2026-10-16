@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -223,4 +224,51 @@ func (a *account) sendText(ctx context.Context, chat, text string) (*ipc.Message
 		},
 		Message: &waE2E.Message{Conversation: proto.String(text)},
 	})
+}
+
+// markRead clears a chat's unread count and, when connected, tells the
+// senders their messages were read.
+func (a *account) markRead(ctx context.Context, chatJID string) (*ipc.Chat, error) {
+	chat, err := types.ParseJID(chatJID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := a.db.QueryContext(ctx, `
+		SELECT id, sender_jid FROM wassup_messages WHERE chat_jid = ? AND from_me = 0
+		ORDER BY timestamp_ms DESC LIMIT (SELECT unread_count FROM wassup_chats WHERE jid = ?)`,
+		chatJID, chatJID)
+	if err != nil {
+		return nil, err
+	}
+	bySender := map[string][]types.MessageID{}
+	for rows.Next() {
+		var id, sender string
+		if err := rows.Scan(&id, &sender); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		bySender[sender] = append(bySender[sender], id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if a.client.IsLoggedIn() {
+		// Receipts are best effort: the chat is read here even if they fail.
+		for sender, ids := range bySender {
+			from, err := types.ParseJID(sender)
+			if err == nil {
+				err = a.client.MarkRead(ctx, ids, time.Now(), chat, from)
+			}
+			if err != nil {
+				a.log.Warn("read receipt", "chat", chatJID, "err", err)
+			}
+		}
+	}
+
+	if _, err := a.db.ExecContext(ctx, `UPDATE wassup_chats SET unread_count = 0 WHERE jid = ?`, chatJID); err != nil {
+		return nil, err
+	}
+	return scanChat(a.id, a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
 }

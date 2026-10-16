@@ -259,6 +259,15 @@ func (d *daemon) reply(req *ipc.Request) *ipc.Event {
 			// TODO: other connected UIs only learn about it through the chat update.
 			d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
 		}
+	case *ipc.Request_MarkRead:
+		a := d.find(k.MarkRead.GetAccountId())
+		if a == nil {
+			fail(errors.New("unknown account"))
+		} else if chat, err := a.markRead(context.Background(), k.MarkRead.GetChatJid()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_ChatChanged{ChatChanged: chat}
+		}
 	case *ipc.Request_LinkAccount:
 		a := d.find(k.LinkAccount.GetAccountId())
 		if a == nil {
