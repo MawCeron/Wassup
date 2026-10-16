@@ -8,6 +8,14 @@ use gtk::{gdk, gio, glib};
 
 use crate::ipc::{self, event, request};
 
+/// Messages fetched per request when opening a chat or scrolling back.
+const PAGE_SIZE: u32 = 50;
+
+const CSS: &str = "
+.bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
+.bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
+";
+
 pub struct Window {
     stack: gtk::Stack,
     status: adw::StatusPage,
@@ -24,6 +32,12 @@ pub struct Window {
     chat_selection: gtk::SingleSelection,
     chats_loaded: Cell<bool>,
     current_chat: RefCell<Option<String>>,
+    content_stack: gtk::Stack,
+    messages: gio::ListStore,
+    message_list: gtk::ListView,
+    message_scroll: gtk::ScrolledWindow,
+    loading: Cell<bool>,
+    has_more: Cell<bool>,
     conn: RefCell<Option<ipc::Connection>>,
     account: RefCell<Option<ipc::Account>>,
 }
@@ -81,7 +95,20 @@ impl Window {
             .icon_name("chat-message-new-symbolic")
             .title("No Chat Selected")
             .build();
-        let content = adw::NavigationPage::new(&with_header(&placeholder), "Wassup");
+        let messages = gio::ListStore::new::<glib::BoxedAnyObject>();
+        let message_list = gtk::ListView::builder()
+            .model(&gtk::NoSelection::new(Some(messages.clone())))
+            .factory(&message_row_factory())
+            .build();
+        let message_scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vexpand(true)
+            .child(&message_list)
+            .build();
+        let content_stack = gtk::Stack::new();
+        content_stack.add_named(&placeholder, Some("empty"));
+        content_stack.add_named(&message_scroll, Some("messages"));
+        let content = adw::NavigationPage::new(&with_header(&content_stack), "Wassup");
         let split = adw::NavigationSplitView::builder()
             .sidebar(&adw::NavigationPage::new(&sidebar, "Chats"))
             .content(&content)
@@ -91,6 +118,14 @@ impl Window {
         stack.add_named(&with_header(&status), Some("status"));
         stack.add_named(&with_header(&link), Some("link"));
         stack.add_named(&split, Some("main"));
+
+        let css = gtk::CssProvider::new();
+        css.load_from_string(CSS);
+        gtk::style_context_add_provider_for_display(
+            &gdk::Display::default().expect("a display"),
+            &css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
 
         let toasts = adw::ToastOverlay::new();
         toasts.set_child(Some(&stack));
@@ -123,6 +158,12 @@ impl Window {
             chat_selection,
             chats_loaded: Cell::new(false),
             current_chat: RefCell::new(None),
+            content_stack,
+            messages,
+            message_list,
+            message_scroll,
+            loading: Cell::new(false),
+            has_more: Cell::new(false),
             conn: RefCell::new(None),
             account: RefCell::new(None),
         });
@@ -145,6 +186,19 @@ impl Window {
                 if let Some(item) = selection.selected_item() {
                     let chat = item.downcast::<glib::BoxedAnyObject>().unwrap();
                     ui.open_chat(&chat.borrow::<ipc::Chat>());
+                }
+            }
+        ));
+        ui.message_scroll.connect_edge_reached(glib::clone!(
+            #[weak]
+            ui,
+            move |_, edge| {
+                if edge == gtk::PositionType::Top && ui.has_more.get() && !ui.loading.get() {
+                    let first = ui.messages.item(0).and_downcast::<glib::BoxedAnyObject>();
+                    if let Some(first) = first {
+                        let id = first.borrow::<ipc::Message>().id.clone();
+                        ui.load_messages(id);
+                    }
                 }
             }
         ));
@@ -214,6 +268,8 @@ impl Window {
             Some(event::Kind::ChatChanged(chat)) if self.is_current(&chat.account_id) => {
                 self.upsert_chat(chat)
             }
+            Some(event::Kind::Messages(list)) => self.add_page(list.messages),
+            Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => self.add_message(msg),
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
                 self.link.set_description(Some(
@@ -307,6 +363,90 @@ impl Window {
         }
         self.current_chat.replace(Some(chat.jid.clone()));
         self.content.set_title(&chat_title(chat));
+        self.content_stack.set_visible_child_name("messages");
+        self.messages.remove_all();
+        self.load_messages(String::new());
+        if chat.unread_count > 0 {
+            self.mark_read();
+        }
+    }
+
+    fn is_open(&self, msg: &ipc::Message) -> bool {
+        self.is_current(&msg.account_id)
+            && self.current_chat.borrow().as_deref() == Some(msg.chat_jid.as_str())
+    }
+
+    /// Account and chat ids of the open chat.
+    fn open_ids(&self) -> Option<(String, String)> {
+        let account = self.account.borrow().as_ref()?.id.clone();
+        Some((account, self.current_chat.borrow().clone()?))
+    }
+
+    fn load_messages(&self, before_id: String) {
+        let Some((account_id, chat_jid)) = self.open_ids() else {
+            return;
+        };
+        self.loading.set(true);
+        self.send(request::Kind::ListMessages(ipc::ListMessages {
+            account_id,
+            chat_jid,
+            before_id,
+            limit: PAGE_SIZE,
+        }));
+    }
+
+    fn mark_read(&self) {
+        if let Some((account_id, chat_jid)) = self.open_ids() {
+            self.send(request::Kind::MarkRead(ipc::MarkRead {
+                account_id,
+                chat_jid,
+            }));
+        }
+    }
+
+    /// Prepends an older page; the first page also scrolls to the newest message.
+    fn add_page(&self, page: Vec<ipc::Message>) {
+        self.loading.set(false);
+        // A page for a chat that is no longer open is dropped.
+        if !page.first().is_some_and(|m| self.is_open(m)) {
+            self.has_more.set(false);
+            return;
+        }
+        self.has_more.set(page.len() == PAGE_SIZE as usize);
+        let first_page = self.messages.n_items() == 0;
+        let items: Vec<_> = page
+            .into_iter()
+            .rev()
+            .map(glib::BoxedAnyObject::new)
+            .collect();
+        self.messages.splice(0, 0, &items);
+        if first_page {
+            self.scroll_to_bottom();
+        }
+    }
+
+    fn add_message(&self, msg: ipc::Message) {
+        let adj = self.message_scroll.vadjustment();
+        let at_bottom = adj.value() + adj.page_size() >= adj.upper() - 48.0;
+        let incoming = !msg.from_me;
+        self.messages.append(&glib::BoxedAnyObject::new(msg));
+        if at_bottom || !incoming {
+            self.scroll_to_bottom();
+        }
+        let window = self.toasts.root().and_downcast::<gtk::Window>();
+        if incoming && window.is_some_and(|w| w.is_active()) {
+            self.mark_read();
+        }
+    }
+
+    fn scroll_to_bottom(&self) {
+        let (list, n) = (self.message_list.clone(), self.messages.n_items());
+        // After the new rows have been laid out.
+        glib::idle_add_local_once(move || {
+            if n > 0 {
+                list.scroll_to(n - 1, gtk::ListScrollFlags::NONE, None);
+            }
+        });
     }
 
     fn start_link(&self) {
@@ -368,6 +508,13 @@ fn format_time(ms: i64) -> String {
     at.format(format).map(Into::into).unwrap_or_default()
 }
 
+fn time_of_day(ms: i64) -> String {
+    glib::DateTime::from_unix_local(ms / 1000)
+        .and_then(|at| at.format("%H:%M"))
+        .map(Into::into)
+        .unwrap_or_default()
+}
+
 fn chat_row_factory() -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {
@@ -407,6 +554,72 @@ fn chat_row_factory() -> gtk::SignalListItemFactory {
         time.set_label(&format_time(chat.last_message_at_ms));
         unread.set_label(&chat.unread_count.to_string());
         unread.set_visible(chat.unread_count > 0);
+    });
+    factory
+}
+
+fn message_row_factory() -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, item| {
+        let item = item.downcast_ref::<gtk::ListItem>().unwrap();
+        item.set_activatable(false);
+        item.set_selectable(false);
+        let sender = gtk::Label::builder()
+            .xalign(0.0)
+            .css_classes(["caption-heading", "accent"])
+            .build();
+        let text = gtk::Label::builder()
+            .xalign(0.0)
+            .wrap(true)
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
+            .max_width_chars(60)
+            .build();
+        let time = gtk::Label::builder()
+            .halign(gtk::Align::End)
+            .css_classes(["caption", "dim-label"])
+            .build();
+        let bubble = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .hexpand(true)
+            .css_classes(["bubble"])
+            .build();
+        bubble.append(&sender);
+        bubble.append(&text);
+        bubble.append(&time);
+        let row = gtk::Box::builder()
+            .margin_start(12)
+            .margin_end(12)
+            .margin_top(3)
+            .margin_bottom(3)
+            .build();
+        row.append(&bubble);
+        item.set_child(Some(&row));
+    });
+    factory.connect_bind(|_, item| {
+        let item = item.downcast_ref::<gtk::ListItem>().unwrap();
+        let msg = item.item().and_downcast::<glib::BoxedAnyObject>().unwrap();
+        let msg = msg.borrow::<ipc::Message>();
+        let bubble = item.child().and_then(|row| row.first_child()).unwrap();
+        let sender = bubble.first_child().and_downcast::<gtk::Label>().unwrap();
+        let text = sender.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let time = text.next_sibling().and_downcast::<gtk::Label>().unwrap();
+
+        let in_group = msg.chat_jid.ends_with("@g.us");
+        sender.set_visible(in_group && !msg.from_me);
+        sender.set_label(msg.sender_jid.split('@').next().unwrap_or_default());
+        text.set_label(&msg.text);
+        time.set_label(&time_of_day(msg.timestamp_ms));
+        bubble.set_halign(if msg.from_me {
+            gtk::Align::End
+        } else {
+            gtk::Align::Start
+        });
+        if msg.from_me {
+            bubble.add_css_class("mine");
+        } else {
+            bubble.remove_css_class("mine");
+        }
     });
     factory
 }
