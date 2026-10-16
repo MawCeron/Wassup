@@ -247,6 +247,18 @@ func (d *daemon) reply(req *ipc.Request) *ipc.Event {
 		} else {
 			ev.Kind = &ipc.Event_Messages{Messages: &ipc.MessageList{Messages: msgs}}
 		}
+	case *ipc.Request_SendText:
+		r := k.SendText
+		a := d.find(r.GetAccountId())
+		if a == nil {
+			fail(errors.New("unknown account"))
+		} else if msg, chat, err := a.sendText(context.Background(), r.GetChatJid(), r.GetText()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}
+			// TODO: other connected UIs only learn about it through the chat update.
+			d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+		}
 	case *ipc.Request_LinkAccount:
 		a := d.find(k.LinkAccount.GetAccountId())
 		if a == nil {

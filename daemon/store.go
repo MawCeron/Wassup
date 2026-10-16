@@ -6,8 +6,10 @@ import (
 	"errors"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
+	"google.golang.org/protobuf/proto"
 )
 
 // Our tables live next to whatsmeow's in the account database.
@@ -187,4 +189,38 @@ func (a *account) listMessages(ctx context.Context, chatJID, beforeID string, li
 		msgs = append(msgs, m)
 	}
 	return msgs, rows.Err()
+}
+
+// sendText sends a text message and stores it like a received one.
+func (a *account) sendText(ctx context.Context, chat, text string) (*ipc.Message, *ipc.Chat, error) {
+	if text == "" {
+		return nil, nil, errors.New("empty message")
+	}
+	if !a.client.IsLoggedIn() {
+		return nil, nil, errors.New("account is not connected")
+	}
+	to, err := types.ParseJID(chat)
+	if err != nil {
+		return nil, nil, err
+	}
+	resp, err := a.client.SendMessage(ctx, to, &waE2E.Message{Conversation: proto.String(text)})
+	if err != nil {
+		return nil, nil, err
+	}
+	// The server may route the message to the contact's other identity (LID or phone number).
+	if !resp.Chat.IsEmpty() {
+		to = resp.Chat
+	}
+	sender := resp.Sender
+	if sender.IsEmpty() {
+		sender = *a.client.Store.ID
+	}
+	return a.saveMessage(ctx, &events.Message{
+		Info: types.MessageInfo{
+			MessageSource: types.MessageSource{Chat: to, Sender: sender, IsFromMe: true, IsGroup: to.Server == types.GroupServer},
+			ID:            resp.ID,
+			Timestamp:     resp.Timestamp,
+		},
+		Message: &waE2E.Message{Conversation: proto.String(text)},
+	})
 }

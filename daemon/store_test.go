@@ -73,4 +73,11 @@ func TestSaveAndListMessages(t *testing.T) {
 	if err != nil || len(page) != 1 || page[0].Id != "A" {
 		t.Fatalf("page before B: %v, %v", page, err)
 	}
+
+	if _, _, err := a.sendText(ctx, chat.String(), ""); err == nil {
+		t.Fatal("sent an empty message")
+	}
+	if _, _, err := a.sendText(ctx, chat.String(), "hi"); err == nil {
+		t.Fatal("sent from an unlinked account")
+	}
 }
