@@ -38,6 +38,10 @@ pub struct Window {
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
     has_more: Cell<bool>,
+    composer: gtk::Entry,
+    content_view: adw::ToolbarView,
+    /// Id of the SendText request awaiting its reply, or 0.
+    sending: Cell<u64>,
     conn: RefCell<Option<ipc::Connection>>,
     account: RefCell<Option<ipc::Account>>,
 }
@@ -108,7 +112,28 @@ impl Window {
         let content_stack = gtk::Stack::new();
         content_stack.add_named(&placeholder, Some("empty"));
         content_stack.add_named(&message_scroll, Some("messages"));
-        let content = adw::NavigationPage::new(&with_header(&content_stack), "Wassup");
+        let composer = gtk::Entry::builder()
+            .placeholder_text("Message")
+            .hexpand(true)
+            .build();
+        let send_button = gtk::Button::builder()
+            .icon_name("mail-send-symbolic")
+            .tooltip_text("Send")
+            .css_classes(["circular", "suggested-action"])
+            .build();
+        let composer_bar = gtk::Box::builder()
+            .spacing(6)
+            .margin_top(6)
+            .margin_bottom(6)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        composer_bar.append(&composer);
+        composer_bar.append(&send_button);
+        let content_view = with_header(&content_stack);
+        content_view.add_bottom_bar(&composer_bar);
+        content_view.set_reveal_bottom_bars(false);
+        let content = adw::NavigationPage::new(&content_view, "Wassup");
         let split = adw::NavigationSplitView::builder()
             .sidebar(&adw::NavigationPage::new(&sidebar, "Chats"))
             .content(&content)
@@ -164,6 +189,9 @@ impl Window {
             message_scroll,
             loading: Cell::new(false),
             has_more: Cell::new(false),
+            composer,
+            content_view,
+            sending: Cell::new(0),
             conn: RefCell::new(None),
             account: RefCell::new(None),
         });
@@ -202,6 +230,16 @@ impl Window {
                 }
             }
         ));
+        ui.composer.connect_activate(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.send_text()
+        ));
+        send_button.connect_clicked(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.send_text()
+        ));
         ui.connect();
         window
     }
@@ -235,17 +273,23 @@ impl Window {
         });
     }
 
-    pub fn send(&self, kind: request::Kind) {
-        let failed = match &*self.conn.borrow() {
-            Some(conn) => conn.send(kind).err(),
-            None => return,
-        };
-        if let Some(e) = failed {
-            self.toast(&format!("Couldn't reach the daemon: {e}"));
-        }
+    /// Sends a request; returns its id, or None if it could not be sent.
+    pub fn send(&self, kind: request::Kind) -> Option<u64> {
+        let sent = self.conn.borrow().as_ref()?.send(kind);
+        sent.inspect_err(|e| self.toast(&format!("Couldn't reach the daemon: {e}")))
+            .ok()
     }
 
     fn handle(self: &Rc<Self>, event: ipc::Event) {
+        if event.request_id != 0 && event.request_id == self.sending.get() {
+            self.sending.set(0);
+            self.composer.set_sensitive(true);
+            // Keep the text so a failed message can be sent again.
+            if matches!(event.kind, Some(event::Kind::MessageReceived(_))) {
+                self.composer.set_text("");
+            }
+            self.composer.grab_focus();
+        }
         match event.kind {
             Some(event::Kind::Error(e)) => self.toast(&e.message),
             Some(event::Kind::Accounts(list)) => {
@@ -364,10 +408,31 @@ impl Window {
         self.current_chat.replace(Some(chat.jid.clone()));
         self.content.set_title(&chat_title(chat));
         self.content_stack.set_visible_child_name("messages");
+        self.content_view.set_reveal_bottom_bars(true);
+        self.composer.grab_focus();
         self.messages.remove_all();
         self.load_messages(String::new());
         if chat.unread_count > 0 {
             self.mark_read();
+        }
+    }
+
+    fn send_text(&self) {
+        let text = self.composer.text().trim().to_owned();
+        let Some((account_id, chat_jid)) = self.open_ids() else {
+            return;
+        };
+        if text.is_empty() || self.sending.get() != 0 {
+            return;
+        }
+        let request = request::Kind::SendText(ipc::SendText {
+            account_id,
+            chat_jid,
+            text,
+        });
+        if let Some(id) = self.send(request) {
+            self.sending.set(id);
+            self.composer.set_sensitive(false);
         }
     }
 

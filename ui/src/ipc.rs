@@ -45,14 +45,16 @@ impl Connection {
         Ok((conn, rx))
     }
 
-    pub fn send(&self, kind: request::Kind) -> io::Result<()> {
+    /// Sends a request and returns the id its reply will carry.
+    pub fn send(&self, kind: request::Kind) -> io::Result<u64> {
         let id = self.next_id.get() + 1;
         self.next_id.set(id);
         let req = Request {
             id,
             kind: Some(kind),
         };
-        write_frame(&mut &self.stream, &req)
+        write_frame(&mut &self.stream, &req)?;
+        Ok(id)
     }
 }
 
