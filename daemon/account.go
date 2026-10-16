@@ -40,7 +40,7 @@ func openAccounts(ctx context.Context, dataDir string) ([]*account, error) {
 			ids = append(ids, e.Name())
 		}
 	}
-	// ponytail: single-account phase creates its one account here; account management replaces this.
+	// TODO: create the only account here until accounts can be added over IPC.
 	if len(ids) == 0 {
 		ids = append(ids, rand.Text())
 	}

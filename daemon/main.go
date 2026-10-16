@@ -58,7 +58,7 @@ func run() error {
 	d := newDaemon(accounts)
 	for _, a := range accounts {
 		if a.client.Store.ID != nil {
-			// ponytail: a failed first connect is only logged; whatsmeow retries only after one success.
+			// TODO: a failed first connect is only logged; whatsmeow retries only after one success.
 			if err := a.client.Connect(); err != nil {
 				slog.Warn("connect", "account", a.id, "err", err)
 			}
@@ -126,7 +126,7 @@ func listen() (net.Listener, error) {
 // daemon serves the IPC clients and pushes account events to all of them.
 type daemon struct {
 	accounts []*account
-	// ponytail: one lock for every socket write; per-connection queues if a slow UI ever stalls the others.
+	// TODO: one lock for every socket write; per-connection queues if a slow UI ever stalls the others.
 	mu    sync.Mutex
 	conns map[net.Conn]struct{}
 }
