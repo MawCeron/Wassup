@@ -103,6 +103,8 @@ mod tests {
         assert!(built.success());
         let mut daemon = Command::new(&bin)
             .env("XDG_RUNTIME_DIR", &dir)
+            .env("XDG_DATA_HOME", &dir)
+            .env("XDG_CACHE_HOME", &dir)
             .spawn()
             .unwrap();
 
