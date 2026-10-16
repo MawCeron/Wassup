@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package wassup.ipc.v1;
+
+// Every frame on the socket is one of these two messages.
+
+// UI -> daemon.
+message Request {
+  // Echoed in the matching Event so the UI can pair them. Never 0.
+  uint64 id = 1;
+  oneof kind {
+    ListAccounts list_accounts = 2;
+    ListChats list_chats = 3;
+    ListMessages list_messages = 4;
+    SendText send_text = 5;
+  }
+}
+
+// Daemon -> UI. Either the reply to a Request or a pushed update.
+message Event {
+  // Id of the Request this answers; 0 for unsolicited updates.
+  uint64 request_id = 1;
+  oneof kind {
+    Error error = 2;
+    AccountList accounts = 3;
+    ChatList chats = 4;
+    MessageList messages = 5;
+    Account account_changed = 6;
+    Chat chat_changed = 7;
+    Message message_received = 8;
+  }
+}
+
+message ListAccounts {}
+
+message ListChats {
+  string account_id = 1;
+}
+
+// Newest first. Pages backwards from before_id; empty means latest.
+message ListMessages {
+  string account_id = 1;
+  string chat_jid = 2;
+  string before_id = 3;
+  uint32 limit = 4;
+}
+
+// Answered with message_received carrying the stored message, or error.
+message SendText {
+  string account_id = 1;
+  string chat_jid = 2;
+  string text = 3;
+}
+
+message Error {
+  string message = 1;
+}
+
+message AccountList {
+  repeated Account accounts = 1;
+}
+
+message ChatList {
+  repeated Chat chats = 1;
+}
+
+message MessageList {
+  repeated Message messages = 1;
+}
+
+enum ConnectionState {
+  CONNECTION_STATE_UNSPECIFIED = 0;
+  CONNECTION_STATE_DISCONNECTED = 1;
+  CONNECTION_STATE_CONNECTING = 2;
+  CONNECTION_STATE_CONNECTED = 3;
+  CONNECTION_STATE_LOGGED_OUT = 4;
+}
+
+message Account {
+  string id = 1;
+  string jid = 2;
+  string push_name = 3;
+  ConnectionState state = 4;
+}
+
+message Chat {
+  string account_id = 1;
+  string jid = 2;
+  string name = 3;
+  bool is_group = 4;
+  uint32 unread_count = 5;
+  int64 last_message_at_ms = 6;
+}
+
+message Message {
+  string account_id = 1;
+  string chat_jid = 2;
+  string id = 3;
+  string sender_jid = 4;
+  bool from_me = 5;
+  int64 timestamp_ms = 6;
+  string text = 7;
+}
