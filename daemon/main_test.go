@@ -18,7 +18,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	go serve(ln)
+	go serve(ln, nil)
 
 	path, _ := socketPath()
 	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o600 {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,12 +41,19 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	// Listen first: it refuses to start if another daemon already owns the databases.
 	ln, err := listen()
 	if err != nil {
 		return err
 	}
-	slog.Info("started", "socket", ln.Addr(), "data", data, "cache", cache)
-	serve(ln)
+	accounts, err := openAccounts(context.Background(), data)
+	if err != nil {
+		ln.Close()
+		return err
+	}
+	defer closeAccounts(accounts)
+	slog.Info("started", "socket", ln.Addr(), "data", data, "cache", cache, "accounts", len(accounts))
+	serve(ln, accounts)
 	return nil
 }
 
@@ -103,7 +111,7 @@ func listen() (net.Listener, error) {
 	return ln, nil
 }
 
-func serve(ln net.Listener) {
+func serve(ln net.Listener, accounts []*account) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -112,11 +120,11 @@ func serve(ln net.Listener) {
 			}
 			return
 		}
-		go handle(conn)
+		go handle(conn, accounts)
 	}
 }
 
-func handle(conn net.Conn) {
+func handle(conn net.Conn, accounts []*account) {
 	defer conn.Close()
 	r := bufio.NewReader(conn)
 	for {
@@ -128,18 +136,22 @@ func handle(conn net.Conn) {
 			return
 		}
 		slog.Debug("request", "id", req.GetId(), "kind", fmt.Sprintf("%T", req.Kind))
-		if _, err := protodelim.MarshalTo(conn, reply(&req)); err != nil {
+		if _, err := protodelim.MarshalTo(conn, reply(&req, accounts)); err != nil {
 			slog.Warn("write event", "err", err)
 			return
 		}
 	}
 }
 
-func reply(req *ipc.Request) *ipc.Event {
+func reply(req *ipc.Request, accounts []*account) *ipc.Event {
 	ev := &ipc.Event{RequestId: req.GetId()}
 	switch req.Kind.(type) {
 	case *ipc.Request_ListAccounts:
-		ev.Kind = &ipc.Event_Accounts{Accounts: &ipc.AccountList{}}
+		list := &ipc.AccountList{}
+		for _, a := range accounts {
+			list.Accounts = append(list.Accounts, a.info())
+		}
+		ev.Kind = &ipc.Event_Accounts{Accounts: list}
 	default:
 		ev.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: "not implemented"}}
 	}
