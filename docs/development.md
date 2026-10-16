@@ -35,3 +35,14 @@ Run from `ui/`:
 | Static analysis | `cargo clippy -- -D warnings` |
 
 Formatting and lint rules are the tools' defaults; no config files.
+
+## IPC code generation
+
+`proto/ipc.proto` is the single source for both sides.
+
+- **Go:** run `go generate ./...` from `daemon/` after changing the schema,
+  and commit `daemon/ipc/ipc.pb.go`. `protoc-gen-go` is pinned as a tool in
+  `daemon/go.mod`, so no global install is needed.
+- **Rust:** `ui/build.rs` regenerates the types on every `cargo build`
+  that sees a schema change; nothing is committed. It needs `protoc` in
+  `PATH`.
