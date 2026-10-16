@@ -38,6 +38,11 @@ Run from `ui/`:
 | Tests | `cargo test` |
 | Tests against the Go daemon | `cargo test -- --include-ignored` |
 
+Run the UI with `cargo run` while the daemon is running. The app is
+single-instance (`io.github.MawCeron.Wassup`): launching it again only
+brings the existing window to the front. An unlinked account shows the
+QR code to link it.
+
 Formatting and lint rules are the tools' defaults; no config files.
 
 ## IPC code generation
