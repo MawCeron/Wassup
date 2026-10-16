@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
-use gtk::{gdk, glib};
+use gtk::{gdk, gio, glib};
 
 use crate::ipc::{self, event, request};
 
@@ -17,6 +17,13 @@ pub struct Window {
     qr: gtk::Picture,
     link_retry: gtk::Button,
     linking: Cell<bool>,
+    split: adw::NavigationSplitView,
+    sidebar_title: adw::WindowTitle,
+    content: adw::NavigationPage,
+    chats: gio::ListStore,
+    chat_selection: gtk::SingleSelection,
+    chats_loaded: Cell<bool>,
+    current_chat: RefCell<Option<String>>,
     conn: RefCell<Option<ipc::Connection>>,
     account: RefCell<Option<ipc::Account>>,
 }
@@ -48,9 +55,42 @@ impl Window {
             .child(&link_box)
             .build();
 
+        let chats = gio::ListStore::new::<glib::BoxedAnyObject>();
+        let chat_selection = gtk::SingleSelection::builder()
+            .model(&chats)
+            .autoselect(false)
+            .can_unselect(true)
+            .build();
+        let chat_list = gtk::ListView::builder()
+            .model(&chat_selection)
+            .factory(&chat_row_factory())
+            .css_classes(["navigation-sidebar"])
+            .build();
+        let sidebar_title = adw::WindowTitle::new("Chats", "");
+        let sidebar_header = adw::HeaderBar::new();
+        sidebar_header.set_title_widget(Some(&sidebar_title));
+        let sidebar = adw::ToolbarView::new();
+        sidebar.add_top_bar(&sidebar_header);
+        sidebar.set_content(Some(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .child(&chat_list)
+                .build(),
+        ));
+        let placeholder = adw::StatusPage::builder()
+            .icon_name("chat-message-new-symbolic")
+            .title("No Chat Selected")
+            .build();
+        let content = adw::NavigationPage::new(&with_header(&placeholder), "Wassup");
+        let split = adw::NavigationSplitView::builder()
+            .sidebar(&adw::NavigationPage::new(&sidebar, "Chats"))
+            .content(&content)
+            .build();
+
         let stack = gtk::Stack::new();
         stack.add_named(&with_header(&status), Some("status"));
         stack.add_named(&with_header(&link), Some("link"));
+        stack.add_named(&split, Some("main"));
 
         let toasts = adw::ToastOverlay::new();
         toasts.set_child(Some(&stack));
@@ -61,6 +101,11 @@ impl Window {
             .default_height(640)
             .content(&toasts)
             .build();
+        let narrow = adw::Breakpoint::new(
+            adw::BreakpointCondition::parse("max-width: 600sp").expect("valid condition"),
+        );
+        narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
+        window.add_breakpoint(narrow);
 
         let ui = Rc::new(Self {
             stack,
@@ -71,6 +116,13 @@ impl Window {
             qr,
             link_retry,
             linking: Cell::new(false),
+            split,
+            sidebar_title,
+            content,
+            chats,
+            chat_selection,
+            chats_loaded: Cell::new(false),
+            current_chat: RefCell::new(None),
             conn: RefCell::new(None),
             account: RefCell::new(None),
         });
@@ -85,6 +137,17 @@ impl Window {
             ui,
             move |_| ui.start_link()
         ));
+        ui.chat_selection.connect_selected_item_notify(glib::clone!(
+            #[weak]
+            ui,
+            move |selection| {
+                // Re-sorting a chat briefly unselects it; that is not a user action.
+                if let Some(item) = selection.selected_item() {
+                    let chat = item.downcast::<glib::BoxedAnyObject>().unwrap();
+                    ui.open_chat(&chat.borrow::<ipc::Chat>());
+                }
+            }
+        ));
         ui.connect();
         window
     }
@@ -97,6 +160,8 @@ impl Window {
             }
         };
         self.conn.replace(Some(conn));
+        // Events may have been missed while disconnected.
+        self.chats_loaded.set(false);
         self.show_status("Connecting…", "", false);
         self.send(request::Kind::ListAccounts(ipc::ListAccounts {}));
 
@@ -139,6 +204,16 @@ impl Window {
             Some(event::Kind::AccountChanged(account)) if self.is_current(&account.id) => {
                 self.set_account(account)
             }
+            Some(event::Kind::Chats(list)) => {
+                self.chats.remove_all();
+                for chat in list.chats {
+                    self.chats.append(&glib::BoxedAnyObject::new(chat));
+                }
+                self.reselect_current();
+            }
+            Some(event::Kind::ChatChanged(chat)) if self.is_current(&chat.account_id) => {
+                self.upsert_chat(chat)
+            }
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
                 self.link.set_description(Some(
@@ -176,7 +251,62 @@ impl Window {
             return;
         }
         self.linking.set(false);
-        self.show_status(&format!("{state:?}"), &name, false);
+        let subtitle = match state {
+            ipc::ConnectionState::Connected => "",
+            ipc::ConnectionState::Connecting => "Connecting…",
+            _ => "Offline",
+        };
+        self.sidebar_title.set_subtitle(subtitle);
+        self.sidebar_title
+            .set_title(if name.is_empty() { "Chats" } else { &name });
+        self.stack.set_visible_child_name("main");
+        if !self.chats_loaded.replace(true) {
+            let account_id = self.account.borrow().as_ref().unwrap().id.clone();
+            self.send(request::Kind::ListChats(ipc::ListChats { account_id }));
+        }
+    }
+
+    fn chat_at(&self, pos: u32) -> Option<glib::BoxedAnyObject> {
+        self.chats.item(pos).and_downcast()
+    }
+
+    fn position_of(&self, jid: &str) -> Option<u32> {
+        (0..self.chats.n_items()).find(|&i| {
+            self.chat_at(i)
+                .is_some_and(|c| c.borrow::<ipc::Chat>().jid == jid)
+        })
+    }
+
+    /// Moves or inserts a chat, keeping the list newest first.
+    fn upsert_chat(&self, chat: ipc::Chat) {
+        if let Some(pos) = self.position_of(&chat.jid) {
+            self.chats.remove(pos);
+        }
+        let pos = (0..self.chats.n_items())
+            .find(|&i| {
+                self.chat_at(i).is_some_and(|c| {
+                    c.borrow::<ipc::Chat>().last_message_at_ms < chat.last_message_at_ms
+                })
+            })
+            .unwrap_or(self.chats.n_items());
+        self.chats.insert(pos, &glib::BoxedAnyObject::new(chat));
+        self.reselect_current();
+    }
+
+    fn reselect_current(&self) {
+        let current = self.current_chat.borrow().clone();
+        if let Some(pos) = current.and_then(|jid| self.position_of(&jid)) {
+            self.chat_selection.set_selected(pos);
+        }
+    }
+
+    fn open_chat(&self, chat: &ipc::Chat) {
+        self.split.set_show_content(true);
+        if self.current_chat.borrow().as_deref() == Some(chat.jid.as_str()) {
+            return;
+        }
+        self.current_chat.replace(Some(chat.jid.clone()));
+        self.content.set_title(&chat_title(chat));
     }
 
     fn start_link(&self) {
@@ -212,6 +342,73 @@ fn with_header(child: &impl IsA<gtk::Widget>) -> adw::ToolbarView {
     view.add_top_bar(&adw::HeaderBar::new());
     view.set_content(Some(child));
     view
+}
+
+/// A chat's name, or its phone number when the name is unknown.
+fn chat_title(chat: &ipc::Chat) -> String {
+    if !chat.name.is_empty() {
+        return chat.name.clone();
+    }
+    match chat.jid.split_once('@') {
+        Some((user, "s.whatsapp.net")) => format!("+{user}"),
+        Some((user, _)) => user.to_owned(),
+        None => chat.jid.clone(),
+    }
+}
+
+/// Time of day for today, the date otherwise, in the user's locale.
+fn format_time(ms: i64) -> String {
+    let (Ok(at), Ok(now)) = (
+        glib::DateTime::from_unix_local(ms / 1000),
+        glib::DateTime::now_local(),
+    ) else {
+        return String::new();
+    };
+    let format = if at.ymd() == now.ymd() { "%H:%M" } else { "%x" };
+    at.format(format).map(Into::into).unwrap_or_default()
+}
+
+fn chat_row_factory() -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, item| {
+        let title = gtk::Label::builder()
+            .xalign(0.0)
+            .hexpand(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["heading"])
+            .build();
+        let time = gtk::Label::builder()
+            .css_classes(["dim-label", "caption"])
+            .build();
+        let unread = gtk::Label::builder()
+            .css_classes(["caption-heading", "accent"])
+            .build();
+        let row = gtk::Box::builder()
+            .spacing(12)
+            .margin_top(6)
+            .margin_bottom(6)
+            .build();
+        row.append(&title);
+        row.append(&time);
+        row.append(&unread);
+        item.downcast_ref::<gtk::ListItem>()
+            .unwrap()
+            .set_child(Some(&row));
+    });
+    factory.connect_bind(|_, item| {
+        let item = item.downcast_ref::<gtk::ListItem>().unwrap();
+        let chat = item.item().and_downcast::<glib::BoxedAnyObject>().unwrap();
+        let chat = chat.borrow::<ipc::Chat>();
+        let row = item.child().unwrap();
+        let title = row.first_child().and_downcast::<gtk::Label>().unwrap();
+        let time = title.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let unread = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        title.set_label(&chat_title(&chat));
+        time.set_label(&format_time(chat.last_message_at_ms));
+        unread.set_label(&chat.unread_count.to_string());
+        unread.set_visible(chat.unread_count > 0);
+    });
+    factory
 }
 
 /// Pixels per QR module, and the blank margin the QR spec asks for, in modules.
