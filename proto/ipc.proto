@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package wassup.ipc.v1;
 
+option go_package = "github.com/MawCeron/Wassup/daemon/ipc";
+
 // Every frame on the socket is one of these two messages.
 
 // UI -> daemon.
