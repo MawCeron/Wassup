@@ -1,2 +1,5 @@
 # Rust build output
 target/
+
+# Go build output
+/daemon/daemon
