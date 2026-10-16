@@ -15,6 +15,7 @@ message Request {
     ListChats list_chats = 3;
     ListMessages list_messages = 4;
     SendText send_text = 5;
+    LinkAccount link_account = 6;
   }
 }
 
@@ -30,6 +31,8 @@ message Event {
     Account account_changed = 6;
     Chat chat_changed = 7;
     Message message_received = 8;
+    QrCode qr_code = 9;
+    LinkFailed link_failed = 10;
   }
 }
 
@@ -52,6 +55,25 @@ message SendText {
   string account_id = 1;
   string chat_jid = 2;
   string text = 3;
+}
+
+// Starts QR linking for an unlinked account. Answered with account_changed
+// (CONNECTING) or error; then qr_code events follow until account_changed
+// (CONNECTED) or link_failed.
+message LinkAccount {
+  string account_id = 1;
+}
+
+// Text to render as a QR code. Replaced by a new one after timeout_ms.
+message QrCode {
+  string account_id = 1;
+  string code = 2;
+  uint32 timeout_ms = 3;
+}
+
+message LinkFailed {
+  string account_id = 1;
+  string reason = 2;
 }
 
 message Error {

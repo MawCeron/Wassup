@@ -87,6 +87,7 @@ type Request struct {
 	//	*Request_ListChats
 	//	*Request_ListMessages
 	//	*Request_SendText
+	//	*Request_LinkAccount
 	Kind          isRequest_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -172,6 +173,15 @@ func (x *Request) GetSendText() *SendText {
 	return nil
 }
 
+func (x *Request) GetLinkAccount() *LinkAccount {
+	if x != nil {
+		if x, ok := x.Kind.(*Request_LinkAccount); ok {
+			return x.LinkAccount
+		}
+	}
+	return nil
+}
+
 type isRequest_Kind interface {
 	isRequest_Kind()
 }
@@ -192,6 +202,10 @@ type Request_SendText struct {
 	SendText *SendText `protobuf:"bytes,5,opt,name=send_text,json=sendText,proto3,oneof"`
 }
 
+type Request_LinkAccount struct {
+	LinkAccount *LinkAccount `protobuf:"bytes,6,opt,name=link_account,json=linkAccount,proto3,oneof"`
+}
+
 func (*Request_ListAccounts) isRequest_Kind() {}
 
 func (*Request_ListChats) isRequest_Kind() {}
@@ -199,6 +213,8 @@ func (*Request_ListChats) isRequest_Kind() {}
 func (*Request_ListMessages) isRequest_Kind() {}
 
 func (*Request_SendText) isRequest_Kind() {}
+
+func (*Request_LinkAccount) isRequest_Kind() {}
 
 // Daemon -> UI. Either the reply to a Request or a pushed update.
 type Event struct {
@@ -214,6 +230,8 @@ type Event struct {
 	//	*Event_AccountChanged
 	//	*Event_ChatChanged
 	//	*Event_MessageReceived
+	//	*Event_QrCode
+	//	*Event_LinkFailed
 	Kind          isEvent_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -326,6 +344,24 @@ func (x *Event) GetMessageReceived() *Message {
 	return nil
 }
 
+func (x *Event) GetQrCode() *QrCode {
+	if x != nil {
+		if x, ok := x.Kind.(*Event_QrCode); ok {
+			return x.QrCode
+		}
+	}
+	return nil
+}
+
+func (x *Event) GetLinkFailed() *LinkFailed {
+	if x != nil {
+		if x, ok := x.Kind.(*Event_LinkFailed); ok {
+			return x.LinkFailed
+		}
+	}
+	return nil
+}
+
 type isEvent_Kind interface {
 	isEvent_Kind()
 }
@@ -358,6 +394,14 @@ type Event_MessageReceived struct {
 	MessageReceived *Message `protobuf:"bytes,8,opt,name=message_received,json=messageReceived,proto3,oneof"`
 }
 
+type Event_QrCode struct {
+	QrCode *QrCode `protobuf:"bytes,9,opt,name=qr_code,json=qrCode,proto3,oneof"`
+}
+
+type Event_LinkFailed struct {
+	LinkFailed *LinkFailed `protobuf:"bytes,10,opt,name=link_failed,json=linkFailed,proto3,oneof"`
+}
+
 func (*Event_Error) isEvent_Kind() {}
 
 func (*Event_Accounts) isEvent_Kind() {}
@@ -371,6 +415,10 @@ func (*Event_AccountChanged) isEvent_Kind() {}
 func (*Event_ChatChanged) isEvent_Kind() {}
 
 func (*Event_MessageReceived) isEvent_Kind() {}
+
+func (*Event_QrCode) isEvent_Kind() {}
+
+func (*Event_LinkFailed) isEvent_Kind() {}
 
 type ListAccounts struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -582,6 +630,166 @@ func (x *SendText) GetText() string {
 	return ""
 }
 
+// Starts QR linking for an unlinked account. Answered with account_changed
+// (CONNECTING) or error; then qr_code events follow until account_changed
+// (CONNECTED) or link_failed.
+type LinkAccount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkAccount) Reset() {
+	*x = LinkAccount{}
+	mi := &file_ipc_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkAccount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkAccount) ProtoMessage() {}
+
+func (x *LinkAccount) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkAccount.ProtoReflect.Descriptor instead.
+func (*LinkAccount) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LinkAccount) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+// Text to render as a QR code. Replaced by a new one after timeout_ms.
+type QrCode struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	TimeoutMs     uint32                 `protobuf:"varint,3,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QrCode) Reset() {
+	*x = QrCode{}
+	mi := &file_ipc_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QrCode) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QrCode) ProtoMessage() {}
+
+func (x *QrCode) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QrCode.ProtoReflect.Descriptor instead.
+func (*QrCode) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *QrCode) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *QrCode) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *QrCode) GetTimeoutMs() uint32 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+type LinkFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkFailed) Reset() {
+	*x = LinkFailed{}
+	mi := &file_ipc_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkFailed) ProtoMessage() {}
+
+func (x *LinkFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkFailed.ProtoReflect.Descriptor instead.
+func (*LinkFailed) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LinkFailed) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *LinkFailed) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 type Error struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
@@ -591,7 +799,7 @@ type Error struct {
 
 func (x *Error) Reset() {
 	*x = Error{}
-	mi := &file_ipc_proto_msgTypes[6]
+	mi := &file_ipc_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -603,7 +811,7 @@ func (x *Error) String() string {
 func (*Error) ProtoMessage() {}
 
 func (x *Error) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[6]
+	mi := &file_ipc_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -616,7 +824,7 @@ func (x *Error) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Error.ProtoReflect.Descriptor instead.
 func (*Error) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{6}
+	return file_ipc_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Error) GetMessage() string {
@@ -635,7 +843,7 @@ type AccountList struct {
 
 func (x *AccountList) Reset() {
 	*x = AccountList{}
-	mi := &file_ipc_proto_msgTypes[7]
+	mi := &file_ipc_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +855,7 @@ func (x *AccountList) String() string {
 func (*AccountList) ProtoMessage() {}
 
 func (x *AccountList) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[7]
+	mi := &file_ipc_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +868,7 @@ func (x *AccountList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountList.ProtoReflect.Descriptor instead.
 func (*AccountList) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{7}
+	return file_ipc_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AccountList) GetAccounts() []*Account {
@@ -679,7 +887,7 @@ type ChatList struct {
 
 func (x *ChatList) Reset() {
 	*x = ChatList{}
-	mi := &file_ipc_proto_msgTypes[8]
+	mi := &file_ipc_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +899,7 @@ func (x *ChatList) String() string {
 func (*ChatList) ProtoMessage() {}
 
 func (x *ChatList) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[8]
+	mi := &file_ipc_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +912,7 @@ func (x *ChatList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatList.ProtoReflect.Descriptor instead.
 func (*ChatList) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{8}
+	return file_ipc_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ChatList) GetChats() []*Chat {
@@ -723,7 +931,7 @@ type MessageList struct {
 
 func (x *MessageList) Reset() {
 	*x = MessageList{}
-	mi := &file_ipc_proto_msgTypes[9]
+	mi := &file_ipc_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -735,7 +943,7 @@ func (x *MessageList) String() string {
 func (*MessageList) ProtoMessage() {}
 
 func (x *MessageList) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[9]
+	mi := &file_ipc_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -748,7 +956,7 @@ func (x *MessageList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageList.ProtoReflect.Descriptor instead.
 func (*MessageList) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{9}
+	return file_ipc_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *MessageList) GetMessages() []*Message {
@@ -770,7 +978,7 @@ type Account struct {
 
 func (x *Account) Reset() {
 	*x = Account{}
-	mi := &file_ipc_proto_msgTypes[10]
+	mi := &file_ipc_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -782,7 +990,7 @@ func (x *Account) String() string {
 func (*Account) ProtoMessage() {}
 
 func (x *Account) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[10]
+	mi := &file_ipc_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -795,7 +1003,7 @@ func (x *Account) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Account.ProtoReflect.Descriptor instead.
 func (*Account) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{10}
+	return file_ipc_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Account) GetId() string {
@@ -840,7 +1048,7 @@ type Chat struct {
 
 func (x *Chat) Reset() {
 	*x = Chat{}
-	mi := &file_ipc_proto_msgTypes[11]
+	mi := &file_ipc_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -852,7 +1060,7 @@ func (x *Chat) String() string {
 func (*Chat) ProtoMessage() {}
 
 func (x *Chat) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[11]
+	mi := &file_ipc_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -865,7 +1073,7 @@ func (x *Chat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Chat.ProtoReflect.Descriptor instead.
 func (*Chat) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{11}
+	return file_ipc_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Chat) GetAccountId() string {
@@ -925,7 +1133,7 @@ type Message struct {
 
 func (x *Message) Reset() {
 	*x = Message{}
-	mi := &file_ipc_proto_msgTypes[12]
+	mi := &file_ipc_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -937,7 +1145,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[12]
+	mi := &file_ipc_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -950,7 +1158,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{12}
+	return file_ipc_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Message) GetAccountId() string {
@@ -1006,15 +1214,16 @@ var File_ipc_proto protoreflect.FileDescriptor
 
 const file_ipc_proto_rawDesc = "" +
 	"\n" +
-	"\tipc.proto\x12\rwassup.ipc.v1\"\x9c\x02\n" +
+	"\tipc.proto\x12\rwassup.ipc.v1\"\xdd\x02\n" +
 	"\aRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12B\n" +
 	"\rlist_accounts\x18\x02 \x01(\v2\x1b.wassup.ipc.v1.ListAccountsH\x00R\flistAccounts\x129\n" +
 	"\n" +
 	"list_chats\x18\x03 \x01(\v2\x18.wassup.ipc.v1.ListChatsH\x00R\tlistChats\x12B\n" +
 	"\rlist_messages\x18\x04 \x01(\v2\x1b.wassup.ipc.v1.ListMessagesH\x00R\flistMessages\x126\n" +
-	"\tsend_text\x18\x05 \x01(\v2\x17.wassup.ipc.v1.SendTextH\x00R\bsendTextB\x06\n" +
-	"\x04kind\"\xc3\x03\n" +
+	"\tsend_text\x18\x05 \x01(\v2\x17.wassup.ipc.v1.SendTextH\x00R\bsendText\x12?\n" +
+	"\flink_account\x18\x06 \x01(\v2\x1a.wassup.ipc.v1.LinkAccountH\x00R\vlinkAccountB\x06\n" +
+	"\x04kind\"\xb3\x04\n" +
 	"\x05Event\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12,\n" +
@@ -1024,7 +1233,11 @@ const file_ipc_proto_rawDesc = "" +
 	"\bmessages\x18\x05 \x01(\v2\x1a.wassup.ipc.v1.MessageListH\x00R\bmessages\x12A\n" +
 	"\x0faccount_changed\x18\x06 \x01(\v2\x16.wassup.ipc.v1.AccountH\x00R\x0eaccountChanged\x128\n" +
 	"\fchat_changed\x18\a \x01(\v2\x13.wassup.ipc.v1.ChatH\x00R\vchatChanged\x12C\n" +
-	"\x10message_received\x18\b \x01(\v2\x16.wassup.ipc.v1.MessageH\x00R\x0fmessageReceivedB\x06\n" +
+	"\x10message_received\x18\b \x01(\v2\x16.wassup.ipc.v1.MessageH\x00R\x0fmessageReceived\x120\n" +
+	"\aqr_code\x18\t \x01(\v2\x15.wassup.ipc.v1.QrCodeH\x00R\x06qrCode\x12<\n" +
+	"\vlink_failed\x18\n" +
+	" \x01(\v2\x19.wassup.ipc.v1.LinkFailedH\x00R\n" +
+	"linkFailedB\x06\n" +
 	"\x04kind\"\x0e\n" +
 	"\fListAccounts\"*\n" +
 	"\tListChats\x12\x1d\n" +
@@ -1040,7 +1253,21 @@ const file_ipc_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
 	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\"!\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\",\n" +
+	"\vLinkAccount\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"Z\n" +
+	"\x06QrCode\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1d\n" +
+	"\n" +
+	"timeout_ms\x18\x03 \x01(\rR\ttimeoutMs\"C\n" +
+	"\n" +
+	"LinkFailed\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"!\n" +
 	"\x05Error\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"A\n" +
 	"\vAccountList\x122\n" +
@@ -1092,7 +1319,7 @@ func file_ipc_proto_rawDescGZIP() []byte {
 }
 
 var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_ipc_proto_goTypes = []any{
 	(ConnectionState)(0), // 0: wassup.ipc.v1.ConnectionState
 	(*Request)(nil),      // 1: wassup.ipc.v1.Request
@@ -1101,35 +1328,41 @@ var file_ipc_proto_goTypes = []any{
 	(*ListChats)(nil),    // 4: wassup.ipc.v1.ListChats
 	(*ListMessages)(nil), // 5: wassup.ipc.v1.ListMessages
 	(*SendText)(nil),     // 6: wassup.ipc.v1.SendText
-	(*Error)(nil),        // 7: wassup.ipc.v1.Error
-	(*AccountList)(nil),  // 8: wassup.ipc.v1.AccountList
-	(*ChatList)(nil),     // 9: wassup.ipc.v1.ChatList
-	(*MessageList)(nil),  // 10: wassup.ipc.v1.MessageList
-	(*Account)(nil),      // 11: wassup.ipc.v1.Account
-	(*Chat)(nil),         // 12: wassup.ipc.v1.Chat
-	(*Message)(nil),      // 13: wassup.ipc.v1.Message
+	(*LinkAccount)(nil),  // 7: wassup.ipc.v1.LinkAccount
+	(*QrCode)(nil),       // 8: wassup.ipc.v1.QrCode
+	(*LinkFailed)(nil),   // 9: wassup.ipc.v1.LinkFailed
+	(*Error)(nil),        // 10: wassup.ipc.v1.Error
+	(*AccountList)(nil),  // 11: wassup.ipc.v1.AccountList
+	(*ChatList)(nil),     // 12: wassup.ipc.v1.ChatList
+	(*MessageList)(nil),  // 13: wassup.ipc.v1.MessageList
+	(*Account)(nil),      // 14: wassup.ipc.v1.Account
+	(*Chat)(nil),         // 15: wassup.ipc.v1.Chat
+	(*Message)(nil),      // 16: wassup.ipc.v1.Message
 }
 var file_ipc_proto_depIdxs = []int32{
 	3,  // 0: wassup.ipc.v1.Request.list_accounts:type_name -> wassup.ipc.v1.ListAccounts
 	4,  // 1: wassup.ipc.v1.Request.list_chats:type_name -> wassup.ipc.v1.ListChats
 	5,  // 2: wassup.ipc.v1.Request.list_messages:type_name -> wassup.ipc.v1.ListMessages
 	6,  // 3: wassup.ipc.v1.Request.send_text:type_name -> wassup.ipc.v1.SendText
-	7,  // 4: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
-	8,  // 5: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
-	9,  // 6: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
-	10, // 7: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
-	11, // 8: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
-	12, // 9: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
-	13, // 10: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
-	11, // 11: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
-	12, // 12: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
-	13, // 13: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
-	0,  // 14: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	7,  // 4: wassup.ipc.v1.Request.link_account:type_name -> wassup.ipc.v1.LinkAccount
+	10, // 5: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
+	11, // 6: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
+	12, // 7: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
+	13, // 8: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
+	14, // 9: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
+	15, // 10: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
+	16, // 11: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
+	8,  // 12: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
+	9,  // 13: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
+	14, // 14: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
+	15, // 15: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
+	16, // 16: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
+	0,  // 17: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
+	18, // [18:18] is the sub-list for method output_type
+	18, // [18:18] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_ipc_proto_init() }
@@ -1142,6 +1375,7 @@ func file_ipc_proto_init() {
 		(*Request_ListChats)(nil),
 		(*Request_ListMessages)(nil),
 		(*Request_SendText)(nil),
+		(*Request_LinkAccount)(nil),
 	}
 	file_ipc_proto_msgTypes[1].OneofWrappers = []any{
 		(*Event_Error)(nil),
@@ -1151,6 +1385,8 @@ func file_ipc_proto_init() {
 		(*Event_AccountChanged)(nil),
 		(*Event_ChatChanged)(nil),
 		(*Event_MessageReceived)(nil),
+		(*Event_QrCode)(nil),
+		(*Event_LinkFailed)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1158,7 +1394,7 @@ func file_ipc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipc_proto_rawDesc), len(file_ipc_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   13,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
