@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	_ "modernc.org/sqlite"
 )
@@ -164,3 +166,13 @@ func (w waLogger) Warnf(msg string, args ...any)  { w.l.Warn(fmt.Sprintf(msg, ar
 func (w waLogger) Infof(msg string, args ...any)  { w.l.Info(fmt.Sprintf(msg, args...)) }
 func (w waLogger) Debugf(msg string, args ...any) { w.l.Debug(fmt.Sprintf(msg, args...)) }
 func (w waLogger) Sub(module string) waLog.Logger { return waLogger{w.l.With("module", module)} }
+
+// muted reports whether the user silenced the chat in WhatsApp.
+func (a *account) muted(ctx context.Context, chat types.JID) bool {
+	settings := a.client.Store.ChatSettings
+	if settings == nil { // Nil until the device is linked.
+		return false
+	}
+	s, err := settings.GetChatSettings(ctx, chat)
+	return err == nil && s.MutedUntil.After(time.Now())
+}

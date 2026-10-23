@@ -44,6 +44,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	configDir, err := xdgDir("XDG_CONFIG_HOME", ".config")
+	if err != nil {
+		return err
+	}
+	cfg, err := loadConfig(configDir)
+	if err != nil {
+		return err
+	}
 	// Listen first: it refuses to start if another daemon already owns the databases.
 	ln, err := listen()
 	if err != nil {
@@ -55,7 +63,7 @@ func run() error {
 		return err
 	}
 	defer closeAccounts(accounts)
-	d := newDaemon(accounts)
+	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
 	for _, a := range accounts {
 		if a.client.Store.ID != nil {
 			// TODO: a failed first connect is only logged; whatsmeow retries only after one success.
@@ -126,13 +134,14 @@ func listen() (net.Listener, error) {
 // daemon serves the IPC clients and pushes account events to all of them.
 type daemon struct {
 	accounts []*account
+	notify   *notifier
 	// TODO: one lock for every socket write; per-connection queues if a slow UI ever stalls the others.
 	mu    sync.Mutex
 	conns map[net.Conn]struct{}
 }
 
-func newDaemon(accounts []*account) *daemon {
-	d := &daemon{accounts: accounts, conns: map[net.Conn]struct{}{}}
+func newDaemon(accounts []*account, notify *notifier) *daemon {
+	d := &daemon{accounts: accounts, notify: notify, conns: map[net.Conn]struct{}{}}
 	for _, a := range accounts {
 		a.client.AddEventHandler(func(evt any) {
 			switch e := evt.(type) {
@@ -160,6 +169,9 @@ func newDaemon(accounts []*account) *daemon {
 				} else if msg != nil {
 					d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageReceived{MessageReceived: msg}})
 					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+					if !msg.FromMe && !a.muted(context.Background(), e.Info.Chat) {
+						d.notify.message(chat, msg)
+					}
 				}
 			}
 		})
@@ -281,6 +293,7 @@ func (d *daemon) reply(req *ipc.Request) *ipc.Event {
 		} else if chat, err := a.markRead(context.Background(), k.MarkRead.GetChatJid()); err != nil {
 			fail(err)
 		} else {
+			d.notify.dismiss(a.id, chat.Jid)
 			ev.Kind = &ipc.Event_ChatChanged{ChatChanged: chat}
 		}
 	case *ipc.Request_LinkAccount:

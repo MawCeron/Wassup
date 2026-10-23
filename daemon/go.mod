@@ -5,6 +5,7 @@ go 1.26.9
 tool google.golang.org/protobuf/cmd/protoc-gen-go
 
 require (
+	github.com/godbus/dbus/v5 v5.2.2
 	go.mau.fi/whatsmeow v0.0.0-20261015105041-df33a485cc46
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.60.1

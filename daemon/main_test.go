@@ -18,7 +18,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	go newDaemon(nil).serve(ln)
+	go newDaemon(nil, nil).serve(ln)
 
 	path, _ := socketPath()
 	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o600 {
@@ -78,7 +78,7 @@ func TestBroadcastAndLinkErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	d := newDaemon(nil)
+	d := newDaemon(nil, nil)
 	go d.serve(ln)
 	path, _ := socketPath()
 
