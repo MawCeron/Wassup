@@ -99,5 +99,26 @@ An unknown option or a syntax error stops the daemon instead of being
 ignored, so a misspelled privacy option cannot silently turn itself off.
 
 Notifications go through `org.freedesktop.Notifications` on the session
-bus. Muted chats do not notify, each chat keeps a single notification
+bus. The chat open in a focused UI window is not notified. Muted chats do not notify, each chat keeps a single notification
 that newer messages replace, and reading the chat withdraws it.
+
+## Desktop integration
+
+Clicking a notification opens its chat. The daemon asks the UI to do it
+through D-Bus (`org.freedesktop.Application.ActivateAction`, action
+`open-chat`), which also starts the UI when it is closed. That needs the
+files in `packaging/` installed; for development, point them at the
+debug build:
+
+```sh
+mkdir -p ~/.local/share/dbus-1/services ~/.local/share/applications
+sed "s|/usr/bin/wassup|$PWD/ui/target/debug/wassup|" \
+  packaging/io.github.MawCeron.Wassup.service \
+  > ~/.local/share/dbus-1/services/io.github.MawCeron.Wassup.service
+sed "s|^Exec=wassup|Exec=$PWD/ui/target/debug/wassup|" \
+  packaging/io.github.MawCeron.Wassup.desktop \
+  > ~/.local/share/applications/io.github.MawCeron.Wassup.desktop
+```
+
+`wassup --toggle` shows the window, or closes it if it has focus. On
+Wayland, bind it to a key in Settings → Keyboard → Custom Shortcuts.
