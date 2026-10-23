@@ -8,6 +8,9 @@ use gtk::{gdk, gio, glib};
 
 use crate::ipc::{self, event, request};
 
+/// Widest a message bubble gets, in pixels, however wide the window.
+const BUBBLE_MAX_WIDTH: i32 = 520;
+
 /// Messages fetched per request when opening a chat or scrolling back.
 const PAGE_SIZE: u32 = 50;
 
@@ -928,7 +931,6 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
             .xalign(0.0)
             .wrap(true)
             .wrap_mode(gtk::pango::WrapMode::WordChar)
-            .max_width_chars(60)
             .build();
         let time = gtk::Label::builder()
             .css_classes(["caption", "dim-label"])
@@ -943,7 +945,6 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
         let bubble = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(2)
-            .hexpand(true)
             .css_classes(["bubble"])
             .build();
         bubble.append(&sender);
@@ -955,7 +956,15 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
             .margin_top(3)
             .margin_bottom(3)
             .build();
-        row.append(&bubble);
+        // A wrapping label asks for its whole text on one line; the clamp
+        // caps the bubble so long messages wrap instead of filling the view.
+        let clamp = adw::Clamp::builder()
+            .maximum_size(BUBBLE_MAX_WIDTH)
+            .tightening_threshold(BUBBLE_MAX_WIDTH)
+            .hexpand(true)
+            .child(&bubble)
+            .build();
+        row.append(&clamp);
         item.set_child(Some(&row));
     });
     let bound = status_labels.clone();
@@ -963,7 +972,8 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         let msg = item.item().and_downcast::<glib::BoxedAnyObject>().unwrap();
         let msg = msg.borrow::<ipc::Message>();
-        let bubble = item.child().and_then(|row| row.first_child()).unwrap();
+        let clamp = item.child().and_then(|row| row.first_child()).unwrap();
+        let bubble = clamp.first_child().unwrap();
         let sender = bubble.first_child().and_downcast::<gtk::Label>().unwrap();
         let text = sender.next_sibling().and_downcast::<gtk::Label>().unwrap();
         let footer = text.next_sibling().unwrap();
@@ -983,7 +993,7 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
         bound
             .borrow_mut()
             .insert(msg.id.clone(), status.downgrade());
-        bubble.set_halign(if msg.from_me {
+        clamp.set_halign(if msg.from_me {
             gtk::Align::End
         } else {
             gtk::Align::Start
