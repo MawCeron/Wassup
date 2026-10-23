@@ -551,13 +551,21 @@ fn with_header(child: &impl IsA<gtk::Widget>) -> adw::ToolbarView {
 
 /// A chat's name, or its phone number when the name is unknown.
 fn chat_title(chat: &ipc::Chat) -> String {
-    if !chat.name.is_empty() {
-        return chat.name.clone();
+    if chat.name.is_empty() {
+        user_label(&chat.jid)
+    } else {
+        chat.name.clone()
     }
-    match chat.jid.split_once('@') {
+}
+
+/// How to show a user without a known name. Hidden (LID) ids are not phone
+/// numbers, so they are never shown as one.
+fn user_label(jid: &str) -> String {
+    match jid.split_once('@') {
         Some((user, "s.whatsapp.net")) => format!("+{user}"),
+        Some((_, "lid")) => "Unknown contact".to_owned(),
         Some((user, _)) => user.to_owned(),
-        None => chat.jid.clone(),
+        None => jid.to_owned(),
     }
 }
 
@@ -672,7 +680,11 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
 
         let in_group = msg.chat_jid.ends_with("@g.us");
         sender.set_visible(in_group && !msg.from_me);
-        sender.set_label(msg.sender_jid.split('@').next().unwrap_or_default());
+        if msg.sender_name.is_empty() {
+            sender.set_label(&user_label(&msg.sender_jid));
+        } else {
+            sender.set_label(&msg.sender_name);
+        }
         text.set_label(&msg.text);
         time.set_label(&time_of_day(msg.timestamp_ms));
         bubble.set_halign(if msg.from_me {
@@ -728,6 +740,12 @@ fn qr_texture(code: &str) -> gdk::Texture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hidden_ids_are_not_shown_as_numbers() {
+        assert_eq!(user_label("5215550000000@s.whatsapp.net"), "+5215550000000");
+        assert_eq!(user_label("99128348550@lid"), "Unknown contact");
+    }
 
     #[test]
     fn qr_has_quiet_zone_and_finder() {
