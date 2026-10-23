@@ -138,10 +138,12 @@ type daemon struct {
 	// TODO: one lock for every socket write; per-connection queues if a slow UI ever stalls the others.
 	mu    sync.Mutex
 	conns map[net.Conn]struct{}
+	// Chat each UI is showing, as "account/chat", so it is not notified.
+	active map[net.Conn]string
 }
 
 func newDaemon(accounts []*account, notify *notifier) *daemon {
-	d := &daemon{accounts: accounts, notify: notify, conns: map[net.Conn]struct{}{}}
+	d := &daemon{accounts: accounts, notify: notify, conns: map[net.Conn]struct{}{}, active: map[net.Conn]string{}}
 	for _, a := range accounts {
 		a.client.AddEventHandler(func(evt any) {
 			switch e := evt.(type) {
@@ -169,7 +171,7 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 				} else if msg != nil {
 					d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageReceived{MessageReceived: msg}})
 					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
-					if !msg.FromMe && !a.muted(context.Background(), e.Info.Chat) {
+					if !msg.FromMe && !d.isActive(chatKey(a.id, chat.Jid)) && !a.muted(context.Background(), e.Info.Chat) {
 						d.notify.message(chat, msg)
 					}
 				}
@@ -199,6 +201,7 @@ func (d *daemon) handle(conn net.Conn) {
 	defer func() {
 		d.mu.Lock()
 		delete(d.conns, conn)
+		delete(d.active, conn)
 		d.mu.Unlock()
 		conn.Close()
 	}()
@@ -212,7 +215,7 @@ func (d *daemon) handle(conn net.Conn) {
 			return
 		}
 		slog.Debug("request", "id", req.GetId(), "kind", fmt.Sprintf("%T", req.Kind))
-		ev := d.reply(&req) // Outside the lock: it may connect and trigger broadcasts.
+		ev := d.reply(conn, &req) // Outside the lock: it may connect and trigger broadcasts.
 		d.mu.Lock()
 		err := write(conn, ev)
 		d.mu.Unlock()
@@ -243,7 +246,20 @@ func write(conn net.Conn, ev *ipc.Event) error {
 	return err
 }
 
-func (d *daemon) reply(req *ipc.Request) *ipc.Event {
+func chatKey(accountID, chatJID string) string { return accountID + "/" + chatJID }
+
+func (d *daemon) isActive(key string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, k := range d.active {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 	ev := &ipc.Event{RequestId: req.GetId()}
 	fail := func(err error) {
 		ev.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
@@ -296,6 +312,16 @@ func (d *daemon) reply(req *ipc.Request) *ipc.Event {
 			d.notify.dismiss(a.id, chat.Jid)
 			ev.Kind = &ipc.Event_ChatChanged{ChatChanged: chat}
 		}
+	case *ipc.Request_SetActiveChat:
+		r := k.SetActiveChat
+		d.mu.Lock()
+		if r.GetChatJid() == "" {
+			delete(d.active, conn)
+		} else {
+			d.active[conn] = chatKey(r.GetAccountId(), r.GetChatJid())
+		}
+		d.mu.Unlock()
+		ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
 	case *ipc.Request_LinkAccount:
 		a := d.find(k.LinkAccount.GetAccountId())
 		if a == nil {

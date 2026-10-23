@@ -17,6 +17,7 @@ message Request {
     SendText send_text = 5;
     LinkAccount link_account = 6;
     MarkRead mark_read = 7;
+    SetActiveChat set_active_chat = 8;
   }
 }
 
@@ -35,6 +36,7 @@ message Event {
     QrCode qr_code = 9;
     LinkFailed link_failed = 10;
     MessageStatusChanged message_status_changed = 11;
+    Ack ack = 12;
   }
 }
 
@@ -84,6 +86,16 @@ message MarkRead {
   string account_id = 1;
   string chat_jid = 2;
 }
+
+// The chat the user is looking at in this UI, if any. The daemon does not
+// notify about it. Empty fields mean none. Answered with ack.
+message SetActiveChat {
+  string account_id = 1;
+  string chat_jid = 2;
+}
+
+// Reply to requests that have nothing else to return.
+message Ack {}
 
 message Error {
   string message = 1;

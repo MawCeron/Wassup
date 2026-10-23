@@ -117,3 +117,25 @@ func TestBroadcastAndLinkErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestActiveChatPerConnection(t *testing.T) {
+	d := newDaemon(nil, nil)
+	a, b := net.Pipe()
+	defer a.Close()
+	defer b.Close()
+	set := func(conn net.Conn, chat string) {
+		ev := d.reply(conn, &ipc.Request{Id: 1, Kind: &ipc.Request_SetActiveChat{SetActiveChat: &ipc.SetActiveChat{AccountId: "acc", ChatJid: chat}}})
+		if ev.GetAck() == nil {
+			t.Fatalf("set active chat: %v", ev)
+		}
+	}
+	set(a, "x@g.us")
+	set(b, "y@g.us")
+	if !d.isActive("acc/x@g.us") || !d.isActive("acc/y@g.us") || d.isActive("acc/z@g.us") {
+		t.Fatal("active chats not tracked per connection")
+	}
+	set(a, "")
+	if d.isActive("acc/x@g.us") {
+		t.Fatal("clearing did not stop suppressing the chat")
+	}
+}
