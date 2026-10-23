@@ -1,0 +1,12 @@
+[Unit]
+Description=Wassup daemon, an unofficial WhatsApp client
+Documentation=https://github.com/MawCeron/Wassup
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/wassupd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
