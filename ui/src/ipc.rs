@@ -150,6 +150,7 @@ mod tests {
             .env("XDG_RUNTIME_DIR", &dir)
             .env("XDG_DATA_HOME", &dir)
             .env("XDG_CACHE_HOME", &dir)
+            .env("XDG_CONFIG_HOME", &dir)
             .spawn()
             .unwrap();
 
