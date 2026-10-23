@@ -145,3 +145,23 @@ func TestMigrateExistingDatabase(t *testing.T) {
 		t.Fatalf("statuses after migration: mine=%d theirs=%d", mine, theirs)
 	}
 }
+
+func TestBacklogIsNotNews(t *testing.T) {
+	a := &account{}
+	msg := &ipc.Message{TimestampMs: 1_000}
+	if a.isNews(msg) {
+		t.Fatal("notified while not connected")
+	}
+	a.connectedAt.Store(2_000)
+	if a.isNews(msg) {
+		t.Fatal("notified a message sent before connecting")
+	}
+	msg.TimestampMs = 3_000
+	if !a.isNews(msg) {
+		t.Fatal("did not notify a message sent while connected")
+	}
+	msg.FromMe = true
+	if a.isNews(msg) {
+		t.Fatal("notified an own message")
+	}
+}

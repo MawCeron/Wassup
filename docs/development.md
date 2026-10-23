@@ -99,7 +99,9 @@ An unknown option or a syntax error stops the daemon instead of being
 ignored, so a misspelled privacy option cannot silently turn itself off.
 
 Notifications go through `org.freedesktop.Notifications` on the session
-bus. The chat open in a focused UI window is not notified. Muted chats do not notify, each chat keeps a single notification
+bus. The chat open in a focused UI window is not notified, and neither
+are messages sent while the daemon was offline: they only raise the
+chat's unread count. Muted chats do not notify, each chat keeps a single notification
 that newer messages replace, and reading the chat withdraws it.
 
 ## Desktop integration

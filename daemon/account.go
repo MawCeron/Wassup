@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
@@ -25,6 +26,9 @@ type account struct {
 	db     *sql.DB
 	client *whatsmeow.Client
 	log    *slog.Logger
+	// When the current connection started, in Unix ms; 0 while disconnected.
+	// Messages sent before it are backlog delivered on connect, not news.
+	connectedAt atomic.Int64
 }
 
 // openAccounts opens every account under dataDir/accounts.
@@ -175,4 +179,11 @@ func (a *account) muted(ctx context.Context, chat types.JID) bool {
 	}
 	s, err := settings.GetChatSettings(ctx, chat)
 	return err == nil && s.MutedUntil.After(time.Now())
+}
+
+// isNews reports whether a received message arrived while connected, as
+// opposed to the backlog WhatsApp delivers on connect, which is not notified.
+func (a *account) isNews(msg *ipc.Message) bool {
+	since := a.connectedAt.Load()
+	return !msg.FromMe && since != 0 && msg.TimestampMs >= since
 }

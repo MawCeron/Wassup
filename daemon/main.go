@@ -148,6 +148,11 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 		a.client.AddEventHandler(func(evt any) {
 			switch e := evt.(type) {
 			case *events.Connected, *events.Disconnected, *events.LoggedOut, *events.StreamReplaced:
+				if _, ok := e.(*events.Connected); ok {
+					a.connectedAt.Store(time.Now().UnixMilli())
+				} else {
+					a.connectedAt.Store(0)
+				}
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
 			case *events.Receipt:
 				// TODO: in groups WhatsApp waits for every member; this takes the first receipt.
@@ -171,7 +176,7 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 				} else if msg != nil {
 					d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageReceived{MessageReceived: msg}})
 					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
-					if !msg.FromMe && !d.isActive(chatKey(a.id, chat.Jid)) && !a.muted(context.Background(), e.Info.Chat) {
+					if a.isNews(msg) && !d.isActive(chatKey(a.id, chat.Jid)) && !a.muted(context.Background(), e.Info.Chat) {
 						d.notify.message(chat, msg)
 					}
 				}
