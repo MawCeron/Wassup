@@ -1189,14 +1189,18 @@ func (x *Chat) GetLastMessageAtMs() int64 {
 }
 
 type Message struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	ChatJid       string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
-	Id            string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
-	SenderJid     string                 `protobuf:"bytes,4,opt,name=sender_jid,json=senderJid,proto3" json:"sender_jid,omitempty"`
-	FromMe        bool                   `protobuf:"varint,5,opt,name=from_me,json=fromMe,proto3" json:"from_me,omitempty"`
-	TimestampMs   int64                  `protobuf:"varint,6,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
-	Text          string                 `protobuf:"bytes,7,opt,name=text,proto3" json:"text,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	AccountId   string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ChatJid     string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
+	Id          string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
+	SenderJid   string                 `protobuf:"bytes,4,opt,name=sender_jid,json=senderJid,proto3" json:"sender_jid,omitempty"`
+	FromMe      bool                   `protobuf:"varint,5,opt,name=from_me,json=fromMe,proto3" json:"from_me,omitempty"`
+	TimestampMs int64                  `protobuf:"varint,6,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	// Plain text, or a bracketed placeholder such as "[Sticker]" for content
+	// the client cannot show yet.
+	Text string `protobuf:"bytes,7,opt,name=text,proto3" json:"text,omitempty"`
+	// Display name of the sender; empty for own messages or when unknown.
+	SenderName    string `protobuf:"bytes,8,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1276,6 +1280,13 @@ func (x *Message) GetTimestampMs() int64 {
 func (x *Message) GetText() string {
 	if x != nil {
 		return x.Text
+	}
+	return ""
+}
+
+func (x *Message) GetSenderName() string {
+	if x != nil {
+		return x.SenderName
 	}
 	return ""
 }
@@ -1363,7 +1374,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x19\n" +
 	"\bis_group\x18\x04 \x01(\bR\aisGroup\x12!\n" +
 	"\funread_count\x18\x05 \x01(\rR\vunreadCount\x12+\n" +
-	"\x12last_message_at_ms\x18\x06 \x01(\x03R\x0flastMessageAtMs\"\xc2\x01\n" +
+	"\x12last_message_at_ms\x18\x06 \x01(\x03R\x0flastMessageAtMs\"\xe3\x01\n" +
 	"\aMessage\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -1373,7 +1384,9 @@ const file_ipc_proto_rawDesc = "" +
 	"sender_jid\x18\x04 \x01(\tR\tsenderJid\x12\x17\n" +
 	"\afrom_me\x18\x05 \x01(\bR\x06fromMe\x12!\n" +
 	"\ftimestamp_ms\x18\x06 \x01(\x03R\vtimestampMs\x12\x12\n" +
-	"\x04text\x18\a \x01(\tR\x04text*\xb8\x01\n" +
+	"\x04text\x18\a \x01(\tR\x04text\x12\x1f\n" +
+	"\vsender_name\x18\b \x01(\tR\n" +
+	"senderName*\xb8\x01\n" +
 	"\x0fConnectionState\x12 \n" +
 	"\x1cCONNECTION_STATE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dCONNECTION_STATE_DISCONNECTED\x10\x01\x12\x1f\n" +

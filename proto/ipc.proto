@@ -131,5 +131,9 @@ message Message {
   string sender_jid = 4;
   bool from_me = 5;
   int64 timestamp_ms = 6;
+  // Plain text, or a bracketed placeholder such as "[Sticker]" for content
+  // the client cannot show yet.
   string text = 7;
+  // Display name of the sender; empty for own messages or when unknown.
+  string sender_name = 8;
 }

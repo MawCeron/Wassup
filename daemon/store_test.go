@@ -49,7 +49,15 @@ func TestSaveAndListMessages(t *testing.T) {
 		t.Fatal("redelivered message saved twice")
 	}
 	if save(&events.Message{Info: text("C", 3, false).Info, Message: &waE2E.Message{}}) {
-		t.Fatal("non-text message saved")
+		t.Fatal("empty message saved")
+	}
+	sticker := &events.Message{Info: text("S", 0, false).Info, Message: &waE2E.Message{StickerMessage: &waE2E.StickerMessage{}}}
+	if got := messageText(sticker); got != "[Sticker]" {
+		t.Fatalf("sticker shown as %q", got)
+	}
+	doc := &events.Message{Message: &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("a.pdf")}}}
+	if got := messageText(doc); got != "[Document] a.pdf" {
+		t.Fatalf("document shown as %q", got)
 	}
 
 	chats, err := a.listChats(ctx)

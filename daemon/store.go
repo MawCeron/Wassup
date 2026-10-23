@@ -39,15 +39,51 @@ const (
 	maxPageSize     = 500
 )
 
-// messageText returns the text of a plain text message, or "" for anything else.
+// messageText returns a message's text, a bracketed placeholder for content
+// that is not shown yet, or "" for messages that are not shown at all.
 func messageText(evt *events.Message) string {
 	if evt.IsEdit {
 		return "" // TODO: apply edits to the stored message instead of skipping them.
 	}
-	if t := evt.Message.GetConversation(); t != "" {
-		return t
+	m := evt.Message
+	label := func(kind string, details ...string) string {
+		for _, d := range details {
+			if d != "" {
+				return kind + " " + d
+			}
+		}
+		return kind
 	}
-	return evt.Message.GetExtendedTextMessage().GetText()
+	switch {
+	case m.GetConversation() != "":
+		return m.GetConversation()
+	case m.GetExtendedTextMessage() != nil:
+		return m.GetExtendedTextMessage().GetText()
+	case m.GetStickerMessage() != nil:
+		return "[Sticker]"
+	case m.GetImageMessage() != nil:
+		return label("[Photo]", m.GetImageMessage().GetCaption())
+	case m.GetVideoMessage() != nil:
+		return label("[Video]", m.GetVideoMessage().GetCaption())
+	case m.GetAudioMessage() != nil:
+		if m.GetAudioMessage().GetPTT() {
+			return "[Voice message]"
+		}
+		return "[Audio]"
+	case m.GetDocumentMessage() != nil:
+		d := m.GetDocumentMessage()
+		return label("[Document]", d.GetCaption(), d.GetFileName())
+	case m.GetContactMessage() != nil:
+		return label("[Contact]", m.GetContactMessage().GetDisplayName())
+	case m.GetLocationMessage() != nil, m.GetLiveLocationMessage() != nil:
+		return "[Location]"
+	case m.GetPollCreationMessage() != nil:
+		return label("[Poll]", m.GetPollCreationMessage().GetName())
+	case m.GetPollCreationMessageV3() != nil:
+		return label("[Poll]", m.GetPollCreationMessageV3().GetName())
+	}
+	// Reactions, receipts and protocol messages are not chat messages.
+	return ""
 }
 
 // saveMessage stores a text message and updates its chat. It returns nil
@@ -66,6 +102,12 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 		FromMe:      info.IsFromMe,
 		TimestampMs: info.Timestamp.UnixMilli(),
 		Text:        text,
+	}
+	if !msg.FromMe {
+		msg.SenderName = a.contactName(ctx, info.Sender.ToNonAD())
+		if msg.SenderName == "" {
+			msg.SenderName = info.PushName
+		}
 	}
 
 	// Resolved before the transaction: it may ask the server for a group name.
@@ -112,7 +154,10 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	if err != nil {
 		return nil, nil, err
 	}
-	return msg, chat, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, nil, err
+	}
+	return msg, a.named(ctx, chat), nil
 }
 
 // chatName looks up a display name for a chat seen for the first time.
@@ -125,20 +170,62 @@ func (a *account) chatName(ctx context.Context, evt *events.Message) string {
 		}
 		return group.Name
 	}
-	// Contacts is nil until the device is linked.
-	if contacts := a.client.Store.Contacts; contacts != nil {
-		if c, err := contacts.GetContact(ctx, evt.Info.Chat); err == nil && c.Found {
-			for _, name := range []string{c.FullName, c.FirstName, c.BusinessName, c.PushName} {
-				if name != "" {
-					return name
-				}
-			}
-		}
+	if name := a.contactName(ctx, evt.Info.Chat); name != "" {
+		return name
 	}
 	if !evt.Info.IsFromMe {
 		return evt.Info.PushName
 	}
 	return ""
+}
+
+// contactName returns the best known name for a user: the address book
+// name first, then the name they chose. Hidden (LID) users are looked up
+// by their phone number too, since address book names are stored there.
+func (a *account) contactName(ctx context.Context, user types.JID) string {
+	store := a.client.Store
+	if store.Contacts == nil { // Nil until the device is linked.
+		return ""
+	}
+	candidates := []types.JID{user}
+	if user.Server == types.HiddenUserServer && store.LIDs != nil {
+		if pn, err := store.LIDs.GetPNForLID(ctx, user); err == nil && !pn.IsEmpty() {
+			candidates = []types.JID{pn, user}
+		}
+	}
+	var contacts []types.ContactInfo
+	for _, jid := range candidates {
+		if c, err := store.Contacts.GetContact(ctx, jid); err == nil && c.Found {
+			contacts = append(contacts, c)
+		}
+	}
+	for _, c := range contacts {
+		for _, name := range []string{c.FullName, c.FirstName, c.BusinessName} {
+			if name != "" {
+				return name
+			}
+		}
+	}
+	for _, c := range contacts {
+		if c.PushName != "" {
+			return c.PushName
+		}
+	}
+	return ""
+}
+
+// named refreshes a one-to-one chat's name from the contacts, which may
+// have learned it after the chat was stored.
+func (a *account) named(ctx context.Context, chat *ipc.Chat) *ipc.Chat {
+	if chat.IsGroup {
+		return chat
+	}
+	if jid, err := types.ParseJID(chat.Jid); err == nil {
+		if name := a.contactName(ctx, jid); name != "" {
+			chat.Name = name
+		}
+	}
+	return chat
 }
 
 const chatQuery = `SELECT jid, name, is_group, unread_count, last_message_at_ms FROM wassup_chats`
@@ -160,7 +247,7 @@ func (a *account) listChats(ctx context.Context) ([]*ipc.Chat, error) {
 		if err != nil {
 			return nil, err
 		}
-		chats = append(chats, c)
+		chats = append(chats, a.named(ctx, c))
 	}
 	return chats, rows.Err()
 }
@@ -182,10 +269,21 @@ func (a *account) listMessages(ctx context.Context, chatJID, beforeID string, li
 	}
 	defer rows.Close()
 	var msgs []*ipc.Message
+	names := map[string]string{}
 	for rows.Next() {
 		m := &ipc.Message{AccountId: a.id, ChatJid: chatJID}
 		if err := rows.Scan(&m.Id, &m.SenderJid, &m.FromMe, &m.TimestampMs, &m.Text); err != nil {
 			return nil, err
+		}
+		if !m.FromMe {
+			name, ok := names[m.SenderJid]
+			if !ok {
+				if jid, err := types.ParseJID(m.SenderJid); err == nil {
+					name = a.contactName(ctx, jid)
+				}
+				names[m.SenderJid] = name
+			}
+			m.SenderName = name
 		}
 		msgs = append(msgs, m)
 	}
@@ -270,5 +368,9 @@ func (a *account) markRead(ctx context.Context, chatJID string) (*ipc.Chat, erro
 	if _, err := a.db.ExecContext(ctx, `UPDATE wassup_chats SET unread_count = 0 WHERE jid = ?`, chatJID); err != nil {
 		return nil, err
 	}
-	return scanChat(a.id, a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
+	c, err := scanChat(a.id, a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
+	if err != nil {
+		return nil, err
+	}
+	return a.named(ctx, c), nil
 }
