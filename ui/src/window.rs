@@ -14,6 +14,7 @@ const PAGE_SIZE: u32 = 50;
 const CSS: &str = "
 .bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
+.composer { border-radius: 10px; background: var(--card-bg-color); }
 ";
 
 pub struct Window {
@@ -42,10 +43,11 @@ pub struct Window {
     has_more: Cell<bool>,
     /// Keep the newest message in view while the list grows, until the user scrolls up.
     stick_bottom: Cell<bool>,
-    composer: gtk::Entry,
+    composer: gtk::TextView,
     content_view: adw::ToolbarView,
-    /// Id of the SendText request awaiting its reply, or 0.
-    sending: Cell<u64>,
+    /// Text of each SendText request awaiting its reply, by request id, so
+    /// a message that fails can be put back.
+    sending: RefCell<std::collections::HashMap<u64, String>>,
     /// Chat that was open when the window last closed, reopened once chats load.
     restore_chat: RefCell<Option<String>>,
     conn: RefCell<Option<ipc::Connection>>,
@@ -118,13 +120,28 @@ impl Window {
         let content_stack = gtk::Stack::new();
         content_stack.add_named(&placeholder, Some("empty"));
         content_stack.add_named(&message_scroll, Some("messages"));
-        let composer = gtk::Entry::builder()
-            .placeholder_text("Message")
+        let composer = gtk::TextView::builder()
+            .wrap_mode(gtk::WrapMode::WordChar)
+            .accepts_tab(false)
+            .top_margin(8)
+            .bottom_margin(8)
+            .left_margin(10)
+            .right_margin(10)
+            .css_classes(["composer"])
+            .build();
+        composer.update_property(&[gtk::accessible::Property::Label("Message")]);
+        // Grows with the text up to a few lines, then scrolls.
+        let composer_scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .propagate_natural_height(true)
+            .max_content_height(140)
             .hexpand(true)
+            .child(&composer)
             .build();
         let send_button = gtk::Button::builder()
             .icon_name("mail-send-symbolic")
             .tooltip_text("Send")
+            .valign(gtk::Align::End)
             .css_classes(["circular", "suggested-action"])
             .build();
         let composer_bar = gtk::Box::builder()
@@ -134,7 +151,7 @@ impl Window {
             .margin_start(12)
             .margin_end(12)
             .build();
-        composer_bar.append(&composer);
+        composer_bar.append(&composer_scroll);
         composer_bar.append(&send_button);
         let content_view = with_header(&content_stack);
         content_view.add_bottom_bar(&composer_bar);
@@ -201,7 +218,7 @@ impl Window {
             stick_bottom: Cell::new(false),
             composer,
             content_view,
-            sending: Cell::new(0),
+            sending: RefCell::default(),
             restore_chat: RefCell::new(saved.chat),
             conn: RefCell::new(None),
             account: RefCell::new(None),
@@ -260,11 +277,24 @@ impl Window {
                 }
             }
         ));
-        ui.composer.connect_activate(glib::clone!(
+        // Enter sends; Shift+Enter starts a new line.
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        keys.connect_key_pressed(glib::clone!(
             #[weak]
             ui,
-            move |_| ui.send_text()
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, modifiers| {
+                let enter = matches!(key, gdk::Key::Return | gdk::Key::KP_Enter);
+                if enter && !modifiers.contains(gdk::ModifierType::SHIFT_MASK) {
+                    ui.send_text();
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            }
         ));
+        ui.composer.add_controller(keys);
         send_button.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -405,14 +435,16 @@ impl Window {
     }
 
     fn handle(self: &Rc<Self>, event: ipc::Event) {
-        if event.request_id != 0 && event.request_id == self.sending.get() {
-            self.sending.set(0);
-            self.composer.set_sensitive(true);
-            // Keep the text so a failed message can be sent again.
-            if matches!(event.kind, Some(event::Kind::MessageReceived(_))) {
-                self.composer.set_text("");
+        let pending = self.sending.borrow_mut().remove(&event.request_id);
+        if let Some(text) = pending {
+            let buffer = self.composer.buffer();
+            // Put a failed message back so it can be sent again, unless the
+            // user has already started a new one.
+            if !matches!(event.kind, Some(event::Kind::MessageReceived(_)))
+                && buffer.char_count() == 0
+            {
+                buffer.set_text(&text);
             }
-            self.composer.grab_focus();
         }
         match event.kind {
             Some(event::Kind::Error(e)) => self.toast(&e.message),
@@ -549,21 +581,25 @@ impl Window {
     }
 
     fn send_text(&self) {
-        let text = self.composer.text().trim().to_owned();
+        let buffer = self.composer.buffer();
+        let (start, end) = buffer.bounds();
+        let text = buffer.text(&start, &end, false).trim().to_owned();
         let Some((account_id, chat_jid)) = self.open_ids() else {
             return;
         };
-        if text.is_empty() || self.sending.get() != 0 {
+        if text.is_empty() {
             return;
         }
+        // The composer stays usable while sending: disabling it would move
+        // the keyboard focus into the message list and scroll it.
         let request = request::Kind::SendText(ipc::SendText {
             account_id,
             chat_jid,
-            text,
+            text: text.clone(),
         });
         if let Some(id) = self.send(request) {
-            self.sending.set(id);
-            self.composer.set_sensitive(false);
+            buffer.set_text("");
+            self.sending.borrow_mut().insert(id, text);
         }
     }
 
@@ -834,6 +870,8 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
     factory.connect_setup(|_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         item.set_activatable(false);
+        // A focused row would scroll the list to itself.
+        item.set_focusable(false);
         item.set_selectable(false);
         let sender = gtk::Label::builder()
             .xalign(0.0)
