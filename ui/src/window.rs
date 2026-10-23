@@ -314,6 +314,7 @@ impl Window {
             }
             Some(event::Kind::Messages(list)) => self.add_page(list.messages),
             Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => self.add_message(msg),
+            Some(event::Kind::MessageStatusChanged(change)) => self.update_status(change),
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
                 self.link.set_description(Some(
@@ -504,6 +505,31 @@ impl Window {
         }
     }
 
+    fn update_status(&self, change: ipc::MessageStatusChanged) {
+        let open = self.is_current(&change.account_id)
+            && self.current_chat.borrow().as_deref() == Some(change.chat_jid.as_str());
+        if !open {
+            return;
+        }
+        for pos in 0..self.messages.n_items() {
+            let Some(item) = self
+                .messages
+                .item(pos)
+                .and_downcast::<glib::BoxedAnyObject>()
+            else {
+                continue;
+            };
+            let hit = change
+                .message_ids
+                .contains(&item.borrow::<ipc::Message>().id);
+            if hit {
+                item.borrow_mut::<ipc::Message>().status = change.status;
+                // Re-adding the same item makes the list view rebind its row.
+                self.messages.splice(pos, 1, &[item]);
+            }
+        }
+    }
+
     fn scroll_to_bottom(&self) {
         let (list, n) = (self.message_list.clone(), self.messages.n_items());
         // After the new rows have been laid out.
@@ -648,9 +674,15 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
             .max_width_chars(60)
             .build();
         let time = gtk::Label::builder()
-            .halign(gtk::Align::End)
             .css_classes(["caption", "dim-label"])
             .build();
+        let status = gtk::Label::builder().css_classes(["caption"]).build();
+        let footer = gtk::Box::builder()
+            .spacing(4)
+            .halign(gtk::Align::End)
+            .build();
+        footer.append(&time);
+        footer.append(&status);
         let bubble = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(2)
@@ -659,7 +691,7 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
             .build();
         bubble.append(&sender);
         bubble.append(&text);
-        bubble.append(&time);
+        bubble.append(&footer);
         let row = gtk::Box::builder()
             .margin_start(12)
             .margin_end(12)
@@ -676,7 +708,9 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
         let bubble = item.child().and_then(|row| row.first_child()).unwrap();
         let sender = bubble.first_child().and_downcast::<gtk::Label>().unwrap();
         let text = sender.next_sibling().and_downcast::<gtk::Label>().unwrap();
-        let time = text.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let footer = text.next_sibling().unwrap();
+        let time = footer.first_child().and_downcast::<gtk::Label>().unwrap();
+        let status = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
 
         let in_group = msg.chat_jid.ends_with("@g.us");
         sender.set_visible(in_group && !msg.from_me);
@@ -687,6 +721,20 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
         }
         text.set_label(&msg.text);
         time.set_label(&time_of_day(msg.timestamp_ms));
+        let (marks, tooltip, read) = match msg.status() {
+            ipc::MessageStatus::Sent => ("✓", "Sent", false),
+            ipc::MessageStatus::Delivered => ("✓✓", "Delivered", false),
+            ipc::MessageStatus::Read => ("✓✓", "Read", true),
+            ipc::MessageStatus::Unspecified => ("", "", false),
+        };
+        status.set_label(marks);
+        status.set_tooltip_text(Some(tooltip));
+        status.update_property(&[gtk::accessible::Property::Label(tooltip)]);
+        status.set_css_classes(if read {
+            &["caption", "accent"]
+        } else {
+            &["caption", "dim-label"]
+        });
         bubble.set_halign(if msg.from_me {
             gtk::Align::End
         } else {
