@@ -79,3 +79,25 @@ go run ./cmd/wassupctl messages <account> 5215550000000
 (`sudo dnf install qrencode`); otherwise it prints the text to encode.
 
 Use a secondary number: this is an unofficial client.
+
+## Configuration
+
+The daemon reads `$XDG_CONFIG_HOME/wassup/config.json` at startup. The
+file is optional; every option defaults to off.
+
+```json
+{
+  "hide_notification_content": true
+}
+```
+
+| Option | Effect |
+|---|---|
+| `hide_notification_content` | Notifications show the chat but not the message text. |
+
+An unknown option or a syntax error stops the daemon instead of being
+ignored, so a misspelled privacy option cannot silently turn itself off.
+
+Notifications go through `org.freedesktop.Notifications` on the session
+bus. Muted chats do not notify, each chat keeps a single notification
+that newer messages replace, and reading the chat withdraws it.
