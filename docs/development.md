@@ -124,3 +124,20 @@ sed "s|^Exec=wassup|Exec=$PWD/ui/target/debug/wassup|" \
 
 `wassup --toggle` shows the window, or closes it if it has focus. On
 Wayland, bind it to a key in Settings → Keyboard → Custom Shortcuts.
+
+## Running the daemon as a service
+
+`packaging/wassupd.service` is a systemd user unit that starts the daemon
+at login and restarts it if it fails. Without network at login, the
+daemon keeps retrying in the background. For development, install it
+against a local build:
+
+```sh
+go -C daemon build -o ~/.local/bin/wassupd .
+mkdir -p ~/.config/systemd/user
+sed "s|/usr/bin/wassupd|$HOME/.local/bin/wassupd|" packaging/wassupd.service \
+  > ~/.config/systemd/user/wassupd.service
+systemctl --user daemon-reload
+systemctl --user enable --now wassupd
+journalctl --user -u wassupd -f   # logs
+```
