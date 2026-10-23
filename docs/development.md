@@ -43,6 +43,10 @@ single-instance (`io.github.MawCeron.Wassup`): launching it again only
 brings the existing window to the front. An unlinked account shows the
 QR code to link it.
 
+Closing the window ends the UI process but not the daemon, which keeps
+receiving messages. The window size and the open chat are saved to
+`$XDG_STATE_HOME/wassup/ui.ini` and restored on the next launch.
+
 Formatting and lint rules are the tools' defaults; no config files.
 
 ## IPC code generation
