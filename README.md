@@ -9,5 +9,6 @@ An **unofficial** WhatsApp client for Linux (GNOME), with a native protocol impl
 - Development setup: [`docs/development.md`](docs/development.md).
 - IPC between the daemon and the UI: [`docs/ipc.md`](docs/ipc.md).
 - Memory measurements: [`docs/performance.md`](docs/performance.md).
+- Icons and look: [`docs/visual-identity.md`](docs/visual-identity.md).
 
 Copyright © 2026 Mauricio Cerón Medina. Licensed under the [GNU GPL v3 or later](LICENSE).

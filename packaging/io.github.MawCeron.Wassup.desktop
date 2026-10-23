@@ -2,6 +2,7 @@
 Type=Application
 Name=Wassup
 Comment=Unofficial WhatsApp client
+Icon=io.github.MawCeron.Wassup
 Exec=wassup
 Terminal=false
 Categories=Network;InstantMessaging;

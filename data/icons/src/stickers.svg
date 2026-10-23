@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <title>Stickers</title>
+  <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4.5 1.75 H11.5 A2.75 2.75 0 0 1 14.25 4.5 V8.8 L8.8 14.25 H4.5 A2.75 2.75 0 0 1 1.75 11.5 V4.5 A2.75 2.75 0 0 1 4.5 1.75 Z"/>
+    <path d="M14.25 8.8 H11.8 A3 3 0 0 0 8.8 11.8 V14.25"/>
+    <path d="M4.9 8.6 Q6.4 10.2 7.6 9.6"/>
+  </g>
+  <circle cx="5.6" cy="5.9" r="0.95" fill="currentColor"/>
+  <circle cx="10.4" cy="5.9" r="0.95" fill="currentColor"/>
+</svg>
