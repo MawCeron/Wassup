@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Wassup
+Comment=Unofficial WhatsApp client
+Exec=wassup
+Terminal=false
+Categories=Network;InstantMessaging;
+Keywords=WhatsApp;Chat;Messages;
+StartupNotify=true
+DBusActivatable=true
