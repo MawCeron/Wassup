@@ -26,8 +26,18 @@ func main() {
 	if *debug {
 		level = slog.LevelDebug
 	}
-	// stderr is collected by journald when run as a systemd unit.
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+	opts := &slog.HandlerOptions{Level: level}
+	// systemd sets JOURNAL_STREAM when stderr goes to the journal, which
+	// stamps every line already.
+	if os.Getenv("JOURNAL_STREAM") != "" {
+		opts.ReplaceAttr = func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey && len(groups) == 0 {
+				return slog.Attr{}
+			}
+			return a
+		}
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, opts)))
 
 	if err := run(); err != nil {
 		slog.Error("startup failed", "err", err)
@@ -66,7 +76,8 @@ func run() error {
 	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
 	for _, a := range accounts {
 		if a.client.Store.ID != nil {
-			// TODO: a failed first connect is only logged; whatsmeow retries only after one success.
+			// Without network at login, keep retrying in the background.
+			a.client.InitialAutoReconnect = true
 			if err := a.client.Connect(); err != nil {
 				slog.Warn("connect", "account", a.id, "err", err)
 			}
