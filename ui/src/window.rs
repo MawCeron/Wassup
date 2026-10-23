@@ -17,6 +17,9 @@ const CSS: &str = "
 ";
 
 pub struct Window {
+    window: adw::ApplicationWindow,
+    /// Last chat reported to the daemon as being looked at, as "account/chat".
+    reported_active: RefCell<String>,
     stack: gtk::Stack,
     status: adw::StatusPage,
     retry: gtk::Button,
@@ -50,7 +53,7 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
+    pub fn build(app: &adw::Application) -> Rc<Self> {
         let retry = gtk::Button::builder()
             .label("Retry")
             .halign(gtk::Align::Center)
@@ -173,6 +176,8 @@ impl Window {
         window.add_breakpoint(narrow);
 
         let ui = Rc::new(Self {
+            window: window.clone(),
+            reported_active: RefCell::new(String::new()),
             stack,
             status,
             retry,
@@ -284,8 +289,81 @@ impl Window {
                 glib::Propagation::Proceed
             }
         ));
+        let report = glib::clone!(
+            #[weak]
+            ui,
+            move || ui.report_active()
+        );
+        ui.window.connect_is_active_notify({
+            let report = report.clone();
+            move |_| report()
+        });
+        ui.split.connect_show_content_notify({
+            let report = report.clone();
+            move |_| report()
+        });
+        ui.split.connect_collapsed_notify(move |_| report());
         ui.connect();
-        window
+        ui
+    }
+
+    pub fn present(&self) {
+        self.window.present();
+    }
+
+    pub fn connect_destroy(&self, f: impl Fn() + 'static) {
+        self.window.connect_destroy(move |_| f());
+    }
+
+    /// Closes the window if the user is looking at it, shows it otherwise.
+    /// Closing ends the UI process, which is the point: it frees its memory.
+    pub fn toggle(&self) {
+        if self.window.is_active() {
+            self.window.close();
+        } else {
+            self.present();
+        }
+    }
+
+    /// Shows a chat, e.g. after a notification click.
+    pub fn show_chat(&self, account_id: &str, chat_jid: &str) {
+        self.present();
+        let other_account = self
+            .account
+            .borrow()
+            .as_ref()
+            .is_some_and(|a| a.id != account_id);
+        if other_account {
+            return; // TODO: switch account once the UI supports several.
+        }
+        match self.position_of(chat_jid) {
+            Some(pos) => {
+                self.chat_selection.set_selected(pos);
+                self.split.set_show_content(true);
+            }
+            // Chats are not loaded yet; open it when they are.
+            None => {
+                self.restore_chat.replace(Some(chat_jid.to_owned()));
+            }
+        }
+    }
+
+    /// Tells the daemon which chat is on screen, so it does not notify about it.
+    fn report_active(&self) {
+        let showing = !self.split.is_collapsed() || self.split.shows_content();
+        let (account_id, chat_jid) = match self.open_ids() {
+            Some(ids) if self.window.is_active() && showing => ids,
+            _ => Default::default(),
+        };
+        let key = format!("{account_id}/{chat_jid}");
+        if *self.reported_active.borrow() == key {
+            return;
+        }
+        self.reported_active.replace(key);
+        self.send(request::Kind::SetActiveChat(ipc::SetActiveChat {
+            account_id,
+            chat_jid,
+        }));
     }
 
     fn connect(self: &Rc<Self>) {
@@ -298,6 +376,8 @@ impl Window {
         self.conn.replace(Some(conn));
         // Events may have been missed while disconnected.
         self.chats_loaded.set(false);
+        // The daemon forgets the active chat of a closed connection.
+        self.reported_active.replace("/".to_owned());
         self.show_status("Connecting…", "", false);
         self.send(request::Kind::ListAccounts(ipc::ListAccounts {}));
 
@@ -409,6 +489,7 @@ impl Window {
         self.sidebar_title
             .set_title(if name.is_empty() { "Chats" } else { &name });
         self.stack.set_visible_child_name("main");
+        self.report_active();
         if !self.chats_loaded.replace(true) {
             let account_id = self.account.borrow().as_ref().unwrap().id.clone();
             self.send(request::Kind::ListChats(ipc::ListChats { account_id }));
@@ -456,6 +537,7 @@ impl Window {
         }
         self.current_chat.replace(Some(chat.jid.clone()));
         self.content.set_title(&chat_title(chat));
+        self.report_active();
         self.content_stack.set_visible_child_name("messages");
         self.content_view.set_reveal_bottom_bars(true);
         self.composer.grab_focus();
