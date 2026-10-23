@@ -34,14 +34,17 @@ pub struct Window {
     current_chat: RefCell<Option<String>>,
     content_stack: gtk::Stack,
     messages: gio::ListStore,
-    message_list: gtk::ListView,
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
     has_more: Cell<bool>,
+    /// Keep the newest message in view while the list grows, until the user scrolls up.
+    stick_bottom: Cell<bool>,
     composer: gtk::Entry,
     content_view: adw::ToolbarView,
     /// Id of the SendText request awaiting its reply, or 0.
     sending: Cell<u64>,
+    /// Chat that was open when the window last closed, reopened once chats load.
+    restore_chat: RefCell<Option<String>>,
     conn: RefCell<Option<ipc::Connection>>,
     account: RefCell<Option<ipc::Account>>,
 }
@@ -154,11 +157,13 @@ impl Window {
 
         let toasts = adw::ToastOverlay::new();
         toasts.set_child(Some(&stack));
+        let saved = SavedState::load(&state_path());
         let window = adw::ApplicationWindow::builder()
             .application(app)
             .title("Wassup")
-            .default_width(900)
-            .default_height(640)
+            .default_width(if saved.width > 0 { saved.width } else { 900 })
+            .default_height(if saved.height > 0 { saved.height } else { 640 })
+            .maximized(saved.maximized)
             .content(&toasts)
             .build();
         let narrow = adw::Breakpoint::new(
@@ -185,13 +190,14 @@ impl Window {
             current_chat: RefCell::new(None),
             content_stack,
             messages,
-            message_list,
             message_scroll,
             loading: Cell::new(false),
             has_more: Cell::new(false),
+            stick_bottom: Cell::new(false),
             composer,
             content_view,
             sending: Cell::new(0),
+            restore_chat: RefCell::new(saved.chat),
             conn: RefCell::new(None),
             account: RefCell::new(None),
         });
@@ -217,6 +223,25 @@ impl Window {
                 }
             }
         ));
+        let adj = ui.message_scroll.vadjustment();
+        // Rows get their real height only once drawn, so the bottom keeps moving.
+        adj.connect_changed(glib::clone!(
+            #[weak]
+            ui,
+            move |adj| {
+                if ui.stick_bottom.get() {
+                    adj.set_value(adj.upper() - adj.page_size());
+                }
+            }
+        ));
+        adj.connect_value_changed(glib::clone!(
+            #[weak]
+            ui,
+            move |adj| {
+                let at_bottom = adj.value() + adj.page_size() >= adj.upper() - 1.0;
+                ui.stick_bottom.set(at_bottom);
+            }
+        ));
         ui.message_scroll.connect_edge_reached(glib::clone!(
             #[weak]
             ui,
@@ -239,6 +264,25 @@ impl Window {
             #[weak]
             ui,
             move |_| ui.send_text()
+        ));
+        window.connect_close_request(glib::clone!(
+            #[weak]
+            ui,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |window| {
+                let (width, height) = window.default_size();
+                let state = SavedState {
+                    width,
+                    height,
+                    maximized: window.is_maximized(),
+                    chat: ui.current_chat.borrow().clone(),
+                };
+                if let Err(e) = state.save(&state_path()) {
+                    eprintln!("wassup: couldn't save window state: {e}");
+                }
+                glib::Propagation::Proceed
+            }
         ));
         ui.connect();
         window
@@ -308,6 +352,10 @@ impl Window {
                     self.chats.append(&glib::BoxedAnyObject::new(chat));
                 }
                 self.reselect_current();
+                let restore = self.restore_chat.take();
+                if let Some(pos) = restore.and_then(|jid| self.position_of(&jid)) {
+                    self.chat_selection.set_selected(pos);
+                }
             }
             Some(event::Kind::ChatChanged(chat)) if self.is_current(&chat.account_id) => {
                 self.upsert_chat(chat)
@@ -492,13 +540,12 @@ impl Window {
     }
 
     fn add_message(&self, msg: ipc::Message) {
-        let adj = self.message_scroll.vadjustment();
-        let at_bottom = adj.value() + adj.page_size() >= adj.upper() - 48.0;
         let incoming = !msg.from_me;
-        self.messages.append(&glib::BoxedAnyObject::new(msg));
-        if at_bottom || !incoming {
+        // Own messages always come into view; others only if already following.
+        if !incoming {
             self.scroll_to_bottom();
         }
+        self.messages.append(&glib::BoxedAnyObject::new(msg));
         let window = self.toasts.root().and_downcast::<gtk::Window>();
         if incoming && window.is_some_and(|w| w.is_active()) {
             self.mark_read();
@@ -531,13 +578,9 @@ impl Window {
     }
 
     fn scroll_to_bottom(&self) {
-        let (list, n) = (self.message_list.clone(), self.messages.n_items());
-        // After the new rows have been laid out.
-        glib::idle_add_local_once(move || {
-            if n > 0 {
-                list.scroll_to(n - 1, gtk::ListScrollFlags::NONE, None);
-            }
-        });
+        self.stick_bottom.set(true);
+        let adj = self.message_scroll.vadjustment();
+        adj.set_value(adj.upper() - adj.page_size());
     }
 
     fn start_link(&self) {
@@ -564,6 +607,53 @@ impl Window {
 
     fn toast(&self, message: &str) {
         self.toasts.add_toast(adw::Toast::new(message));
+    }
+}
+
+/// Window state kept between runs, so closing the UI to save memory does
+/// not lose the user's place.
+#[derive(Debug, Default, PartialEq)]
+struct SavedState {
+    width: i32,
+    height: i32,
+    maximized: bool,
+    chat: Option<String>,
+}
+
+fn state_path() -> std::path::PathBuf {
+    glib::user_state_dir().join("wassup").join("ui.ini")
+}
+
+impl SavedState {
+    /// Missing or unreadable state just means defaults.
+    fn load(path: &std::path::Path) -> Self {
+        let file = glib::KeyFile::new();
+        if file.load_from_file(path, glib::KeyFileFlags::NONE).is_err() {
+            return Self::default();
+        }
+        Self {
+            width: file.integer("window", "width").unwrap_or(0),
+            height: file.integer("window", "height").unwrap_or(0),
+            maximized: file.boolean("window", "maximized").unwrap_or(false),
+            chat: file
+                .string("window", "chat")
+                .ok()
+                .map(String::from)
+                .filter(|chat| !chat.is_empty()),
+        }
+    }
+
+    fn save(&self, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+        let file = glib::KeyFile::new();
+        file.set_integer("window", "width", self.width);
+        file.set_integer("window", "height", self.height);
+        file.set_boolean("window", "maximized", self.maximized);
+        file.set_string("window", "chat", self.chat.as_deref().unwrap_or_default());
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        file.save_to_file(path)?;
+        Ok(())
     }
 }
 
@@ -788,6 +878,23 @@ fn qr_texture(code: &str) -> gdk::Texture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn saved_state_round_trips() {
+        let path = std::env::temp_dir()
+            .join(format!("wassup-state-{}", std::process::id()))
+            .join("ui.ini");
+        assert_eq!(SavedState::load(&path), SavedState::default());
+        let state = SavedState {
+            width: 1000,
+            height: 700,
+            maximized: true,
+            chat: Some("123@g.us".into()),
+        };
+        state.save(&path).unwrap();
+        assert_eq!(SavedState::load(&path), state);
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
 
     #[test]
     fn hidden_ids_are_not_shown_as_numbers() {
