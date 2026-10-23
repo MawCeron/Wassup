@@ -17,7 +17,13 @@ const CSS: &str = "
 .composer { border-radius: 10px; background: var(--card-bg-color); }
 ";
 
+/// Status label of each bound message row, by message id, so receipts
+/// update a row in place instead of replacing it in the model, which makes
+/// the list re-measure and lose its scroll position.
+type StatusLabels = Rc<RefCell<std::collections::HashMap<String, glib::WeakRef<gtk::Label>>>>;
+
 pub struct Window {
+    status_labels: StatusLabels,
     window: adw::ApplicationWindow,
     /// Last chat reported to the daemon as being looked at, as "account/chat".
     reported_active: RefCell<String>,
@@ -38,6 +44,7 @@ pub struct Window {
     current_chat: RefCell<Option<String>>,
     content_stack: gtk::Stack,
     messages: gio::ListStore,
+    message_list: gtk::ListView,
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
     has_more: Cell<bool>,
@@ -107,10 +114,11 @@ impl Window {
             .icon_name("chat-message-new-symbolic")
             .title("No Chat Selected")
             .build();
+        let status_labels = StatusLabels::default();
         let messages = gio::ListStore::new::<glib::BoxedAnyObject>();
         let message_list = gtk::ListView::builder()
             .model(&gtk::NoSelection::new(Some(messages.clone())))
-            .factory(&message_row_factory())
+            .factory(&message_row_factory(status_labels.clone()))
             .build();
         let message_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -130,9 +138,12 @@ impl Window {
             .css_classes(["composer"])
             .build();
         composer.update_property(&[gtk::accessible::Property::Label("Message")]);
-        // Grows with the text up to a few lines, then scrolls.
+        // Grows with the text up to a few lines, then scrolls. No scrollbar:
+        // reserving room for one would make the empty field two lines tall,
+        // and the text view keeps the cursor in sight on its own.
         let composer_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
+            .vscrollbar_policy(gtk::PolicyType::External)
             .propagate_natural_height(true)
             .max_content_height(140)
             .hexpand(true)
@@ -193,6 +204,7 @@ impl Window {
         window.add_breakpoint(narrow);
 
         let ui = Rc::new(Self {
+            status_labels,
             window: window.clone(),
             reported_active: RefCell::new(String::new()),
             stack,
@@ -212,6 +224,7 @@ impl Window {
             current_chat: RefCell::new(None),
             content_stack,
             messages,
+            message_list,
             message_scroll,
             loading: Cell::new(false),
             has_more: Cell::new(false),
@@ -250,9 +263,9 @@ impl Window {
         adj.connect_changed(glib::clone!(
             #[weak]
             ui,
-            move |adj| {
+            move |_| {
                 if ui.stick_bottom.get() {
-                    adj.set_value(adj.upper() - adj.page_size());
+                    ui.show_last_row();
                 }
             }
         ));
@@ -688,17 +701,34 @@ impl Window {
                 .message_ids
                 .contains(&item.borrow::<ipc::Message>().id);
             if hit {
-                item.borrow_mut::<ipc::Message>().status = change.status;
-                // Re-adding the same item makes the list view rebind its row.
-                self.messages.splice(pos, 1, &[item]);
+                let mut msg = item.borrow_mut::<ipc::Message>();
+                msg.status = change.status;
+                let label = self
+                    .status_labels
+                    .borrow()
+                    .get(&msg.id)
+                    .and_then(|l| l.upgrade());
+                if let Some(label) = label {
+                    show_status(&label, change.status());
+                }
             }
         }
     }
 
     fn scroll_to_bottom(&self) {
         self.stick_bottom.set(true);
-        let adj = self.message_scroll.vadjustment();
-        adj.set_value(adj.upper() - adj.page_size());
+        self.show_last_row();
+    }
+
+    /// Scrolls through the list view rather than by setting the adjustment:
+    /// the list keeps its own anchor, and moving the adjustment behind its
+    /// back makes the next row resize (a receipt, say) jump to the top.
+    fn show_last_row(&self) {
+        let n = self.messages.n_items();
+        if n > 0 {
+            self.message_list
+                .scroll_to(n - 1, gtk::ListScrollFlags::NONE, None);
+        }
     }
 
     fn start_link(&self) {
@@ -865,7 +895,24 @@ fn chat_row_factory() -> gtk::SignalListItemFactory {
     factory
 }
 
-fn message_row_factory() -> gtk::SignalListItemFactory {
+fn show_status(label: &gtk::Label, status: ipc::MessageStatus) {
+    let (marks, tooltip, read) = match status {
+        ipc::MessageStatus::Sent => ("✓", "Sent", false),
+        ipc::MessageStatus::Delivered => ("✓✓", "Delivered", false),
+        ipc::MessageStatus::Read => ("✓✓", "Read", true),
+        ipc::MessageStatus::Unspecified => ("", "", false),
+    };
+    label.set_label(marks);
+    label.set_tooltip_text(Some(tooltip));
+    label.update_property(&[gtk::accessible::Property::Label(tooltip)]);
+    label.set_css_classes(if read {
+        &["caption", "accent"]
+    } else {
+        &["caption", "dim-label"]
+    });
+}
+
+fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
@@ -911,7 +958,8 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
         row.append(&bubble);
         item.set_child(Some(&row));
     });
-    factory.connect_bind(|_, item| {
+    let bound = status_labels.clone();
+    factory.connect_bind(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         let msg = item.item().and_downcast::<glib::BoxedAnyObject>().unwrap();
         let msg = msg.borrow::<ipc::Message>();
@@ -931,20 +979,10 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
         }
         text.set_label(&msg.text);
         time.set_label(&time_of_day(msg.timestamp_ms));
-        let (marks, tooltip, read) = match msg.status() {
-            ipc::MessageStatus::Sent => ("✓", "Sent", false),
-            ipc::MessageStatus::Delivered => ("✓✓", "Delivered", false),
-            ipc::MessageStatus::Read => ("✓✓", "Read", true),
-            ipc::MessageStatus::Unspecified => ("", "", false),
-        };
-        status.set_label(marks);
-        status.set_tooltip_text(Some(tooltip));
-        status.update_property(&[gtk::accessible::Property::Label(tooltip)]);
-        status.set_css_classes(if read {
-            &["caption", "accent"]
-        } else {
-            &["caption", "dim-label"]
-        });
+        show_status(&status, msg.status());
+        bound
+            .borrow_mut()
+            .insert(msg.id.clone(), status.downgrade());
         bubble.set_halign(if msg.from_me {
             gtk::Align::End
         } else {
@@ -954,6 +992,14 @@ fn message_row_factory() -> gtk::SignalListItemFactory {
             bubble.add_css_class("mine");
         } else {
             bubble.remove_css_class("mine");
+        }
+    });
+    factory.connect_unbind(move |_, item| {
+        let item = item.downcast_ref::<gtk::ListItem>().unwrap();
+        if let Some(msg) = item.item().and_downcast::<glib::BoxedAnyObject>() {
+            status_labels
+                .borrow_mut()
+                .remove(&msg.borrow::<ipc::Message>().id);
         }
     });
     factory
