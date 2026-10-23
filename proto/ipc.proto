@@ -34,6 +34,7 @@ message Event {
     Message message_received = 8;
     QrCode qr_code = 9;
     LinkFailed link_failed = 10;
+    MessageStatusChanged message_status_changed = 11;
   }
 }
 
@@ -136,4 +137,21 @@ message Message {
   string text = 7;
   // Display name of the sender; empty for own messages or when unknown.
   string sender_name = 8;
+  // Delivery progress of own messages; unspecified for received ones.
+  MessageStatus status = 9;
+}
+
+enum MessageStatus {
+  MESSAGE_STATUS_UNSPECIFIED = 0;
+  MESSAGE_STATUS_SENT = 1;
+  MESSAGE_STATUS_DELIVERED = 2;
+  MESSAGE_STATUS_READ = 3;
+}
+
+// Own messages that moved forward to a new status.
+message MessageStatusChanged {
+  string account_id = 1;
+  string chat_jid = 2;
+  repeated string message_ids = 3;
+  MessageStatus status = 4;
 }

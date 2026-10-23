@@ -76,6 +76,58 @@ func (ConnectionState) EnumDescriptor() ([]byte, []int) {
 	return file_ipc_proto_rawDescGZIP(), []int{0}
 }
 
+type MessageStatus int32
+
+const (
+	MessageStatus_MESSAGE_STATUS_UNSPECIFIED MessageStatus = 0
+	MessageStatus_MESSAGE_STATUS_SENT        MessageStatus = 1
+	MessageStatus_MESSAGE_STATUS_DELIVERED   MessageStatus = 2
+	MessageStatus_MESSAGE_STATUS_READ        MessageStatus = 3
+)
+
+// Enum value maps for MessageStatus.
+var (
+	MessageStatus_name = map[int32]string{
+		0: "MESSAGE_STATUS_UNSPECIFIED",
+		1: "MESSAGE_STATUS_SENT",
+		2: "MESSAGE_STATUS_DELIVERED",
+		3: "MESSAGE_STATUS_READ",
+	}
+	MessageStatus_value = map[string]int32{
+		"MESSAGE_STATUS_UNSPECIFIED": 0,
+		"MESSAGE_STATUS_SENT":        1,
+		"MESSAGE_STATUS_DELIVERED":   2,
+		"MESSAGE_STATUS_READ":        3,
+	}
+)
+
+func (x MessageStatus) Enum() *MessageStatus {
+	p := new(MessageStatus)
+	*p = x
+	return p
+}
+
+func (x MessageStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MessageStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_ipc_proto_enumTypes[1].Descriptor()
+}
+
+func (MessageStatus) Type() protoreflect.EnumType {
+	return &file_ipc_proto_enumTypes[1]
+}
+
+func (x MessageStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MessageStatus.Descriptor instead.
+func (MessageStatus) EnumDescriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{1}
+}
+
 // UI -> daemon.
 type Request struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -248,6 +300,7 @@ type Event struct {
 	//	*Event_MessageReceived
 	//	*Event_QrCode
 	//	*Event_LinkFailed
+	//	*Event_MessageStatusChanged
 	Kind          isEvent_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -378,6 +431,15 @@ func (x *Event) GetLinkFailed() *LinkFailed {
 	return nil
 }
 
+func (x *Event) GetMessageStatusChanged() *MessageStatusChanged {
+	if x != nil {
+		if x, ok := x.Kind.(*Event_MessageStatusChanged); ok {
+			return x.MessageStatusChanged
+		}
+	}
+	return nil
+}
+
 type isEvent_Kind interface {
 	isEvent_Kind()
 }
@@ -418,6 +480,10 @@ type Event_LinkFailed struct {
 	LinkFailed *LinkFailed `protobuf:"bytes,10,opt,name=link_failed,json=linkFailed,proto3,oneof"`
 }
 
+type Event_MessageStatusChanged struct {
+	MessageStatusChanged *MessageStatusChanged `protobuf:"bytes,11,opt,name=message_status_changed,json=messageStatusChanged,proto3,oneof"`
+}
+
 func (*Event_Error) isEvent_Kind() {}
 
 func (*Event_Accounts) isEvent_Kind() {}
@@ -435,6 +501,8 @@ func (*Event_MessageReceived) isEvent_Kind() {}
 func (*Event_QrCode) isEvent_Kind() {}
 
 func (*Event_LinkFailed) isEvent_Kind() {}
+
+func (*Event_MessageStatusChanged) isEvent_Kind() {}
 
 type ListAccounts struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1200,7 +1268,9 @@ type Message struct {
 	// the client cannot show yet.
 	Text string `protobuf:"bytes,7,opt,name=text,proto3" json:"text,omitempty"`
 	// Display name of the sender; empty for own messages or when unknown.
-	SenderName    string `protobuf:"bytes,8,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
+	SenderName string `protobuf:"bytes,8,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
+	// Delivery progress of own messages; unspecified for received ones.
+	Status        MessageStatus `protobuf:"varint,9,opt,name=status,proto3,enum=wassup.ipc.v1.MessageStatus" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1291,6 +1361,82 @@ func (x *Message) GetSenderName() string {
 	return ""
 }
 
+func (x *Message) GetStatus() MessageStatus {
+	if x != nil {
+		return x.Status
+	}
+	return MessageStatus_MESSAGE_STATUS_UNSPECIFIED
+}
+
+// Own messages that moved forward to a new status.
+type MessageStatusChanged struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ChatJid       string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
+	MessageIds    []string               `protobuf:"bytes,3,rep,name=message_ids,json=messageIds,proto3" json:"message_ids,omitempty"`
+	Status        MessageStatus          `protobuf:"varint,4,opt,name=status,proto3,enum=wassup.ipc.v1.MessageStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MessageStatusChanged) Reset() {
+	*x = MessageStatusChanged{}
+	mi := &file_ipc_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MessageStatusChanged) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessageStatusChanged) ProtoMessage() {}
+
+func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessageStatusChanged.ProtoReflect.Descriptor instead.
+func (*MessageStatusChanged) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *MessageStatusChanged) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *MessageStatusChanged) GetChatJid() string {
+	if x != nil {
+		return x.ChatJid
+	}
+	return ""
+}
+
+func (x *MessageStatusChanged) GetMessageIds() []string {
+	if x != nil {
+		return x.MessageIds
+	}
+	return nil
+}
+
+func (x *MessageStatusChanged) GetStatus() MessageStatus {
+	if x != nil {
+		return x.Status
+	}
+	return MessageStatus_MESSAGE_STATUS_UNSPECIFIED
+}
+
 var File_ipc_proto protoreflect.FileDescriptor
 
 const file_ipc_proto_rawDesc = "" +
@@ -1305,7 +1451,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\tsend_text\x18\x05 \x01(\v2\x17.wassup.ipc.v1.SendTextH\x00R\bsendText\x12?\n" +
 	"\flink_account\x18\x06 \x01(\v2\x1a.wassup.ipc.v1.LinkAccountH\x00R\vlinkAccount\x126\n" +
 	"\tmark_read\x18\a \x01(\v2\x17.wassup.ipc.v1.MarkReadH\x00R\bmarkReadB\x06\n" +
-	"\x04kind\"\xb3\x04\n" +
+	"\x04kind\"\x90\x05\n" +
 	"\x05Event\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12,\n" +
@@ -1319,7 +1465,8 @@ const file_ipc_proto_rawDesc = "" +
 	"\aqr_code\x18\t \x01(\v2\x15.wassup.ipc.v1.QrCodeH\x00R\x06qrCode\x12<\n" +
 	"\vlink_failed\x18\n" +
 	" \x01(\v2\x19.wassup.ipc.v1.LinkFailedH\x00R\n" +
-	"linkFailedB\x06\n" +
+	"linkFailed\x12[\n" +
+	"\x16message_status_changed\x18\v \x01(\v2#.wassup.ipc.v1.MessageStatusChangedH\x00R\x14messageStatusChangedB\x06\n" +
 	"\x04kind\"\x0e\n" +
 	"\fListAccounts\"*\n" +
 	"\tListChats\x12\x1d\n" +
@@ -1374,7 +1521,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x19\n" +
 	"\bis_group\x18\x04 \x01(\bR\aisGroup\x12!\n" +
 	"\funread_count\x18\x05 \x01(\rR\vunreadCount\x12+\n" +
-	"\x12last_message_at_ms\x18\x06 \x01(\x03R\x0flastMessageAtMs\"\xe3\x01\n" +
+	"\x12last_message_at_ms\x18\x06 \x01(\x03R\x0flastMessageAtMs\"\x99\x02\n" +
 	"\aMessage\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -1386,13 +1533,26 @@ const file_ipc_proto_rawDesc = "" +
 	"\ftimestamp_ms\x18\x06 \x01(\x03R\vtimestampMs\x12\x12\n" +
 	"\x04text\x18\a \x01(\tR\x04text\x12\x1f\n" +
 	"\vsender_name\x18\b \x01(\tR\n" +
-	"senderName*\xb8\x01\n" +
+	"senderName\x124\n" +
+	"\x06status\x18\t \x01(\x0e2\x1c.wassup.ipc.v1.MessageStatusR\x06status\"\xa7\x01\n" +
+	"\x14MessageStatusChanged\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12\x1f\n" +
+	"\vmessage_ids\x18\x03 \x03(\tR\n" +
+	"messageIds\x124\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x1c.wassup.ipc.v1.MessageStatusR\x06status*\xb8\x01\n" +
 	"\x0fConnectionState\x12 \n" +
 	"\x1cCONNECTION_STATE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dCONNECTION_STATE_DISCONNECTED\x10\x01\x12\x1f\n" +
 	"\x1bCONNECTION_STATE_CONNECTING\x10\x02\x12\x1e\n" +
 	"\x1aCONNECTION_STATE_CONNECTED\x10\x03\x12\x1f\n" +
-	"\x1bCONNECTION_STATE_LOGGED_OUT\x10\x04B'Z%github.com/MawCeron/Wassup/daemon/ipcb\x06proto3"
+	"\x1bCONNECTION_STATE_LOGGED_OUT\x10\x04*\x7f\n" +
+	"\rMessageStatus\x12\x1e\n" +
+	"\x1aMESSAGE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13MESSAGE_STATUS_SENT\x10\x01\x12\x1c\n" +
+	"\x18MESSAGE_STATUS_DELIVERED\x10\x02\x12\x17\n" +
+	"\x13MESSAGE_STATUS_READ\x10\x03B'Z%github.com/MawCeron/Wassup/daemon/ipcb\x06proto3"
 
 var (
 	file_ipc_proto_rawDescOnce sync.Once
@@ -1406,53 +1566,58 @@ func file_ipc_proto_rawDescGZIP() []byte {
 	return file_ipc_proto_rawDescData
 }
 
-var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_ipc_proto_goTypes = []any{
-	(ConnectionState)(0), // 0: wassup.ipc.v1.ConnectionState
-	(*Request)(nil),      // 1: wassup.ipc.v1.Request
-	(*Event)(nil),        // 2: wassup.ipc.v1.Event
-	(*ListAccounts)(nil), // 3: wassup.ipc.v1.ListAccounts
-	(*ListChats)(nil),    // 4: wassup.ipc.v1.ListChats
-	(*ListMessages)(nil), // 5: wassup.ipc.v1.ListMessages
-	(*SendText)(nil),     // 6: wassup.ipc.v1.SendText
-	(*LinkAccount)(nil),  // 7: wassup.ipc.v1.LinkAccount
-	(*QrCode)(nil),       // 8: wassup.ipc.v1.QrCode
-	(*LinkFailed)(nil),   // 9: wassup.ipc.v1.LinkFailed
-	(*MarkRead)(nil),     // 10: wassup.ipc.v1.MarkRead
-	(*Error)(nil),        // 11: wassup.ipc.v1.Error
-	(*AccountList)(nil),  // 12: wassup.ipc.v1.AccountList
-	(*ChatList)(nil),     // 13: wassup.ipc.v1.ChatList
-	(*MessageList)(nil),  // 14: wassup.ipc.v1.MessageList
-	(*Account)(nil),      // 15: wassup.ipc.v1.Account
-	(*Chat)(nil),         // 16: wassup.ipc.v1.Chat
-	(*Message)(nil),      // 17: wassup.ipc.v1.Message
+	(ConnectionState)(0),         // 0: wassup.ipc.v1.ConnectionState
+	(MessageStatus)(0),           // 1: wassup.ipc.v1.MessageStatus
+	(*Request)(nil),              // 2: wassup.ipc.v1.Request
+	(*Event)(nil),                // 3: wassup.ipc.v1.Event
+	(*ListAccounts)(nil),         // 4: wassup.ipc.v1.ListAccounts
+	(*ListChats)(nil),            // 5: wassup.ipc.v1.ListChats
+	(*ListMessages)(nil),         // 6: wassup.ipc.v1.ListMessages
+	(*SendText)(nil),             // 7: wassup.ipc.v1.SendText
+	(*LinkAccount)(nil),          // 8: wassup.ipc.v1.LinkAccount
+	(*QrCode)(nil),               // 9: wassup.ipc.v1.QrCode
+	(*LinkFailed)(nil),           // 10: wassup.ipc.v1.LinkFailed
+	(*MarkRead)(nil),             // 11: wassup.ipc.v1.MarkRead
+	(*Error)(nil),                // 12: wassup.ipc.v1.Error
+	(*AccountList)(nil),          // 13: wassup.ipc.v1.AccountList
+	(*ChatList)(nil),             // 14: wassup.ipc.v1.ChatList
+	(*MessageList)(nil),          // 15: wassup.ipc.v1.MessageList
+	(*Account)(nil),              // 16: wassup.ipc.v1.Account
+	(*Chat)(nil),                 // 17: wassup.ipc.v1.Chat
+	(*Message)(nil),              // 18: wassup.ipc.v1.Message
+	(*MessageStatusChanged)(nil), // 19: wassup.ipc.v1.MessageStatusChanged
 }
 var file_ipc_proto_depIdxs = []int32{
-	3,  // 0: wassup.ipc.v1.Request.list_accounts:type_name -> wassup.ipc.v1.ListAccounts
-	4,  // 1: wassup.ipc.v1.Request.list_chats:type_name -> wassup.ipc.v1.ListChats
-	5,  // 2: wassup.ipc.v1.Request.list_messages:type_name -> wassup.ipc.v1.ListMessages
-	6,  // 3: wassup.ipc.v1.Request.send_text:type_name -> wassup.ipc.v1.SendText
-	7,  // 4: wassup.ipc.v1.Request.link_account:type_name -> wassup.ipc.v1.LinkAccount
-	10, // 5: wassup.ipc.v1.Request.mark_read:type_name -> wassup.ipc.v1.MarkRead
-	11, // 6: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
-	12, // 7: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
-	13, // 8: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
-	14, // 9: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
-	15, // 10: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
-	16, // 11: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
-	17, // 12: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
-	8,  // 13: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
-	9,  // 14: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
-	15, // 15: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
-	16, // 16: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
-	17, // 17: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
-	0,  // 18: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	4,  // 0: wassup.ipc.v1.Request.list_accounts:type_name -> wassup.ipc.v1.ListAccounts
+	5,  // 1: wassup.ipc.v1.Request.list_chats:type_name -> wassup.ipc.v1.ListChats
+	6,  // 2: wassup.ipc.v1.Request.list_messages:type_name -> wassup.ipc.v1.ListMessages
+	7,  // 3: wassup.ipc.v1.Request.send_text:type_name -> wassup.ipc.v1.SendText
+	8,  // 4: wassup.ipc.v1.Request.link_account:type_name -> wassup.ipc.v1.LinkAccount
+	11, // 5: wassup.ipc.v1.Request.mark_read:type_name -> wassup.ipc.v1.MarkRead
+	12, // 6: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
+	13, // 7: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
+	14, // 8: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
+	15, // 9: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
+	16, // 10: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
+	17, // 11: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
+	18, // 12: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
+	9,  // 13: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
+	10, // 14: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
+	19, // 15: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
+	16, // 16: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
+	17, // 17: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
+	18, // 18: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
+	0,  // 19: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
+	1,  // 20: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
+	1,  // 21: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_ipc_proto_init() }
@@ -1478,14 +1643,15 @@ func file_ipc_proto_init() {
 		(*Event_MessageReceived)(nil),
 		(*Event_QrCode)(nil),
 		(*Event_LinkFailed)(nil),
+		(*Event_MessageStatusChanged)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipc_proto_rawDesc), len(file_ipc_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   17,
+			NumEnums:      2,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"path/filepath"
+
+	"github.com/MawCeron/Wassup/daemon/ipc"
 	"testing"
 	"time"
 
@@ -87,10 +91,57 @@ func TestSaveAndListMessages(t *testing.T) {
 		t.Fatalf("page before D: %v, %v", page, err)
 	}
 
+	changed, err := a.advanceStatus(ctx, []types.MessageID{"D", "A"}, ipc.MessageStatus_MESSAGE_STATUS_READ)
+	if err != nil || len(changed[chat.String()]) != 1 || changed[chat.String()][0] != "D" {
+		t.Fatalf("read receipt changed %v, %v; want only own message D", changed, err)
+	}
+	changed, _ = a.advanceStatus(ctx, []types.MessageID{"D"}, ipc.MessageStatus_MESSAGE_STATUS_DELIVERED)
+	if len(changed) != 0 {
+		t.Fatalf("status went back from read to delivered: %v", changed)
+	}
+	page, _ = a.listMessages(ctx, chat.String(), "", 0)
+	for _, m := range page {
+		if m.Id == "D" && m.Status != ipc.MessageStatus_MESSAGE_STATUS_READ {
+			t.Fatalf("stored status of D: %v", m.Status)
+		}
+	}
+
 	if _, _, err := a.sendText(ctx, chat.String(), ""); err == nil {
 		t.Fatal("sent an empty message")
 	}
 	if _, _, err := a.sendText(ctx, chat.String(), "hi"); err == nil {
 		t.Fatal("sent from an unlinked account")
+	}
+}
+
+// A database created before migrations existed has the first tables but
+// user_version 0; migrating must keep its rows and mark own ones as sent.
+func TestMigrateExistingDatabase(t *testing.T) {
+	ctx := context.Background()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "old.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, q := range []string{
+		migrations[0],
+		`INSERT INTO wassup_chats (jid, is_group) VALUES ('c', 0)`,
+		`INSERT INTO wassup_messages VALUES ('c', 'mine', 'me', 1, 1, 'hi'), ('c', 'theirs', 'x', 0, 2, 'yo')`,
+	} {
+		if _, err := db.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	var mine, theirs int
+	db.QueryRowContext(ctx, `SELECT status FROM wassup_messages WHERE id = 'mine'`).Scan(&mine)
+	db.QueryRowContext(ctx, `SELECT status FROM wassup_messages WHERE id = 'theirs'`).Scan(&theirs)
+	if mine != 1 || theirs != 0 {
+		t.Fatalf("statuses after migration: mine=%d theirs=%d", mine, theirs)
 	}
 }

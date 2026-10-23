@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
@@ -13,8 +15,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Our tables live next to whatsmeow's in the account database.
-const schema = `
+// Our tables live next to whatsmeow's in the account database. Each
+// migration runs once, in order; PRAGMA user_version counts those applied.
+var migrations = []string{`
 CREATE TABLE IF NOT EXISTS wassup_chats (
 	jid                TEXT PRIMARY KEY,
 	name               TEXT NOT NULL DEFAULT '',
@@ -32,7 +35,35 @@ CREATE TABLE IF NOT EXISTS wassup_messages (
 	PRIMARY KEY (chat_jid, id)
 );
 CREATE INDEX IF NOT EXISTS wassup_messages_by_time ON wassup_messages (chat_jid, timestamp_ms, id);
-`
+`, `
+ALTER TABLE wassup_messages ADD COLUMN status INTEGER NOT NULL DEFAULT 0;
+UPDATE wassup_messages SET status = 1 WHERE from_me = 1;
+`}
+
+func migrate(ctx context.Context, db *sql.DB) error {
+	var version int
+	if err := db.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version); err != nil {
+		return err
+	}
+	for ; version < len(migrations); version++ {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, migrations[version])
+		if err == nil {
+			_, err = tx.ExecContext(ctx, fmt.Sprintf(`PRAGMA user_version = %d`, version+1))
+		}
+		if err == nil {
+			err = tx.Commit()
+		}
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migration %d: %w", version+1, err)
+		}
+	}
+	return nil
+}
 
 const (
 	defaultPageSize = 50
@@ -103,7 +134,9 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 		TimestampMs: info.Timestamp.UnixMilli(),
 		Text:        text,
 	}
-	if !msg.FromMe {
+	if msg.FromMe {
+		msg.Status = ipc.MessageStatus_MESSAGE_STATUS_SENT
+	} else {
 		msg.SenderName = a.contactName(ctx, info.Sender.ToNonAD())
 		if msg.SenderName == "" {
 			msg.SenderName = info.PushName
@@ -133,8 +166,8 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	}
 
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO wassup_messages
-		(chat_jid, id, sender_jid, from_me, timestamp_ms, text) VALUES (?, ?, ?, ?, ?, ?)`,
-		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text)
+		(chat_jid, id, sender_jid, from_me, timestamp_ms, text, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text, msg.Status)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -260,7 +293,7 @@ func (a *account) listMessages(ctx context.Context, chatJID, beforeID string, li
 	}
 	limit = min(limit, maxPageSize)
 	rows, err := a.db.QueryContext(ctx, `
-		SELECT id, sender_jid, from_me, timestamp_ms, text FROM wassup_messages
+		SELECT id, sender_jid, from_me, timestamp_ms, text, status FROM wassup_messages
 		WHERE chat_jid = ?1 AND (?2 = '' OR (timestamp_ms, id) <
 			(SELECT timestamp_ms, id FROM wassup_messages WHERE chat_jid = ?1 AND id = ?2))
 		ORDER BY timestamp_ms DESC, id DESC LIMIT ?3`, chatJID, beforeID, limit)
@@ -272,7 +305,7 @@ func (a *account) listMessages(ctx context.Context, chatJID, beforeID string, li
 	names := map[string]string{}
 	for rows.Next() {
 		m := &ipc.Message{AccountId: a.id, ChatJid: chatJID}
-		if err := rows.Scan(&m.Id, &m.SenderJid, &m.FromMe, &m.TimestampMs, &m.Text); err != nil {
+		if err := rows.Scan(&m.Id, &m.SenderJid, &m.FromMe, &m.TimestampMs, &m.Text, &m.Status); err != nil {
 			return nil, err
 		}
 		if !m.FromMe {
@@ -373,4 +406,46 @@ func (a *account) markRead(ctx context.Context, chatJID string) (*ipc.Chat, erro
 		return nil, err
 	}
 	return a.named(ctx, c), nil
+}
+
+// receiptStatus maps a receipt from a contact to the status it proves, or
+// unspecified for receipts that say nothing about own messages.
+func receiptStatus(t types.ReceiptType) ipc.MessageStatus {
+	switch t {
+	case types.ReceiptTypeDelivered:
+		return ipc.MessageStatus_MESSAGE_STATUS_DELIVERED
+	case types.ReceiptTypeRead, types.ReceiptTypePlayed:
+		return ipc.MessageStatus_MESSAGE_STATUS_READ
+	}
+	return ipc.MessageStatus_MESSAGE_STATUS_UNSPECIFIED
+}
+
+// advanceStatus moves own messages forward to status and returns the ids
+// that changed, by chat. Statuses never go back.
+func (a *account) advanceStatus(ctx context.Context, ids []types.MessageID, status ipc.MessageStatus) (map[string][]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	args := []any{status, status}
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	// Message ids are random and unique enough to match without the chat,
+	// whose id may differ between phone-number and hidden (LID) forms.
+	rows, err := a.db.QueryContext(ctx, `UPDATE wassup_messages SET status = ?
+		WHERE from_me = 1 AND status < ? AND id IN (?`+strings.Repeat(", ?", len(ids)-1)+`)
+		RETURNING chat_jid, id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	changed := map[string][]string{}
+	for rows.Next() {
+		var chat, id string
+		if err := rows.Scan(&chat, &id); err != nil {
+			return nil, err
+		}
+		changed[chat] = append(changed[chat], id)
+	}
+	return changed, rows.Err()
 }

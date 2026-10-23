@@ -138,6 +138,21 @@ func newDaemon(accounts []*account) *daemon {
 			switch e := evt.(type) {
 			case *events.Connected, *events.Disconnected, *events.LoggedOut, *events.StreamReplaced:
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
+			case *events.Receipt:
+				// TODO: in groups WhatsApp waits for every member; this takes the first receipt.
+				status := receiptStatus(e.Type)
+				if status == ipc.MessageStatus_MESSAGE_STATUS_UNSPECIFIED {
+					return
+				}
+				changed, err := a.advanceStatus(context.Background(), e.MessageIDs, status)
+				if err != nil {
+					a.log.Error("message status", "err", err)
+				}
+				for chat, ids := range changed {
+					d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageStatusChanged{MessageStatusChanged: &ipc.MessageStatusChanged{
+						AccountId: a.id, ChatJid: chat, MessageIds: ids, Status: status,
+					}}})
+				}
 			case *events.Message:
 				msg, chat, err := a.saveMessage(context.Background(), e)
 				if err != nil {

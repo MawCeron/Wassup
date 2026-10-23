@@ -73,7 +73,7 @@ func openAccount(ctx context.Context, dir, id string) (*account, error) {
 	if err := container.Upgrade(ctx); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
-	if _, err := db.ExecContext(ctx, schema); err != nil {
+	if err := migrate(ctx, db); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
 	// Returns a fresh, unlinked device when the store is empty.
