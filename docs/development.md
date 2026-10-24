@@ -44,7 +44,9 @@ brings the existing window to the front. An unlinked account shows the
 QR code to link it.
 
 Closing the window ends the UI process but not the daemon, which keeps
-receiving messages. The window size and the open chat are saved to
+receiving messages. If the daemon restarts, for example after an update, the
+UI reconnects on its own and reloads the open chat; there is no need to
+close it, let alone to unlink the device. The window size and the open chat are saved to
 `$XDG_STATE_HOME/wassup/ui.ini` and restored on the next launch.
 
 Formatting and lint rules are the tools' defaults; no config files.

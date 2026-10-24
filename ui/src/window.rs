@@ -39,6 +39,12 @@ struct RowWidgets {
 type Owner = Rc<std::cell::OnceCell<std::rc::Weak<Window>>>;
 
 pub struct Window {
+    /// Shown over the current page while reconnecting after a disconnection.
+    banner: adw::Banner,
+    /// Whether any connection succeeded; until then failures fill the window.
+    ever_connected: Cell<bool>,
+    reconnect_attempts: Cell<u32>,
+    reconnect_pending: Cell<bool>,
     rows: BoundRows,
     /// Messages whose media was asked for and has not arrived yet.
     media_requested: RefCell<std::collections::HashSet<String>>,
@@ -292,7 +298,15 @@ impl Window {
         );
 
         let toasts = adw::ToastOverlay::new();
-        toasts.set_child(Some(&stack));
+        let banner = adw::Banner::builder()
+            .title("Reconnecting to the Wassup daemon…")
+            .button_label("Retry")
+            .build();
+        let page = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        page.append(&banner);
+        page.append(&stack);
+        stack.set_vexpand(true);
+        toasts.set_child(Some(&page));
         let saved = SavedState::load(&state_path());
         let window = adw::ApplicationWindow::builder()
             .application(app)
@@ -309,6 +323,10 @@ impl Window {
         window.add_breakpoint(narrow);
 
         let ui = Rc::new(Self {
+            banner,
+            ever_connected: Cell::new(false),
+            reconnect_attempts: Cell::new(0),
+            reconnect_pending: Cell::new(false),
             rows,
             media_requested: RefCell::default(),
             open_when_ready: RefCell::default(),
@@ -352,6 +370,11 @@ impl Window {
             conn: RefCell::new(None),
             account: RefCell::new(None),
         });
+        ui.banner.connect_button_clicked(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.connect()
+        ));
         // The button owns the state for as long as the window lives.
         ui.retry.connect_clicked(glib::clone!(
             #[strong]
@@ -548,20 +571,31 @@ impl Window {
     }
 
     fn connect(self: &Rc<Self>) {
+        if self.conn.borrow().is_some() {
+            return; // A pending retry raced with a manual one.
+        }
         let (conn, events) = match ipc::Connection::open() {
             Ok(pair) => pair,
-            Err(e) => {
-                return self.show_status("Can't reach the Wassup daemon", &e.to_string(), true);
-            }
+            Err(e) => return self.disconnected("Can't reach the Wassup daemon", &e.to_string()),
         };
         self.conn.replace(Some(conn));
+        self.reconnect_attempts.set(0);
+        self.banner.set_revealed(false);
+        if self.ever_connected.get() {
+            // Reopen the chat once chats load, so messages missed while
+            // disconnected show up.
+            let open = self.current_chat.take();
+            self.restore_chat.replace(open);
+        }
         // Events may have been missed while disconnected.
         self.chats_loaded.set(false);
         self.media_requested.borrow_mut().clear();
         self.avatar_requested.borrow_mut().clear();
         // The daemon forgets the active chat of a closed connection.
         self.reported_active.replace("/".to_owned());
-        self.show_status("Connecting…", "", false);
+        if !self.ever_connected.get() {
+            self.show_status("Connecting…", "", false);
+        }
         self.send(request::Kind::ListAccounts(ipc::ListAccounts {}));
 
         let ui = Rc::downgrade(self);
@@ -572,10 +606,35 @@ impl Window {
                     Ok(event) => ui.handle(event),
                     Err(e) => {
                         ui.conn.take();
-                        ui.show_status("Lost the connection to the daemon", &e.to_string(), true);
+                        ui.disconnected("Lost the connection to the daemon", &e.to_string());
                         break;
                     }
                 }
+            }
+        });
+    }
+
+    /// Retries the connection with growing pauses, since the daemon usually
+    /// comes back on its own, e.g. after an update restarts it. Before the
+    /// first success the failure fills the window; after it, a banner keeps
+    /// the current page in place.
+    fn disconnected(self: &Rc<Self>, title: &str, detail: &str) {
+        if self.ever_connected.get() {
+            self.banner.set_revealed(true);
+        } else {
+            self.show_status(title, detail, true);
+        }
+        if self.reconnect_pending.replace(true) {
+            return;
+        }
+        let attempt = self.reconnect_attempts.get();
+        self.reconnect_attempts.set(attempt + 1);
+        let delay = [1, 2, 4, 8][attempt.min(3) as usize];
+        let ui = Rc::downgrade(self);
+        glib::timeout_add_seconds_local_once(delay, move || {
+            if let Some(ui) = ui.upgrade() {
+                ui.reconnect_pending.set(false);
+                ui.connect();
             }
         });
     }
@@ -608,6 +667,7 @@ impl Window {
         match event.kind {
             Some(event::Kind::Error(e)) => self.toast(&e.message),
             Some(event::Kind::Accounts(list)) => {
+                self.ever_connected.set(true);
                 // TODO: pick the account once the UI supports several.
                 match list.accounts.into_iter().next() {
                     Some(account) => self.set_account(account),
