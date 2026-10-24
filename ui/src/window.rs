@@ -16,9 +16,10 @@ const PAGE_SIZE: u32 = 50;
 
 const CSS: &str = "
 .bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
-.bubble.sticker { background: none; padding: 0; }
 .media { border-radius: 8px; background: alpha(currentColor, 0.08); }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
+/* After .mine, which has the same weight: own stickers have no bubble either. */
+.bubble.sticker { background: none; padding: 0; }
 .composer { border-radius: 10px; background: var(--card-bg-color); }
 ";
 
