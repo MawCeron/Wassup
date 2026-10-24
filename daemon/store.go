@@ -47,6 +47,20 @@ ALTER TABLE wassup_messages ADD COLUMN media BLOB;
 -- checked, so it is not asked for again on every start.
 ALTER TABLE wassup_chats ADD COLUMN avatar_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE wassup_chats ADD COLUMN avatar_checked_ms INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Favorite stickers synced from the phone. action is the serialized
+-- StickerAction; file_sha256 is filled once the sticker is downloaded,
+-- since the sync does not carry it and sending needs it.
+CREATE TABLE wassup_favorite_stickers (
+	id          TEXT PRIMARY KEY,
+	action      BLOB NOT NULL,
+	file_sha256 BLOB,
+	added_ms    INTEGER NOT NULL
+);
+CREATE TABLE wassup_meta (
+	key   TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {

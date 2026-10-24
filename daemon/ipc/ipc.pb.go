@@ -1845,8 +1845,9 @@ func (x *SendMedia) GetAsSticker() bool {
 	return false
 }
 
-// Stickers recently sent or received in any chat, newest first, without
-// repeats. Answered with stickers.
+// The user's favorite stickers, synced from the phone, then stickers
+// recently sent or received in any chat, newest first, without repeats.
+// Answered with stickers.
 type ListStickers struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
@@ -1942,7 +1943,10 @@ type Sticker struct {
 	ChatJid   string                 `protobuf:"bytes,1,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
 	MessageId string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	// Cached file; empty until downloaded like any other media.
-	Path          string `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	Path string `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	// Set for favorites, which come from the phone rather than a message;
+	// chat_jid and message_id are then empty.
+	FavoriteId    string `protobuf:"bytes,4,opt,name=favorite_id,json=favoriteId,proto3" json:"favorite_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1998,6 +2002,13 @@ func (x *Sticker) GetPath() string {
 	return ""
 }
 
+func (x *Sticker) GetFavoriteId() string {
+	if x != nil {
+		return x.FavoriteId
+	}
+	return ""
+}
+
 // Sends a known sticker again, reusing the uploaded file. Answered with
 // message_received, or error.
 type SendSticker struct {
@@ -2006,8 +2017,10 @@ type SendSticker struct {
 	ChatJid         string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
 	SourceChatJid   string                 `protobuf:"bytes,3,opt,name=source_chat_jid,json=sourceChatJid,proto3" json:"source_chat_jid,omitempty"`
 	SourceMessageId string                 `protobuf:"bytes,4,opt,name=source_message_id,json=sourceMessageId,proto3" json:"source_message_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Sends a favorite instead of a sticker from a message.
+	FavoriteId    string `protobuf:"bytes,5,opt,name=favorite_id,json=favoriteId,proto3" json:"favorite_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SendSticker) Reset() {
@@ -2064,6 +2077,13 @@ func (x *SendSticker) GetSourceChatJid() string {
 func (x *SendSticker) GetSourceMessageId() string {
 	if x != nil {
 		return x.SourceMessageId
+	}
+	return ""
+}
+
+func (x *SendSticker) GetFavoriteId() string {
+	if x != nil {
+		return x.FavoriteId
 	}
 	return ""
 }
@@ -2468,18 +2488,22 @@ const file_ipc_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\"A\n" +
 	"\vStickerList\x122\n" +
-	"\bstickers\x18\x01 \x03(\v2\x16.wassup.ipc.v1.StickerR\bstickers\"W\n" +
+	"\bstickers\x18\x01 \x03(\v2\x16.wassup.ipc.v1.StickerR\bstickers\"x\n" +
 	"\aSticker\x12\x19\n" +
 	"\bchat_jid\x18\x01 \x01(\tR\achatJid\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x02 \x01(\tR\tmessageId\x12\x12\n" +
-	"\x04path\x18\x03 \x01(\tR\x04path\"\x9b\x01\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\x12\x1f\n" +
+	"\vfavorite_id\x18\x04 \x01(\tR\n" +
+	"favoriteId\"\xbc\x01\n" +
 	"\vSendSticker\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
 	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12&\n" +
 	"\x0fsource_chat_jid\x18\x03 \x01(\tR\rsourceChatJid\x12*\n" +
-	"\x11source_message_id\x18\x04 \x01(\tR\x0fsourceMessageId\"G\n" +
+	"\x11source_message_id\x18\x04 \x01(\tR\x0fsourceMessageId\x12\x1f\n" +
+	"\vfavorite_id\x18\x05 \x01(\tR\n" +
+	"favoriteId\"G\n" +
 	"\vFetchAvatar\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +

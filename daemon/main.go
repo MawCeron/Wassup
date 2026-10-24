@@ -171,10 +171,13 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 			case *events.Connected, *events.Disconnected, *events.LoggedOut, *events.StreamReplaced:
 				if _, ok := e.(*events.Connected); ok {
 					a.connectedAt.Store(time.Now().UnixMilli())
+					go a.resyncFavorites(context.Background())
 				} else {
 					a.connectedAt.Store(0)
 				}
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
+			case *events.AppState:
+				a.onAppState(context.Background(), e.Index, e.SyncActionValue)
 			case *events.Picture:
 				// One request for the new picture, so open UIs show it right away.
 				if err := a.forgetAvatar(context.Background(), e.JID.String()); err != nil {
@@ -396,7 +399,7 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		r := k.SendSticker
 		if a := d.find(r.GetAccountId()); a == nil {
 			fail(errors.New("unknown account"))
-		} else if msg, chat, err := a.sendSticker(context.Background(), r.GetChatJid(), r.GetSourceChatJid(), r.GetSourceMessageId()); err != nil {
+		} else if msg, chat, err := a.sendSticker(context.Background(), r.GetChatJid(), r.GetSourceChatJid(), r.GetSourceMessageId(), r.GetFavoriteId()); err != nil {
 			fail(err)
 		} else {
 			ev.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}

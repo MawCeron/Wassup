@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/proto/waSyncAction"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestListStickers(t *testing.T) {
@@ -49,7 +52,40 @@ func TestListStickers(t *testing.T) {
 		t.Fatalf("stickers %v; want again, other", got)
 	}
 
-	if _, _, err := a.sendSticker(ctx, chat.String(), chat.String(), "photo"); err == nil {
+	if _, _, err := a.sendSticker(ctx, chat.String(), chat.String(), "photo", ""); err == nil {
 		t.Fatal("sent a photo as a sticker")
+	}
+}
+
+func TestFavoriteStickers(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := openAccounts(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeAccounts(accounts)
+	a := accounts[0]
+	favorite := func(id string, at int64, on bool) {
+		a.onAppState(ctx, []string{appstate.IndexFavoriteSticker, id}, &waSyncAction.SyncActionValue{
+			Timestamp:     proto.Int64(at),
+			StickerAction: &waSyncAction.StickerAction{IsFavorite: proto.Bool(on), DirectPath: proto.String("/x")},
+		})
+	}
+	favorite("old", 1, true)
+	favorite("new", 2, true)
+	favorite("gone", 3, true)
+	favorite("gone", 4, false)
+	a.onAppState(ctx, []string{"pin_v1", "x"}, &waSyncAction.SyncActionValue{}) // Unrelated.
+
+	got, err := a.listStickers(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].FavoriteId != "new" || got[1].FavoriteId != "old" {
+		t.Fatalf("favorites %v; want new, old", got)
+	}
+	// Not downloaded (no connection here), so it cannot be sent yet.
+	if _, err := a.favoriteSticker(ctx, "new"); err == nil {
+		t.Fatal("built a favorite without its file hash")
 	}
 }

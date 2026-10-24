@@ -91,7 +91,10 @@ func openAccount(ctx context.Context, dir, id string) (*account, error) {
 	if err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
-	return &account{id: id, db: db, client: whatsmeow.NewClient(device, log.Sub("client")), log: l, downloads: newDownloads()}, nil
+	client := whatsmeow.NewClient(device, log.Sub("client"))
+	// Favorite stickers only arrive as app state events, also on full syncs.
+	client.EmitAppStateEventsOnFullSync = true
+	return &account{id: id, db: db, client: client, log: l, downloads: newDownloads()}, nil
 }
 
 func closeAccounts(accounts []*account) {

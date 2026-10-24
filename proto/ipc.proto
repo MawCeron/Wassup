@@ -200,8 +200,9 @@ message SendMedia {
   bool as_sticker = 5;
 }
 
-// Stickers recently sent or received in any chat, newest first, without
-// repeats. Answered with stickers.
+// The user's favorite stickers, synced from the phone, then stickers
+// recently sent or received in any chat, newest first, without repeats.
+// Answered with stickers.
 message ListStickers {
   string account_id = 1;
 }
@@ -217,6 +218,9 @@ message Sticker {
   string message_id = 2;
   // Cached file; empty until downloaded like any other media.
   string path = 3;
+  // Set for favorites, which come from the phone rather than a message;
+  // chat_jid and message_id are then empty.
+  string favorite_id = 4;
 }
 
 // Sends a known sticker again, reusing the uploaded file. Answered with
@@ -226,6 +230,8 @@ message SendSticker {
   string chat_jid = 2;
   string source_chat_jid = 3;
   string source_message_id = 4;
+  // Sends a favorite instead of a sticker from a message.
+  string favorite_id = 5;
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with
