@@ -64,6 +64,9 @@ CREATE TABLE wassup_meta (
 `, `
 -- Favorites whose file is no longer on WhatsApp's servers; not retried.
 ALTER TABLE wassup_favorite_stickers ADD COLUMN gone INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Serialized ipc.Quote of a reply, without the quoted sender's name.
+ALTER TABLE wassup_messages ADD COLUMN quote BLOB;
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -148,6 +151,15 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	if evt.IsEdit || (text == "" && media == nil) || info.Chat == types.StatusBroadcastJID {
 		return nil, nil, nil
 	}
+	quote := quoteOf(evt.Message)
+	var quoteBlob []byte
+	if quote != nil {
+		var err error
+		if quoteBlob, err = proto.Marshal(quote); err != nil {
+			return nil, nil, err
+		}
+		a.nameQuote(ctx, quote)
+	}
 	var mediaBlob []byte
 	if media != nil {
 		var err error
@@ -164,6 +176,7 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 		TimestampMs: info.Timestamp.UnixMilli(),
 		Text:        text,
 		Media:       a.ipcMedia(mediaBlob),
+		Quote:       quote,
 	}
 	if msg.FromMe {
 		msg.Status = ipc.MessageStatus_MESSAGE_STATUS_SENT
@@ -197,8 +210,8 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	}
 
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO wassup_messages
-		(chat_jid, id, sender_jid, from_me, timestamp_ms, text, status, media) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text, msg.Status, mediaBlob)
+		(chat_jid, id, sender_jid, from_me, timestamp_ms, text, status, media, quote) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text, msg.Status, mediaBlob, quoteBlob)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -333,7 +346,7 @@ func (a *account) listMessages(ctx context.Context, chatJID, beforeID string, li
 	}
 	limit = min(limit, maxPageSize)
 	rows, err := a.db.QueryContext(ctx, `
-		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media FROM wassup_messages
+		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote FROM wassup_messages
 		WHERE chat_jid = ?1 AND (?2 = '' OR (timestamp_ms, id) <
 			(SELECT timestamp_ms, id FROM wassup_messages WHERE chat_jid = ?1 AND id = ?2))
 		ORDER BY timestamp_ms DESC, id DESC LIMIT ?3`, chatJID, beforeID, limit)
@@ -345,11 +358,12 @@ func (a *account) listMessages(ctx context.Context, chatJID, beforeID string, li
 	names := map[string]string{}
 	for rows.Next() {
 		m := &ipc.Message{AccountId: a.id, ChatJid: chatJID}
-		var mediaBlob []byte
-		if err := rows.Scan(&m.Id, &m.SenderJid, &m.FromMe, &m.TimestampMs, &m.Text, &m.Status, &mediaBlob); err != nil {
+		var mediaBlob, quoteBlob []byte
+		if err := rows.Scan(&m.Id, &m.SenderJid, &m.FromMe, &m.TimestampMs, &m.Text, &m.Status, &mediaBlob, &quoteBlob); err != nil {
 			return nil, err
 		}
 		m.Media = a.ipcMedia(mediaBlob)
+		m.Quote = a.quoteFromBlob(ctx, quoteBlob)
 		if !m.FromMe {
 			name, ok := names[m.SenderJid]
 			if !ok {
