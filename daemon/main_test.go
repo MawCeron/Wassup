@@ -6,9 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
+	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/types/events"
 	"google.golang.org/protobuf/encoding/protodelim"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -137,5 +142,29 @@ func TestActiveChatPerConnection(t *testing.T) {
 	set(a, "")
 	if d.isActive("acc/x@g.us") {
 		t.Fatal("clearing did not stop suppressing the chat")
+	}
+}
+
+func TestViewOnceNoticeBecomesMessage(t *testing.T) {
+	ctx := t.Context()
+	accounts, err := openAccounts(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeAccounts(accounts)
+	a := accounts[0]
+	d := newDaemon(accounts, nil)
+	chat := types.NewJID("120363000000000001", types.GroupServer)
+	d.onMessage(a, &events.Message{
+		Info: types.MessageInfo{
+			MessageSource: types.MessageSource{Chat: chat, Sender: types.NewJID("1", types.HiddenUserServer), IsGroup: true},
+			ID:            "V1",
+			Timestamp:     time.Unix(1_700_000_000, 0),
+		},
+		Message: &waE2E.Message{Conversation: proto.String(viewOncePlaceholder)},
+	})
+	msgs, err := a.listMessages(ctx, chat.String(), "", 0)
+	if err != nil || len(msgs) != 1 || msgs[0].Text != viewOncePlaceholder {
+		t.Fatalf("messages %v, %v", msgs, err)
 	}
 }

@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types/events"
 	"google.golang.org/protobuf/encoding/protodelim"
+	"google.golang.org/protobuf/proto"
 )
 
 func main() {
@@ -200,15 +202,14 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 					}}})
 				}
 			case *events.Message:
-				msg, chat, err := a.saveMessage(context.Background(), e)
-				if err != nil {
-					a.log.Error("save message", "id", e.Info.ID, "err", err)
-				} else if msg != nil {
-					d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageReceived{MessageReceived: msg}})
-					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
-					if a.isNews(msg) && !d.isActive(chatKey(a.id, chat.Jid)) && !a.muted(context.Background(), e.Info.Chat) {
-						d.notify.message(chat, msg)
-					}
+				d.onMessage(a, e)
+			case *events.UndecryptableMessage:
+				// WhatsApp does not send view-once media to linked devices,
+				// only this notice; show that the message exists.
+				if e.IsUnavailable && e.UnavailableType == events.UnavailableTypeViewOnce {
+					d.onMessage(a, &events.Message{Info: e.Info, Message: &waE2E.Message{
+						Conversation: proto.String(viewOncePlaceholder),
+					}})
 				}
 			}
 		})
@@ -282,6 +283,27 @@ func write(conn net.Conn, ev *ipc.Event) error {
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	_, err := protodelim.MarshalTo(conn, ev)
 	return err
+}
+
+// viewOncePlaceholder stands for view-once media, which only the phone gets.
+const viewOncePlaceholder = "[View once] Open it on your phone"
+
+// onMessage stores a message and tells the UIs and, if it is news, the user.
+func (d *daemon) onMessage(a *account, e *events.Message) {
+	ctx := context.Background()
+	msg, chat, err := a.saveMessage(ctx, e)
+	if err != nil {
+		a.log.Error("save message", "id", e.Info.ID, "err", err)
+		return
+	}
+	if msg == nil {
+		return
+	}
+	d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageReceived{MessageReceived: msg}})
+	d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+	if a.isNews(msg) && !d.isActive(chatKey(a.id, chat.Jid)) && !a.muted(ctx, e.Info.Chat) {
+		d.notify.message(chat, msg)
+	}
 }
 
 func chatKey(accountID, chatJID string) string { return accountID + "/" + chatJID }
