@@ -19,6 +19,7 @@ const CSS: &str = "
 .bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
 .media { border-radius: 8px; background: alpha(currentColor, 0.08); }
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
+.quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
 /* After .mine, which has the same weight: own stickers have no bubble either. */
 .bubble.sticker { background: none; padding: 0; }
@@ -1662,6 +1663,27 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             .css_classes(["bubble"])
             .build();
         bubble.append(&sender);
+        let quote_name = gtk::Label::builder()
+            .xalign(0.0)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["caption-heading", "accent"])
+            .build();
+        let quote_text = gtk::Label::builder()
+            .xalign(0.0)
+            .wrap(true)
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
+            .lines(2)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["caption"])
+            .build();
+        let quote = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .css_classes(["quote"])
+            .build();
+        quote.append(&quote_name);
+        quote.append(&quote_text);
+        bubble.append(&quote);
         bubble.append(&picture);
         bubble.append(&document);
         let voice_icon = gtk::Image::builder()
@@ -1739,10 +1761,13 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
         let clamp = item.child().and_then(|row| row.first_child()).unwrap();
         let bubble = clamp.first_child().unwrap();
         let sender = bubble.first_child().and_downcast::<gtk::Label>().unwrap();
-        let picture = sender
+        let quote = sender.next_sibling().unwrap();
+        let quote_name = quote.first_child().and_downcast::<gtk::Label>().unwrap();
+        let quote_text = quote_name
             .next_sibling()
-            .and_downcast::<gtk::Picture>()
+            .and_downcast::<gtk::Label>()
             .unwrap();
+        let picture = quote.next_sibling().and_downcast::<gtk::Picture>().unwrap();
         let document = picture.next_sibling().unwrap();
         let doc_labels = document.last_child().unwrap();
         let doc_name = doc_labels
@@ -1765,6 +1790,17 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             sender.set_label(&user_label(&msg.sender_jid));
         } else {
             sender.set_label(&msg.sender_name);
+        }
+        quote.set_visible(msg.quote.is_some());
+        if let Some(q) = &msg.quote {
+            quote_name.set_label(&if q.from_me {
+                "You".to_owned()
+            } else if q.sender_name.is_empty() {
+                user_label(&q.sender_jid)
+            } else {
+                q.sender_name.clone()
+            });
+            quote_text.set_label(&q.text);
         }
         text.set_label(&msg.text);
         text.set_visible(!msg.text.is_empty());
