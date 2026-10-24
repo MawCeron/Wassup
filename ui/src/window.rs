@@ -224,7 +224,7 @@ impl Window {
             sticker_lists.append(grid);
         }
         let sticker_empty = gtk::Label::builder()
-            .label("Stickers you send or receive show up here.")
+            .label("Your favorite stickers and the ones you send show up here.")
             .wrap(true)
             .css_classes(["dim-label"])
             .build();

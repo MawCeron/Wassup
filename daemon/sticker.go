@@ -26,8 +26,8 @@ const (
 	maxFavorites = 100
 )
 
-// listStickers returns the favorite stickers, then the ones most recently
-// sent or received, one per file.
+// listStickers returns the favorite stickers, then the ones the user sent
+// most recently, one per file.
 func (a *account) listStickers(ctx context.Context) ([]*ipc.Sticker, error) {
 	seen := map[string]bool{}
 	stickers, err := a.listFavorites(ctx, seen)
@@ -36,7 +36,7 @@ func (a *account) listStickers(ctx context.Context) ([]*ipc.Sticker, error) {
 	}
 	favorites := len(stickers)
 	rows, err := a.db.QueryContext(ctx, `SELECT chat_jid, id, media FROM wassup_messages
-		WHERE media IS NOT NULL ORDER BY timestamp_ms DESC`)
+		WHERE media IS NOT NULL AND from_me = 1 ORDER BY timestamp_ms DESC`)
 	if err != nil {
 		return nil, err
 	}

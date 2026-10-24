@@ -1845,8 +1845,8 @@ func (x *SendMedia) GetAsSticker() bool {
 	return false
 }
 
-// The user's favorite stickers, synced from the phone, then stickers
-// recently sent or received in any chat, newest first, without repeats.
+// The user's favorite stickers, synced from the phone, then the stickers
+// they sent most recently in any chat, newest first, without repeats.
 // Answered with stickers.
 type ListStickers struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`

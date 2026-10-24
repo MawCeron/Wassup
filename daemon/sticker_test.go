@@ -28,7 +28,7 @@ func TestListStickers(t *testing.T) {
 		t.Helper()
 		_, _, err := a.saveMessage(ctx, &events.Message{
 			Info: types.MessageInfo{
-				MessageSource: types.MessageSource{Chat: chat, Sender: chat},
+				MessageSource: types.MessageSource{Chat: chat, Sender: chat, IsFromMe: id != "received"},
 				ID:            id,
 				Timestamp:     time.Unix(int64(1_700_000_000+sec), 0),
 			},
@@ -45,13 +45,14 @@ func TestListStickers(t *testing.T) {
 	save("photo", 2, &waE2E.Message{ImageMessage: &waE2E.ImageMessage{FileSHA256: []byte{9}}})
 	save("other", 3, sticker(2))
 	save("again", 4, sticker(1)) // Same file as "old", sent again later.
+	save("received", 5, sticker(3))
 
 	got, err := a.listStickers(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 2 || got[0].MessageId != "again" || got[1].MessageId != "other" {
-		t.Fatalf("stickers %v; want again, other", got)
+		t.Fatalf("stickers %v; want again, other (own stickers only)", got)
 	}
 
 	if _, _, err := a.sendSticker(ctx, chat.String(), chat.String(), "photo", ""); err == nil {

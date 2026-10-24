@@ -200,8 +200,8 @@ message SendMedia {
   bool as_sticker = 5;
 }
 
-// The user's favorite stickers, synced from the phone, then stickers
-// recently sent or received in any chat, newest first, without repeats.
+// The user's favorite stickers, synced from the phone, then the stickers
+// they sent most recently in any chat, newest first, without repeats.
 // Answered with stickers.
 message ListStickers {
   string account_id = 1;
