@@ -68,8 +68,8 @@ func TestSaveAndListMessages(t *testing.T) {
 		t.Fatalf("sticker media not read back: %v", page[0])
 	}
 	doc := &events.Message{Message: &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("a.pdf")}}}
-	if got := messageText(doc); got != "[Document] a.pdf" {
-		t.Fatalf("document shown as %q", got)
+	if got := messageText(doc); got != "" || mediaOf(doc.Message) == nil {
+		t.Fatalf("document text %q, media %v; want no text and media", got, mediaOf(doc.Message))
 	}
 
 	chats, err := a.listChats(ctx)

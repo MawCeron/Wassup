@@ -135,7 +135,14 @@ func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title
 	}
 	body = msg.Text
 	if kind := msg.GetMedia().GetKind(); kind != ipc.MediaKind_MEDIA_KIND_UNSPECIFIED {
-		label := map[ipc.MediaKind]string{ipc.MediaKind_MEDIA_KIND_IMAGE: "Photo", ipc.MediaKind_MEDIA_KIND_STICKER: "Sticker"}[kind]
+		label := map[ipc.MediaKind]string{
+			ipc.MediaKind_MEDIA_KIND_IMAGE:    "Photo",
+			ipc.MediaKind_MEDIA_KIND_STICKER:  "Sticker",
+			ipc.MediaKind_MEDIA_KIND_DOCUMENT: "Document",
+		}[kind]
+		if body == "" {
+			body = msg.GetMedia().GetFileName()
+		}
 		if body == "" {
 			body = label
 		} else {

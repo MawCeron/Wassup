@@ -19,6 +19,7 @@ message Request {
     MarkRead mark_read = 7;
     SetActiveChat set_active_chat = 8;
     DownloadMedia download_media = 9;
+    SendMedia send_media = 10;
   }
 }
 
@@ -153,7 +154,8 @@ message Message {
   string sender_name = 8;
   // Delivery progress of own messages; unspecified for received ones.
   MessageStatus status = 9;
-  // Attached image or sticker; text is then its caption, possibly empty.
+  // Attached image, sticker or document; text is then its caption,
+  // possibly empty.
   Media media = 10;
 }
 
@@ -161,6 +163,7 @@ enum MediaKind {
   MEDIA_KIND_UNSPECIFIED = 0;
   MEDIA_KIND_IMAGE = 1;
   MEDIA_KIND_STICKER = 2;
+  MEDIA_KIND_DOCUMENT = 3;
 }
 
 message Media {
@@ -171,6 +174,21 @@ message Media {
   // Pixel size as announced by the sender, to reserve space before download.
   uint32 width = 3;
   uint32 height = 4;
+  // Name the sender gave a document.
+  string file_name = 5;
+  // In bytes.
+  uint64 size = 6;
+}
+
+// Sends a local file chosen by the user: JPEG and PNG as a photo, anything
+// else as a document. The reply, message_received with the stored message
+// or error, comes once the upload ends; other requests are answered
+// meanwhile.
+message SendMedia {
+  string account_id = 1;
+  string chat_jid = 2;
+  string path = 3;
+  string caption = 4;
 }
 
 // Fetches a message's media into the cache. Answered with ack at once;

@@ -105,8 +105,7 @@ func messageText(evt *events.Message) string {
 		}
 		return "[Audio]"
 	case m.GetDocumentMessage() != nil:
-		d := m.GetDocumentMessage()
-		return label("[Document]", d.GetCaption(), d.GetFileName())
+		return m.GetDocumentMessage().GetCaption() // The file is carried as media.
 	case m.GetContactMessage() != nil:
 		return label("[Contact]", m.GetContactMessage().GetDisplayName())
 	case m.GetLocationMessage() != nil, m.GetLiveLocationMessage() != nil:
@@ -342,6 +341,11 @@ func (a *account) sendText(ctx context.Context, chat, text string) (*ipc.Message
 	if text == "" {
 		return nil, nil, errors.New("empty message")
 	}
+	return a.send(ctx, chat, &waE2E.Message{Conversation: proto.String(text)})
+}
+
+// send delivers content to a chat and stores it like a received message.
+func (a *account) send(ctx context.Context, chat string, content *waE2E.Message) (*ipc.Message, *ipc.Chat, error) {
 	if !a.client.IsLoggedIn() {
 		return nil, nil, errors.New("account is not connected")
 	}
@@ -349,7 +353,7 @@ func (a *account) sendText(ctx context.Context, chat, text string) (*ipc.Message
 	if err != nil {
 		return nil, nil, err
 	}
-	resp, err := a.client.SendMessage(ctx, to, &waE2E.Message{Conversation: proto.String(text)})
+	resp, err := a.client.SendMessage(ctx, to, content)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -367,7 +371,7 @@ func (a *account) sendText(ctx context.Context, chat, text string) (*ipc.Message
 			ID:            resp.ID,
 			Timestamp:     resp.Timestamp,
 		},
-		Message: &waE2E.Message{Conversation: proto.String(text)},
+		Message: content,
 	})
 }
 

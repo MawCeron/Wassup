@@ -5,11 +5,18 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"image"
+	_ "image/jpeg" // For image.DecodeConfig.
+	_ "image/png"
+	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,16 +53,37 @@ func mediaOf(m *waE2E.Message) *waE2E.Message {
 		return &waE2E.Message{ImageMessage: m.GetImageMessage()}
 	case m.GetStickerMessage() != nil:
 		return &waE2E.Message{StickerMessage: m.GetStickerMessage()}
+	case m.GetDocumentMessage() != nil:
+		return &waE2E.Message{DocumentMessage: m.GetDocumentMessage()}
 	}
 	return nil
 }
 
-// downloadable is the image or sticker inside a message from mediaOf.
+// downloadable is the file inside a message from mediaOf, with the file
+// extension to cache it under.
 func downloadable(m *waE2E.Message) (whatsmeow.DownloadableMessage, string) {
-	if img := m.GetImageMessage(); img != nil {
-		return img, img.GetMimetype()
+	switch {
+	case m.GetImageMessage() != nil:
+		return m.GetImageMessage(), extension("", m.GetImageMessage().GetMimetype())
+	case m.GetDocumentMessage() != nil:
+		d := m.GetDocumentMessage()
+		return d, extension(d.GetFileName(), d.GetMimetype())
 	}
-	return m.GetStickerMessage(), m.GetStickerMessage().GetMimetype()
+	return m.GetStickerMessage(), ".webp"
+}
+
+// extension picks a file extension so the desktop opens cached files with
+// the right application. The sender controls the name, so only short
+// alphanumeric extensions are kept.
+func extension(fileName, mimeType string) string {
+	ext := filepath.Ext(fileName)
+	if len(ext) > 1 && len(ext) <= 10 && strings.TrimLeft(strings.ToLower(ext[1:]), "abcdefghijklmnopqrstuvwxyz0123456789") == "" {
+		return strings.ToLower(ext)
+	}
+	if exts, _ := mime.ExtensionsByType(mimeType); len(exts) > 0 {
+		return exts[0]
+	}
+	return ""
 }
 
 // mediaPath names cached files after their content hash, so the same file
@@ -64,8 +92,7 @@ func (a *account) mediaPath(m *waE2E.Message) string {
 	if a.mediaDir == "" {
 		return ""
 	}
-	file, mime := downloadable(m)
-	ext := map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}[mime]
+	file, ext := downloadable(m)
 	return filepath.Join(a.mediaDir, hex.EncodeToString(file.GetFileSHA256())+ext)
 }
 
@@ -78,12 +105,17 @@ func (a *account) ipcMedia(blob []byte) *ipc.Media {
 	if err := proto.Unmarshal(blob, &m); err != nil {
 		return nil
 	}
-	media := &ipc.Media{Kind: ipc.MediaKind_MEDIA_KIND_IMAGE}
-	if s := m.GetStickerMessage(); s != nil {
-		media.Kind = ipc.MediaKind_MEDIA_KIND_STICKER
-		media.Width, media.Height = s.GetWidth(), s.GetHeight()
-	} else {
-		media.Width, media.Height = m.GetImageMessage().GetWidth(), m.GetImageMessage().GetHeight()
+	media := &ipc.Media{}
+	switch {
+	case m.GetStickerMessage() != nil:
+		s := m.GetStickerMessage()
+		media.Kind, media.Width, media.Height, media.Size = ipc.MediaKind_MEDIA_KIND_STICKER, s.GetWidth(), s.GetHeight(), s.GetFileLength()
+	case m.GetDocumentMessage() != nil:
+		d := m.GetDocumentMessage()
+		media.Kind, media.FileName, media.Size = ipc.MediaKind_MEDIA_KIND_DOCUMENT, d.GetFileName(), d.GetFileLength()
+	default:
+		i := m.GetImageMessage()
+		media.Kind, media.Width, media.Height, media.Size = ipc.MediaKind_MEDIA_KIND_IMAGE, i.GetWidth(), i.GetHeight(), i.GetFileLength()
 	}
 	if path := a.mediaPath(&m); path != "" {
 		if _, err := os.Stat(path); err == nil {
@@ -203,4 +235,107 @@ func evictMedia(root string, limit int64) error {
 		total -= f.size
 	}
 	return nil
+}
+
+// sendMedia uploads a local file and sends it: JPEG and PNG as a photo,
+// anything else as a document.
+func (a *account) sendMedia(ctx context.Context, chat, path, caption string) (*ipc.Message, *ipc.Chat, error) {
+	if !a.client.IsLoggedIn() {
+		return nil, nil, errors.New("account is not connected")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+	if info, err := f.Stat(); err != nil {
+		return nil, nil, err
+	} else if !info.Mode().IsRegular() || info.Size() == 0 {
+		return nil, nil, errors.New("not a file that can be sent")
+	}
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(f, head)
+	sniffed := http.DetectContentType(head[:n])
+	photo := sniffed == "image/jpeg" || sniffed == "image/png"
+	mimeType := sniffed
+	if byName := mime.TypeByExtension(filepath.Ext(path)); !photo && byName != "" {
+		mimeType = byName
+	}
+
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, nil, err
+	}
+	// UploadReader encrypts through this file instead of holding it in memory.
+	tmp, err := os.CreateTemp(a.mediaDir, ".upload-*")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	kind := whatsmeow.MediaDocument
+	if photo {
+		kind = whatsmeow.MediaImage
+	}
+	up, err := a.client.UploadReader(ctx, f, tmp, kind)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var text *string
+	if caption != "" {
+		text = proto.String(caption)
+	}
+	var content *waE2E.Message
+	if photo {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, nil, err
+		}
+		// Only the header is read; decoding the whole photo for a preview
+		// would briefly take tens of MB.
+		size, _, _ := image.DecodeConfig(f)
+		content = &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: &mimeType,
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			Width: proto.Uint32(uint32(size.Width)), Height: proto.Uint32(uint32(size.Height)), Caption: text,
+		}}
+	} else {
+		name := filepath.Base(path)
+		content = &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: &mimeType,
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			FileName: &name, Title: &name, Caption: text,
+		}}
+	}
+	if err := a.cacheCopy(f, content); err != nil {
+		a.log.Warn("cache sent media", "err", err)
+	}
+	return a.send(ctx, chat, content)
+}
+
+// cacheCopy keeps a sent file in the cache, so it shows without being
+// downloaded back.
+func (a *account) cacheCopy(f *os.File, content *waE2E.Message) error {
+	dest := a.mediaPath(content)
+	if dest == "" {
+		return nil
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(a.mediaDir, ".copy-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	_, err = io.Copy(tmp, f)
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Rename(tmp.Name(), dest)
+	}
+	if err != nil {
+		return err
+	}
+	return evictMedia(filepath.Dir(a.mediaDir), mediaCacheLimit)
 }

@@ -82,6 +82,7 @@ const (
 	MediaKind_MEDIA_KIND_UNSPECIFIED MediaKind = 0
 	MediaKind_MEDIA_KIND_IMAGE       MediaKind = 1
 	MediaKind_MEDIA_KIND_STICKER     MediaKind = 2
+	MediaKind_MEDIA_KIND_DOCUMENT    MediaKind = 3
 )
 
 // Enum value maps for MediaKind.
@@ -90,11 +91,13 @@ var (
 		0: "MEDIA_KIND_UNSPECIFIED",
 		1: "MEDIA_KIND_IMAGE",
 		2: "MEDIA_KIND_STICKER",
+		3: "MEDIA_KIND_DOCUMENT",
 	}
 	MediaKind_value = map[string]int32{
 		"MEDIA_KIND_UNSPECIFIED": 0,
 		"MEDIA_KIND_IMAGE":       1,
 		"MEDIA_KIND_STICKER":     2,
+		"MEDIA_KIND_DOCUMENT":    3,
 	}
 )
 
@@ -192,6 +195,7 @@ type Request struct {
 	//	*Request_MarkRead
 	//	*Request_SetActiveChat
 	//	*Request_DownloadMedia
+	//	*Request_SendMedia
 	Kind          isRequest_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -313,6 +317,15 @@ func (x *Request) GetDownloadMedia() *DownloadMedia {
 	return nil
 }
 
+func (x *Request) GetSendMedia() *SendMedia {
+	if x != nil {
+		if x, ok := x.Kind.(*Request_SendMedia); ok {
+			return x.SendMedia
+		}
+	}
+	return nil
+}
+
 type isRequest_Kind interface {
 	isRequest_Kind()
 }
@@ -349,6 +362,10 @@ type Request_DownloadMedia struct {
 	DownloadMedia *DownloadMedia `protobuf:"bytes,9,opt,name=download_media,json=downloadMedia,proto3,oneof"`
 }
 
+type Request_SendMedia struct {
+	SendMedia *SendMedia `protobuf:"bytes,10,opt,name=send_media,json=sendMedia,proto3,oneof"`
+}
+
 func (*Request_ListAccounts) isRequest_Kind() {}
 
 func (*Request_ListChats) isRequest_Kind() {}
@@ -364,6 +381,8 @@ func (*Request_MarkRead) isRequest_Kind() {}
 func (*Request_SetActiveChat) isRequest_Kind() {}
 
 func (*Request_DownloadMedia) isRequest_Kind() {}
+
+func (*Request_SendMedia) isRequest_Kind() {}
 
 // Daemon -> UI. Either the reply to a Request or a pushed update.
 type Event struct {
@@ -1475,7 +1494,8 @@ type Message struct {
 	SenderName string `protobuf:"bytes,8,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
 	// Delivery progress of own messages; unspecified for received ones.
 	Status MessageStatus `protobuf:"varint,9,opt,name=status,proto3,enum=wassup.ipc.v1.MessageStatus" json:"status,omitempty"`
-	// Attached image or sticker; text is then its caption, possibly empty.
+	// Attached image, sticker or document; text is then its caption,
+	// possibly empty.
 	Media         *Media `protobuf:"bytes,10,opt,name=media,proto3" json:"media,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1588,8 +1608,12 @@ type Media struct {
 	// travels over the socket, only this path.
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
 	// Pixel size as announced by the sender, to reserve space before download.
-	Width         uint32 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
-	Height        uint32 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
+	Width  uint32 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
+	Height uint32 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
+	// Name the sender gave a document.
+	FileName string `protobuf:"bytes,5,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	// In bytes.
+	Size          uint64 `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1652,6 +1676,92 @@ func (x *Media) GetHeight() uint32 {
 	return 0
 }
 
+func (x *Media) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *Media) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+// Sends a local file chosen by the user: JPEG and PNG as a photo, anything
+// else as a document. The reply, message_received with the stored message
+// or error, comes once the upload ends; other requests are answered
+// meanwhile.
+type SendMedia struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ChatJid       string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
+	Path          string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	Caption       string                 `protobuf:"bytes,4,opt,name=caption,proto3" json:"caption,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendMedia) Reset() {
+	*x = SendMedia{}
+	mi := &file_ipc_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendMedia) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendMedia) ProtoMessage() {}
+
+func (x *SendMedia) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendMedia.ProtoReflect.Descriptor instead.
+func (*SendMedia) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SendMedia) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SendMedia) GetChatJid() string {
+	if x != nil {
+		return x.ChatJid
+	}
+	return ""
+}
+
+func (x *SendMedia) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SendMedia) GetCaption() string {
+	if x != nil {
+		return x.Caption
+	}
+	return ""
+}
+
 // Fetches a message's media into the cache. Answered with ack at once;
 // media_ready follows when the download ends.
 type DownloadMedia struct {
@@ -1665,7 +1775,7 @@ type DownloadMedia struct {
 
 func (x *DownloadMedia) Reset() {
 	*x = DownloadMedia{}
-	mi := &file_ipc_proto_msgTypes[20]
+	mi := &file_ipc_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1677,7 +1787,7 @@ func (x *DownloadMedia) String() string {
 func (*DownloadMedia) ProtoMessage() {}
 
 func (x *DownloadMedia) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[20]
+	mi := &file_ipc_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1690,7 +1800,7 @@ func (x *DownloadMedia) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadMedia.ProtoReflect.Descriptor instead.
 func (*DownloadMedia) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{20}
+	return file_ipc_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DownloadMedia) GetAccountId() string {
@@ -1728,7 +1838,7 @@ type MediaReady struct {
 
 func (x *MediaReady) Reset() {
 	*x = MediaReady{}
-	mi := &file_ipc_proto_msgTypes[21]
+	mi := &file_ipc_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1740,7 +1850,7 @@ func (x *MediaReady) String() string {
 func (*MediaReady) ProtoMessage() {}
 
 func (x *MediaReady) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[21]
+	mi := &file_ipc_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1753,7 +1863,7 @@ func (x *MediaReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaReady.ProtoReflect.Descriptor instead.
 func (*MediaReady) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{21}
+	return file_ipc_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *MediaReady) GetAccountId() string {
@@ -1804,7 +1914,7 @@ type MessageStatusChanged struct {
 
 func (x *MessageStatusChanged) Reset() {
 	*x = MessageStatusChanged{}
-	mi := &file_ipc_proto_msgTypes[22]
+	mi := &file_ipc_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1816,7 +1926,7 @@ func (x *MessageStatusChanged) String() string {
 func (*MessageStatusChanged) ProtoMessage() {}
 
 func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[22]
+	mi := &file_ipc_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1829,7 +1939,7 @@ func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageStatusChanged.ProtoReflect.Descriptor instead.
 func (*MessageStatusChanged) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{22}
+	return file_ipc_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *MessageStatusChanged) GetAccountId() string {
@@ -1864,7 +1974,7 @@ var File_ipc_proto protoreflect.FileDescriptor
 
 const file_ipc_proto_rawDesc = "" +
 	"\n" +
-	"\tipc.proto\x12\rwassup.ipc.v1\"\xa4\x04\n" +
+	"\tipc.proto\x12\rwassup.ipc.v1\"\xdf\x04\n" +
 	"\aRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12B\n" +
 	"\rlist_accounts\x18\x02 \x01(\v2\x1b.wassup.ipc.v1.ListAccountsH\x00R\flistAccounts\x129\n" +
@@ -1875,7 +1985,10 @@ const file_ipc_proto_rawDesc = "" +
 	"\flink_account\x18\x06 \x01(\v2\x1a.wassup.ipc.v1.LinkAccountH\x00R\vlinkAccount\x126\n" +
 	"\tmark_read\x18\a \x01(\v2\x17.wassup.ipc.v1.MarkReadH\x00R\bmarkRead\x12F\n" +
 	"\x0fset_active_chat\x18\b \x01(\v2\x1c.wassup.ipc.v1.SetActiveChatH\x00R\rsetActiveChat\x12E\n" +
-	"\x0edownload_media\x18\t \x01(\v2\x1c.wassup.ipc.v1.DownloadMediaH\x00R\rdownloadMediaB\x06\n" +
+	"\x0edownload_media\x18\t \x01(\v2\x1c.wassup.ipc.v1.DownloadMediaH\x00R\rdownloadMedia\x129\n" +
+	"\n" +
+	"send_media\x18\n" +
+	" \x01(\v2\x18.wassup.ipc.v1.SendMediaH\x00R\tsendMediaB\x06\n" +
 	"\x04kind\"\xf6\x05\n" +
 	"\x05Event\x12\x1d\n" +
 	"\n" +
@@ -1969,12 +2082,20 @@ const file_ipc_proto_rawDesc = "" +
 	"senderName\x124\n" +
 	"\x06status\x18\t \x01(\x0e2\x1c.wassup.ipc.v1.MessageStatusR\x06status\x12*\n" +
 	"\x05media\x18\n" +
-	" \x01(\v2\x14.wassup.ipc.v1.MediaR\x05media\"w\n" +
+	" \x01(\v2\x14.wassup.ipc.v1.MediaR\x05media\"\xa8\x01\n" +
 	"\x05Media\x12,\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x18.wassup.ipc.v1.MediaKindR\x04kind\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
 	"\x05width\x18\x03 \x01(\rR\x05width\x12\x16\n" +
-	"\x06height\x18\x04 \x01(\rR\x06height\"h\n" +
+	"\x06height\x18\x04 \x01(\rR\x06height\x12\x1b\n" +
+	"\tfile_name\x18\x05 \x01(\tR\bfileName\x12\x12\n" +
+	"\x04size\x18\x06 \x01(\x04R\x04size\"s\n" +
+	"\tSendMedia\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12\x12\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\x12\x18\n" +
+	"\acaption\x18\x04 \x01(\tR\acaption\"h\n" +
 	"\rDownloadMedia\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -2002,11 +2123,12 @@ const file_ipc_proto_rawDesc = "" +
 	"\x1dCONNECTION_STATE_DISCONNECTED\x10\x01\x12\x1f\n" +
 	"\x1bCONNECTION_STATE_CONNECTING\x10\x02\x12\x1e\n" +
 	"\x1aCONNECTION_STATE_CONNECTED\x10\x03\x12\x1f\n" +
-	"\x1bCONNECTION_STATE_LOGGED_OUT\x10\x04*U\n" +
+	"\x1bCONNECTION_STATE_LOGGED_OUT\x10\x04*n\n" +
 	"\tMediaKind\x12\x1a\n" +
 	"\x16MEDIA_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MEDIA_KIND_IMAGE\x10\x01\x12\x16\n" +
-	"\x12MEDIA_KIND_STICKER\x10\x02*\x7f\n" +
+	"\x12MEDIA_KIND_STICKER\x10\x02\x12\x17\n" +
+	"\x13MEDIA_KIND_DOCUMENT\x10\x03*\x7f\n" +
 	"\rMessageStatus\x12\x1e\n" +
 	"\x1aMESSAGE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MESSAGE_STATUS_SENT\x10\x01\x12\x1c\n" +
@@ -2026,7 +2148,7 @@ func file_ipc_proto_rawDescGZIP() []byte {
 }
 
 var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_ipc_proto_goTypes = []any{
 	(ConnectionState)(0),         // 0: wassup.ipc.v1.ConnectionState
 	(MediaKind)(0),               // 1: wassup.ipc.v1.MediaKind
@@ -2051,9 +2173,10 @@ var file_ipc_proto_goTypes = []any{
 	(*Chat)(nil),                 // 20: wassup.ipc.v1.Chat
 	(*Message)(nil),              // 21: wassup.ipc.v1.Message
 	(*Media)(nil),                // 22: wassup.ipc.v1.Media
-	(*DownloadMedia)(nil),        // 23: wassup.ipc.v1.DownloadMedia
-	(*MediaReady)(nil),           // 24: wassup.ipc.v1.MediaReady
-	(*MessageStatusChanged)(nil), // 25: wassup.ipc.v1.MessageStatusChanged
+	(*SendMedia)(nil),            // 23: wassup.ipc.v1.SendMedia
+	(*DownloadMedia)(nil),        // 24: wassup.ipc.v1.DownloadMedia
+	(*MediaReady)(nil),           // 25: wassup.ipc.v1.MediaReady
+	(*MessageStatusChanged)(nil), // 26: wassup.ipc.v1.MessageStatusChanged
 }
 var file_ipc_proto_depIdxs = []int32{
 	5,  // 0: wassup.ipc.v1.Request.list_accounts:type_name -> wassup.ipc.v1.ListAccounts
@@ -2063,32 +2186,33 @@ var file_ipc_proto_depIdxs = []int32{
 	9,  // 4: wassup.ipc.v1.Request.link_account:type_name -> wassup.ipc.v1.LinkAccount
 	12, // 5: wassup.ipc.v1.Request.mark_read:type_name -> wassup.ipc.v1.MarkRead
 	13, // 6: wassup.ipc.v1.Request.set_active_chat:type_name -> wassup.ipc.v1.SetActiveChat
-	23, // 7: wassup.ipc.v1.Request.download_media:type_name -> wassup.ipc.v1.DownloadMedia
-	15, // 8: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
-	16, // 9: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
-	17, // 10: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
-	18, // 11: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
-	19, // 12: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
-	20, // 13: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
-	21, // 14: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
-	10, // 15: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
-	11, // 16: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
-	25, // 17: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
-	14, // 18: wassup.ipc.v1.Event.ack:type_name -> wassup.ipc.v1.Ack
-	24, // 19: wassup.ipc.v1.Event.media_ready:type_name -> wassup.ipc.v1.MediaReady
-	19, // 20: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
-	20, // 21: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
-	21, // 22: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
-	0,  // 23: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
-	2,  // 24: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
-	22, // 25: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
-	1,  // 26: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
-	2,  // 27: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	24, // 7: wassup.ipc.v1.Request.download_media:type_name -> wassup.ipc.v1.DownloadMedia
+	23, // 8: wassup.ipc.v1.Request.send_media:type_name -> wassup.ipc.v1.SendMedia
+	15, // 9: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
+	16, // 10: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
+	17, // 11: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
+	18, // 12: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
+	19, // 13: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
+	20, // 14: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
+	21, // 15: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
+	10, // 16: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
+	11, // 17: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
+	26, // 18: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
+	14, // 19: wassup.ipc.v1.Event.ack:type_name -> wassup.ipc.v1.Ack
+	25, // 20: wassup.ipc.v1.Event.media_ready:type_name -> wassup.ipc.v1.MediaReady
+	19, // 21: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
+	20, // 22: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
+	21, // 23: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
+	0,  // 24: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
+	2,  // 25: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
+	22, // 26: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
+	1,  // 27: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
+	2,  // 28: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
+	29, // [29:29] is the sub-list for method output_type
+	29, // [29:29] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_ipc_proto_init() }
@@ -2105,6 +2229,7 @@ func file_ipc_proto_init() {
 		(*Request_MarkRead)(nil),
 		(*Request_SetActiveChat)(nil),
 		(*Request_DownloadMedia)(nil),
+		(*Request_SendMedia)(nil),
 	}
 	file_ipc_proto_msgTypes[1].OneofWrappers = []any{
 		(*Event_Error)(nil),
@@ -2126,7 +2251,7 @@ func file_ipc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipc_proto_rawDesc), len(file_ipc_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   23,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -239,6 +239,9 @@ func (d *daemon) handle(conn net.Conn) {
 		}
 		slog.Debug("request", "id", req.GetId(), "kind", fmt.Sprintf("%T", req.Kind))
 		ev := d.reply(conn, &req) // Outside the lock: it may connect and trigger broadcasts.
+		if ev == nil {
+			continue // Answered later, from the goroutine doing the work.
+		}
 		d.mu.Lock()
 		err := write(conn, ev)
 		d.mu.Unlock()
@@ -345,6 +348,33 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		}
 		d.mu.Unlock()
 		ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
+	case *ipc.Request_SendMedia:
+		r := k.SendMedia
+		a := d.find(r.GetAccountId())
+		if a == nil {
+			fail(errors.New("unknown account"))
+			break
+		}
+		// Uploads can take long: reply when done, without holding up the
+		// connection's other requests.
+		go func() {
+			done := &ipc.Event{RequestId: req.GetId()}
+			msg, chat, err := a.sendMedia(context.Background(), r.GetChatJid(), r.GetPath(), r.GetCaption())
+			if err != nil {
+				done.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
+			} else {
+				done.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}
+			}
+			d.mu.Lock()
+			if err := write(conn, done); err != nil {
+				slog.Warn("write event", "err", err)
+			}
+			d.mu.Unlock()
+			if chat != nil {
+				d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+			}
+		}()
+		return nil
 	case *ipc.Request_DownloadMedia:
 		r := k.DownloadMedia
 		if a := d.find(r.GetAccountId()); a == nil {
