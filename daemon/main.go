@@ -73,6 +73,13 @@ func run() error {
 		return err
 	}
 	defer closeAccounts(accounts)
+	for _, a := range accounts {
+		a.mediaDir = filepath.Join(cache, "media", a.id)
+		if err := os.MkdirAll(a.mediaDir, 0o700); err != nil {
+			closeAccounts(accounts)
+			return err
+		}
+	}
 	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
 	for _, a := range accounts {
 		if a.client.Store.ID != nil {
@@ -338,6 +345,14 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		}
 		d.mu.Unlock()
 		ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
+	case *ipc.Request_DownloadMedia:
+		r := k.DownloadMedia
+		if a := d.find(r.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else {
+			d.download(a, r.GetChatJid(), r.GetMessageId())
+			ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
+		}
 	case *ipc.Request_LinkAccount:
 		a := d.find(k.LinkAccount.GetAccountId())
 		if a == nil {

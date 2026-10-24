@@ -29,6 +29,9 @@ type account struct {
 	// When the current connection started, in Unix ms; 0 while disconnected.
 	// Messages sent before it are backlog delivered on connect, not news.
 	connectedAt atomic.Int64
+	// Where this account's media is cached; empty disables downloads.
+	mediaDir  string
+	downloads *downloads
 }
 
 // openAccounts opens every account under dataDir/accounts.
@@ -87,7 +90,7 @@ func openAccount(ctx context.Context, dir, id string) (*account, error) {
 	if err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
-	return &account{id: id, db: db, client: whatsmeow.NewClient(device, log.Sub("client")), log: l}, nil
+	return &account{id: id, db: db, client: whatsmeow.NewClient(device, log.Sub("client")), log: l, downloads: newDownloads()}, nil
 }
 
 func closeAccounts(accounts []*account) {

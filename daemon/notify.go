@@ -134,6 +134,14 @@ func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title
 		title = "New message"
 	}
 	body = msg.Text
+	if kind := msg.GetMedia().GetKind(); kind != ipc.MediaKind_MEDIA_KIND_UNSPECIFIED {
+		label := map[ipc.MediaKind]string{ipc.MediaKind_MEDIA_KIND_IMAGE: "Photo", ipc.MediaKind_MEDIA_KIND_STICKER: "Sticker"}[kind]
+		if body == "" {
+			body = label
+		} else {
+			body = label + ": " + body
+		}
+	}
 	if hideContent {
 		body = "New message"
 	} else if chat.IsGroup && msg.SenderName != "" {

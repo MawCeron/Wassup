@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"path/filepath"
+	"slices"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
 	"testing"
@@ -55,9 +56,16 @@ func TestSaveAndListMessages(t *testing.T) {
 	if save(&events.Message{Info: text("C", 3, false).Info, Message: &waE2E.Message{}}) {
 		t.Fatal("empty message saved")
 	}
-	sticker := &events.Message{Info: text("S", 0, false).Info, Message: &waE2E.Message{StickerMessage: &waE2E.StickerMessage{}}}
-	if got := messageText(sticker); got != "[Sticker]" {
-		t.Fatalf("sticker shown as %q", got)
+	other := types.NewJID("5215551111111", types.DefaultUserServer)
+	stickerInfo := text("S", 9, false).Info
+	stickerInfo.Chat, stickerInfo.Sender = other, other
+	sticker := &events.Message{Info: stickerInfo, Message: &waE2E.Message{StickerMessage: &waE2E.StickerMessage{Width: proto.Uint32(512), Height: proto.Uint32(512)}}}
+	stickerMsg, _, err := a.saveMessage(ctx, sticker)
+	if err != nil || stickerMsg == nil || stickerMsg.Text != "" || stickerMsg.GetMedia().GetKind() != ipc.MediaKind_MEDIA_KIND_STICKER || stickerMsg.GetMedia().GetWidth() != 512 {
+		t.Fatalf("sticker saved as %v, %v", stickerMsg, err)
+	}
+	if page, _ := a.listMessages(ctx, other.String(), "", 1); page[0].GetMedia().GetKind() != ipc.MediaKind_MEDIA_KIND_STICKER {
+		t.Fatalf("sticker media not read back: %v", page[0])
 	}
 	doc := &events.Message{Message: &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("a.pdf")}}}
 	if got := messageText(doc); got != "[Document] a.pdf" {
@@ -65,6 +73,7 @@ func TestSaveAndListMessages(t *testing.T) {
 	}
 
 	chats, err := a.listChats(ctx)
+	chats = slices.DeleteFunc(chats, func(c *ipc.Chat) bool { return c.Jid == other.String() })
 	if err != nil || len(chats) != 1 {
 		t.Fatalf("chats: %v, %v", chats, err)
 	}
@@ -78,7 +87,9 @@ func TestSaveAndListMessages(t *testing.T) {
 	}
 	save(text("E", 5, false))
 	save(text("D", 4, true))
-	if chats, _ = a.listChats(ctx); chats[0].UnreadCount != 0 {
+	chats, _ = a.listChats(ctx)
+	chats = slices.DeleteFunc(chats, func(c *ipc.Chat) bool { return c.Jid == other.String() })
+	if chats[0].UnreadCount != 0 {
 		t.Fatalf("reply did not clear unread: %v", chats[0])
 	}
 

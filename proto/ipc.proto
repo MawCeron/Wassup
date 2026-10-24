@@ -18,6 +18,7 @@ message Request {
     LinkAccount link_account = 6;
     MarkRead mark_read = 7;
     SetActiveChat set_active_chat = 8;
+    DownloadMedia download_media = 9;
   }
 }
 
@@ -37,6 +38,7 @@ message Event {
     LinkFailed link_failed = 10;
     MessageStatusChanged message_status_changed = 11;
     Ack ack = 12;
+    MediaReady media_ready = 13;
   }
 }
 
@@ -151,6 +153,41 @@ message Message {
   string sender_name = 8;
   // Delivery progress of own messages; unspecified for received ones.
   MessageStatus status = 9;
+  // Attached image or sticker; text is then its caption, possibly empty.
+  Media media = 10;
+}
+
+enum MediaKind {
+  MEDIA_KIND_UNSPECIFIED = 0;
+  MEDIA_KIND_IMAGE = 1;
+  MEDIA_KIND_STICKER = 2;
+}
+
+message Media {
+  MediaKind kind = 1;
+  // Local file in the daemon's cache; empty until downloaded. Media never
+  // travels over the socket, only this path.
+  string path = 2;
+  // Pixel size as announced by the sender, to reserve space before download.
+  uint32 width = 3;
+  uint32 height = 4;
+}
+
+// Fetches a message's media into the cache. Answered with ack at once;
+// media_ready follows when the download ends.
+message DownloadMedia {
+  string account_id = 1;
+  string chat_jid = 2;
+  string message_id = 3;
+}
+
+// Sent to every UI when a download ends: path on success, error otherwise.
+message MediaReady {
+  string account_id = 1;
+  string chat_jid = 2;
+  string message_id = 3;
+  string path = 4;
+  string error = 5;
 }
 
 enum MessageStatus {
