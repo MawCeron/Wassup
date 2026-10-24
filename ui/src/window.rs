@@ -17,6 +17,7 @@ const PAGE_SIZE: u32 = 50;
 const CSS: &str = "
 .bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
 .media { border-radius: 8px; background: alpha(currentColor, 0.08); }
+.document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
 /* After .mine, which has the same weight: own stickers have no bubble either. */
 .bubble.sticker { background: none; padding: 0; }
@@ -40,6 +41,10 @@ pub struct Window {
     rows: BoundRows,
     /// Messages whose media was asked for and has not arrived yet.
     media_requested: RefCell<std::collections::HashSet<String>>,
+    /// Files to open as soon as their download ends.
+    open_when_ready: RefCell<std::collections::HashSet<String>>,
+    /// "Sending…" notice of each upload, by request id.
+    uploads: RefCell<std::collections::HashMap<u64, adw::Toast>>,
     window: adw::ApplicationWindow,
     /// Last chat reported to the daemon as being looked at, as "account/chat".
     reported_active: RefCell<String>,
@@ -179,6 +184,13 @@ impl Window {
             .margin_start(12)
             .margin_end(12)
             .build();
+        let attach = gtk::Button::builder()
+            .icon_name("mail-attachment-symbolic")
+            .tooltip_text("Send a File")
+            .valign(gtk::Align::End)
+            .css_classes(["circular", "flat"])
+            .build();
+        composer_bar.append(&attach);
         composer_bar.append(&composer_scroll);
         composer_bar.append(&send_button);
         let content_view = with_header(&content_stack);
@@ -223,6 +235,8 @@ impl Window {
         let ui = Rc::new(Self {
             rows,
             media_requested: RefCell::default(),
+            open_when_ready: RefCell::default(),
+            uploads: RefCell::default(),
             window: window.clone(),
             reported_active: RefCell::new(String::new()),
             stack,
@@ -364,6 +378,11 @@ impl Window {
             move |_| report()
         });
         ui.split.connect_collapsed_notify(move |_| report());
+        attach.connect_clicked(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.choose_file()
+        ));
         owner.set(Rc::downgrade(&ui)).ok();
         ui.connect();
         ui
@@ -468,6 +487,9 @@ impl Window {
     }
 
     fn handle(self: &Rc<Self>, event: ipc::Event) {
+        if let Some(toast) = self.uploads.borrow_mut().remove(&event.request_id) {
+            toast.dismiss();
+        }
         let pending = self.sending.borrow_mut().remove(&event.request_id);
         if let Some(text) = pending {
             let buffer = self.composer.buffer();
@@ -614,6 +636,80 @@ impl Window {
         }
     }
 
+    fn choose_file(self: &Rc<Self>) {
+        let dialog = gtk::FileDialog::builder()
+            .title("Send a File")
+            .modal(true)
+            .build();
+        let ui = Rc::downgrade(self);
+        dialog.open(
+            Some(&self.window),
+            None::<&gio::Cancellable>,
+            move |result| {
+                let (Some(ui), Ok(file)) = (ui.upgrade(), result) else {
+                    return; // Closed, or cancelled.
+                };
+                if let Some(path) = file.path() {
+                    ui.send_file(&path.to_string_lossy());
+                }
+            },
+        );
+    }
+
+    /// Sends a file, with whatever is in the composer as its caption.
+    fn send_file(&self, path: &str) {
+        let Some((account_id, chat_jid)) = self.open_ids() else {
+            return;
+        };
+        let buffer = self.composer.buffer();
+        let (start, end) = buffer.bounds();
+        let caption = buffer.text(&start, &end, false).trim().to_owned();
+        let request = request::Kind::SendMedia(ipc::SendMedia {
+            account_id,
+            chat_jid,
+            path: path.to_owned(),
+            caption: caption.clone(),
+        });
+        if let Some(id) = self.send(request) {
+            buffer.set_text("");
+            self.sending.borrow_mut().insert(id, caption);
+            let name = std::path::Path::new(path)
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let toast = adw::Toast::builder()
+                .title(format!("Sending {name}…"))
+                .timeout(0)
+                .build();
+            self.toasts.add_toast(toast.clone());
+            self.uploads.borrow_mut().insert(id, toast);
+        }
+    }
+
+    /// Opens a message's file with the desktop's default application,
+    /// downloading it first if needed.
+    fn open_media(&self, msg: &ipc::Message) {
+        let Some(media) = &msg.media else { return };
+        if media.path.is_empty() {
+            self.open_when_ready.borrow_mut().insert(msg.id.clone());
+            self.request_media(msg);
+        } else {
+            self.launch(&media.path);
+        }
+    }
+
+    fn launch(&self, path: &str) {
+        gtk::FileLauncher::new(Some(&gio::File::for_path(path))).launch(
+            Some(&self.window),
+            None::<&gio::Cancellable>,
+            |result| {
+                if let Err(e) = result {
+                    eprintln!("wassup: couldn't open file: {e}");
+                }
+            },
+        );
+    }
+
     fn send_text(&self) {
         let buffer = self.composer.buffer();
         let (start, end) = buffer.bounds();
@@ -718,9 +814,16 @@ impl Window {
 
     fn media_ready(&self, ready: ipc::MediaReady) {
         self.media_requested.borrow_mut().remove(&ready.message_id);
+        let open = self.open_when_ready.borrow_mut().remove(&ready.message_id);
         if !ready.error.is_empty() {
             eprintln!("wassup: couldn't download media: {}", ready.error);
+            if open {
+                self.toast("Couldn't download the file");
+            }
             return;
+        }
+        if open {
+            self.launch(&ready.path);
         }
         for pos in 0..self.messages.n_items() {
             let Some(item) = self
@@ -738,6 +841,9 @@ impl Window {
                 break;
             };
             media.path = ready.path.clone();
+            if media.kind() == ipc::MediaKind::Document {
+                break; // Nothing to draw.
+            }
             let size = media_size(media);
             let picture = self
                 .rows
@@ -983,7 +1089,8 @@ fn show_status(label: &gtk::Label, status: ipc::MessageStatus) {
 
 fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(|_, item| {
+    let opener = owner.clone();
+    factory.connect_setup(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         item.set_activatable(false);
         // A focused row would scroll the list to itself.
@@ -1000,39 +1107,52 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             .css_classes(["media"])
             .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
             .build();
-        // Clicking opens the full image in the user's image viewer.
-        let open = gtk::GestureClick::new();
-        let list_item = item.downgrade();
-        open.connect_released(move |gesture, _, _, _| {
-            let Some(msg) = list_item
-                .upgrade()
-                .and_then(|i| i.item())
-                .and_downcast::<glib::BoxedAnyObject>()
-            else {
-                return;
-            };
-            let path = msg
-                .borrow::<ipc::Message>()
-                .media
-                .as_ref()
-                .map(|m| m.path.clone());
-            if let Some(path) = path.filter(|p| !p.is_empty()) {
-                let window = gesture
-                    .widget()
-                    .and_then(|w| w.root())
-                    .and_downcast::<gtk::Window>();
-                gtk::FileLauncher::new(Some(&gio::File::for_path(path))).launch(
-                    window.as_ref(),
-                    None::<&gio::Cancellable>,
-                    |result| {
-                        if let Err(e) = result {
-                            eprintln!("wassup: couldn't open image: {e}");
-                        }
-                    },
-                );
+        // Clicking opens the file with the desktop's default application.
+        let on_click = {
+            let (list_item, owner) = (item.downgrade(), opener.clone());
+            move || {
+                let msg = list_item
+                    .upgrade()
+                    .and_then(|i| i.item())
+                    .and_downcast::<glib::BoxedAnyObject>();
+                if let (Some(msg), Some(ui)) = (msg, owner.get().and_then(std::rc::Weak::upgrade)) {
+                    ui.open_media(&msg.borrow::<ipc::Message>());
+                }
             }
+        };
+        let open = gtk::GestureClick::new();
+        open.connect_released({
+            let on_click = on_click.clone();
+            move |_, _, _, _| on_click()
         });
         picture.add_controller(open);
+        let doc_name = gtk::Label::builder()
+            .xalign(0.0)
+            .ellipsize(gtk::pango::EllipsizeMode::Middle)
+            .css_classes(["heading"])
+            .build();
+        let doc_size = gtk::Label::builder()
+            .xalign(0.0)
+            .css_classes(["caption", "dim-label"])
+            .build();
+        let doc_labels = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        doc_labels.append(&doc_name);
+        doc_labels.append(&doc_size);
+        let document = gtk::Box::builder()
+            .spacing(10)
+            .css_classes(["document"])
+            .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
+            .build();
+        document.append(
+            &gtk::Image::builder()
+                .icon_name("x-office-document-symbolic")
+                .pixel_size(32)
+                .build(),
+        );
+        document.append(&doc_labels);
+        let open_doc = gtk::GestureClick::new();
+        open_doc.connect_released(move |_, _, _, _| on_click());
+        document.add_controller(open_doc);
         let text = gtk::Label::builder()
             .xalign(0.0)
             .wrap(true)
@@ -1055,6 +1175,7 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             .build();
         bubble.append(&sender);
         bubble.append(&picture);
+        bubble.append(&document);
         bubble.append(&text);
         bubble.append(&footer);
         let row = gtk::Box::builder()
@@ -1086,7 +1207,20 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             .next_sibling()
             .and_downcast::<gtk::Picture>()
             .unwrap();
-        let text = picture.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let document = picture.next_sibling().unwrap();
+        let doc_labels = document.last_child().unwrap();
+        let doc_name = doc_labels
+            .first_child()
+            .and_downcast::<gtk::Label>()
+            .unwrap();
+        let doc_size = doc_name
+            .next_sibling()
+            .and_downcast::<gtk::Label>()
+            .unwrap();
+        let text = document
+            .next_sibling()
+            .and_downcast::<gtk::Label>()
+            .unwrap();
         let footer = text.next_sibling().unwrap();
         let time = footer.first_child().and_downcast::<gtk::Label>().unwrap();
         let status = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
@@ -1109,7 +1243,14 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
                 picture: picture.downgrade(),
             },
         );
-        picture.set_visible(msg.media.is_some());
+        let kind = msg.media.as_ref().map(|m| m.kind());
+        let is_document = kind == Some(ipc::MediaKind::Document);
+        picture.set_visible(kind.is_some() && !is_document);
+        document.set_visible(is_document);
+        if let Some(media) = msg.media.as_ref().filter(|_| is_document) {
+            doc_name.set_label(&media.file_name);
+            doc_size.set_label(&glib::format_size(media.size));
+        }
         picture.set_paintable(None::<&gdk::Paintable>);
         let sticker = msg
             .media
@@ -1123,7 +1264,7 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             bubble.remove_css_class("sticker");
             picture.add_css_class("media");
         }
-        if let Some(media) = &msg.media {
+        if let Some(media) = msg.media.as_ref().filter(|_| !is_document) {
             // Reserve the final size now so the row does not grow later.
             let (width, height) = media_size(media);
             picture.set_size_request(width, height);

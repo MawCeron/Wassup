@@ -146,10 +146,17 @@ journalctl --user -u wassupd -f   # logs
 
 Images and stickers are downloaded on demand: the daemon stores what it
 needs to fetch them, and the UI asks for a file only when its message is
-on screen. Files are cached in `$XDG_CACHE_HOME/wassup/media/<account>/`,
+on screen. Documents are downloaded when clicked, then opened with the
+default application. Files are cached in `$XDG_CACHE_HOME/wassup/media/<account>/`,
 named after their content hash, and the least recently used ones are
 deleted once the cache passes 500 MB; they download again if shown.
 
 The UI decodes images already scaled to their on-screen size, through
 gdk-pixbuf, which on Fedora runs glycin's sandboxed loaders. Clicking an
 image opens the cached file in the default image viewer.
+
+To send a file, the UI passes the daemon its path, never its content.
+JPEG and PNG files go as photos, anything else as a document, with the
+composer's text as caption. The daemon uploads through a temporary file,
+so large files are not held in memory, and replies when the upload ends.
+Photos are sent as they are, without being recompressed.
