@@ -175,3 +175,11 @@ nothing is uploaded. It can also turn an image into a sticker: the UI
 centres it on a transparent 512x512 canvas and encodes it as WebP with
 the system's libwebp, lowering the quality until it fits WhatsApp's
 100 KB limit for stickers.
+
+Favorite stickers come from the phone through WhatsApp's app state. The
+daemon replays the whole app state once to learn the existing ones, then
+follows changes. The sync carries each favorite's file hash as its id,
+which is what whatsmeow needs to verify the download. Favorites whose
+file has expired on WhatsApp's servers, or that only the phone holds,
+cannot be fetched and are left out, unless the same sticker was also
+received in a chat.

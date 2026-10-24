@@ -51,7 +51,8 @@ pub struct Window {
     /// "Sending…" notice of each upload, by request id.
     uploads: RefCell<std::collections::HashMap<u64, adw::Toast>>,
     sticker_popover: gtk::Popover,
-    sticker_grid: gtk::FlowBox,
+    /// Favorites synced from the phone, then recent stickers, each with its heading.
+    sticker_sections: [(gtk::Label, gtk::FlowBox); 2],
     sticker_empty: gtk::Label,
     /// Stickers made here, deleted once the daemon has them, by request id.
     sticker_files: RefCell<std::collections::HashMap<u64, std::path::PathBuf>>,
@@ -203,12 +204,25 @@ impl Window {
             .css_classes(["circular", "flat"])
             .build();
         // Sticker picker: stickers recently sent or received.
-        let sticker_grid = gtk::FlowBox::builder()
-            .selection_mode(gtk::SelectionMode::None)
-            .homogeneous(true)
-            .min_children_per_line(4)
-            .max_children_per_line(6)
-            .build();
+        let sticker_sections = ["Favorites", "Recent"].map(|title| {
+            let heading = gtk::Label::builder()
+                .label(title)
+                .xalign(0.0)
+                .css_classes(["heading"])
+                .build();
+            let grid = gtk::FlowBox::builder()
+                .selection_mode(gtk::SelectionMode::None)
+                .homogeneous(true)
+                .min_children_per_line(4)
+                .max_children_per_line(6)
+                .build();
+            (heading, grid)
+        });
+        let sticker_lists = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        for (heading, grid) in &sticker_sections {
+            sticker_lists.append(heading);
+            sticker_lists.append(grid);
+        }
         let sticker_empty = gtk::Label::builder()
             .label("Stickers you send or receive show up here.")
             .wrap(true)
@@ -227,7 +241,7 @@ impl Window {
                 .min_content_width(STICKER_THUMB * 5)
                 .max_content_height(STICKER_THUMB * 4)
                 .propagate_natural_height(true)
-                .child(&sticker_grid)
+                .child(&sticker_lists)
                 .build(),
         );
         let sticker_popover = gtk::Popover::builder().child(&sticker_box).build();
@@ -303,7 +317,7 @@ impl Window {
             header_title,
             uploads: RefCell::default(),
             sticker_popover,
-            sticker_grid,
+            sticker_sections,
             sticker_empty,
             sticker_files: RefCell::default(),
             sticker_pictures: RefCell::default(),
@@ -934,8 +948,11 @@ impl Window {
     }
 
     fn show_stickers(self: &Rc<Self>, stickers: Vec<ipc::Sticker>) {
-        while let Some(child) = self.sticker_grid.first_child() {
-            self.sticker_grid.remove(&child);
+        for (heading, grid) in &self.sticker_sections {
+            while let Some(child) = grid.first_child() {
+                grid.remove(&child);
+            }
+            heading.set_visible(false);
         }
         self.sticker_pictures.borrow_mut().clear();
         self.sticker_empty.set_visible(stickers.is_empty());
@@ -946,6 +963,8 @@ impl Window {
             .map(|a| a.id.clone())
             .unwrap_or_default();
         for sticker in stickers {
+            // Favorites first, recent stickers second.
+            let section = usize::from(sticker.favorite_id.is_empty());
             let picture = gtk::Picture::builder()
                 .content_fit(gtk::ContentFit::Contain)
                 .width_request(STICKER_THUMB)
@@ -978,7 +997,9 @@ impl Window {
                 self,
                 move |_| ui.send_sticker(&sticker)
             ));
-            self.sticker_grid.append(&button);
+            let (heading, grid) = &self.sticker_sections[section];
+            heading.set_visible(true);
+            grid.append(&button);
         }
     }
 
@@ -1059,6 +1080,7 @@ impl Window {
             chat_jid,
             source_chat_jid: sticker.chat_jid.clone(),
             source_message_id: sticker.message_id.clone(),
+            favorite_id: sticker.favorite_id.clone(),
         }));
     }
 
