@@ -49,6 +49,11 @@ pub struct Window {
     open_when_ready: RefCell<std::collections::HashSet<String>>,
     /// "Sending…" notice of each upload, by request id.
     uploads: RefCell<std::collections::HashMap<u64, adw::Toast>>,
+    sticker_popover: gtk::Popover,
+    sticker_grid: gtk::FlowBox,
+    sticker_empty: gtk::Label,
+    /// Picker pictures waiting for their sticker's download, by message id.
+    sticker_pictures: RefCell<std::collections::HashMap<String, glib::WeakRef<gtk::Picture>>>,
     window: adw::ApplicationWindow,
     /// Last chat reported to the daemon as being looked at, as "account/chat".
     reported_active: RefCell<String>,
@@ -194,7 +199,39 @@ impl Window {
             .valign(gtk::Align::End)
             .css_classes(["circular", "flat"])
             .build();
+        // Sticker picker: stickers recently sent or received.
+        let sticker_grid = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .homogeneous(true)
+            .min_children_per_line(4)
+            .max_children_per_line(6)
+            .build();
+        let sticker_empty = gtk::Label::builder()
+            .label("Stickers you send or receive show up here.")
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build();
+        let sticker_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        sticker_box.append(&sticker_empty);
+        sticker_box.append(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .min_content_width(STICKER_THUMB * 5)
+                .max_content_height(STICKER_THUMB * 4)
+                .propagate_natural_height(true)
+                .child(&sticker_grid)
+                .build(),
+        );
+        let sticker_popover = gtk::Popover::builder().child(&sticker_box).build();
+        let stickers_button = gtk::MenuButton::builder()
+            .icon_name("face-smile-symbolic")
+            .tooltip_text("Stickers")
+            .valign(gtk::Align::End)
+            .popover(&sticker_popover)
+            .css_classes(["circular", "flat"])
+            .build();
         composer_bar.append(&attach);
+        composer_bar.append(&stickers_button);
         composer_bar.append(&composer_scroll);
         composer_bar.append(&send_button);
         // The conversation's header shows the chat's picture next to its name.
@@ -257,6 +294,10 @@ impl Window {
             header_avatar,
             header_title,
             uploads: RefCell::default(),
+            sticker_popover,
+            sticker_grid,
+            sticker_empty,
+            sticker_pictures: RefCell::default(),
             window: window.clone(),
             reported_active: RefCell::new(String::new()),
             stack,
@@ -398,6 +439,17 @@ impl Window {
             move |_| report()
         });
         ui.split.connect_collapsed_notify(move |_| report());
+        ui.sticker_popover.connect_show(glib::clone!(
+            #[weak]
+            ui,
+            move |_| {
+                if let Some(account) = ui.account.borrow().as_ref() {
+                    ui.send(request::Kind::ListStickers(ipc::ListStickers {
+                        account_id: account.id.clone(),
+                    }));
+                }
+            }
+        ));
         attach.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -552,6 +604,7 @@ impl Window {
             Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => self.add_message(msg),
             Some(event::Kind::MessageStatusChanged(change)) => self.update_status(change),
             Some(event::Kind::MediaReady(ready)) => self.media_ready(ready),
+            Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
                 self.link.set_description(Some(
@@ -719,6 +772,7 @@ impl Window {
             chat_jid,
             path: path.to_owned(),
             caption: caption.clone(),
+            as_sticker: false,
         });
         if let Some(id) = self.send(request) {
             buffer.set_text("");
@@ -862,8 +916,76 @@ impl Window {
         }));
     }
 
+    fn show_stickers(self: &Rc<Self>, stickers: Vec<ipc::Sticker>) {
+        while let Some(child) = self.sticker_grid.first_child() {
+            self.sticker_grid.remove(&child);
+        }
+        self.sticker_pictures.borrow_mut().clear();
+        self.sticker_empty.set_visible(stickers.is_empty());
+        let account_id = self
+            .account
+            .borrow()
+            .as_ref()
+            .map(|a| a.id.clone())
+            .unwrap_or_default();
+        for sticker in stickers {
+            let picture = gtk::Picture::builder()
+                .content_fit(gtk::ContentFit::Contain)
+                .width_request(STICKER_THUMB)
+                .height_request(STICKER_THUMB)
+                .build();
+            let button = gtk::Button::builder()
+                .child(&picture)
+                .css_classes(["flat"])
+                .build();
+            if sticker.path.is_empty() {
+                self.sticker_pictures
+                    .borrow_mut()
+                    .insert(sticker.message_id.clone(), picture.downgrade());
+                if self
+                    .media_requested
+                    .borrow_mut()
+                    .insert(sticker.message_id.clone())
+                {
+                    self.send(request::Kind::DownloadMedia(ipc::DownloadMedia {
+                        account_id: account_id.clone(),
+                        chat_jid: sticker.chat_jid.clone(),
+                        message_id: sticker.message_id.clone(),
+                    }));
+                }
+            } else {
+                show_thumb(&picture, &sticker.path);
+            }
+            button.connect_clicked(glib::clone!(
+                #[weak(rename_to = ui)]
+                self,
+                move |_| ui.send_sticker(&sticker)
+            ));
+            self.sticker_grid.append(&button);
+        }
+    }
+
+    fn send_sticker(&self, sticker: &ipc::Sticker) {
+        self.sticker_popover.popdown();
+        let Some((account_id, chat_jid)) = self.open_ids() else {
+            return;
+        };
+        self.send(request::Kind::SendSticker(ipc::SendSticker {
+            account_id,
+            chat_jid,
+            source_chat_jid: sticker.chat_jid.clone(),
+            source_message_id: sticker.message_id.clone(),
+        }));
+    }
+
     fn media_ready(&self, ready: ipc::MediaReady) {
         self.media_requested.borrow_mut().remove(&ready.message_id);
+        let waiting = self.sticker_pictures.borrow_mut().remove(&ready.message_id);
+        if let Some(picture) = waiting.and_then(|p| p.upgrade())
+            && ready.error.is_empty()
+        {
+            show_thumb(&picture, &ready.path);
+        }
         let open = self.open_when_ready.borrow_mut().remove(&ready.message_id);
         if !ready.error.is_empty() {
             eprintln!("wassup: couldn't download media: {}", ready.error);
@@ -1487,6 +1609,19 @@ fn avatar_placeholder(avatar: &adw::Avatar, chat: &ipc::Chat) {
     } else {
         "avatar-default-symbolic"
     }));
+}
+
+/// Size of a sticker in the picker, in pixels.
+const STICKER_THUMB: i32 = 64;
+
+fn show_thumb(picture: &gtk::Picture, path: &str) {
+    let scale = picture.scale_factor().max(1);
+    let picture = picture.downgrade();
+    load_texture(path, STICKER_THUMB, STICKER_THUMB, scale, move |texture| {
+        if let Some(picture) = picture.upgrade() {
+            picture.set_paintable(Some(&texture));
+        }
+    });
 }
 
 /// Puts a chat's cached picture in an avatar, unless by the time it is
