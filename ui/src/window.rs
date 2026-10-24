@@ -103,6 +103,8 @@ pub struct Window {
     has_more: Cell<bool>,
     /// Keep the newest message in view while the list grows, until the user scrolls up.
     stick_bottom: Cell<bool>,
+    /// A scroll to the newest message is queued for after layout.
+    pin_pending: Cell<bool>,
     composer: gtk::TextView,
     content_view: adw::ToolbarView,
     /// Text of each SendText request awaiting its reply, by request id, so
@@ -378,6 +380,7 @@ impl Window {
             loading: Cell::new(false),
             has_more: Cell::new(false),
             stick_bottom: Cell::new(false),
+            pin_pending: Cell::new(false),
             composer,
             content_view,
             sending: RefCell::default(),
@@ -418,19 +421,60 @@ impl Window {
             #[weak]
             ui,
             move |_| {
-                if ui.stick_bottom.get() {
-                    ui.show_last_row();
+                // This fires mid-layout, while the list still holds the old
+                // row positions; scroll once the layout is done.
+                if ui.stick_bottom.get() && !ui.pin_pending.replace(true) {
+                    let ui = Rc::downgrade(&ui);
+                    glib::idle_add_local_once(move || {
+                        if let Some(ui) = ui.upgrade() {
+                            ui.pin_pending.set(false);
+                            if ui.stick_bottom.get() {
+                                // Layout is done, so this moves the view the
+                                // way a user's scroll would and the list
+                                // re-anchors itself correctly.
+                                let adj = ui.message_scroll.vadjustment();
+                                adj.set_value(adj.upper() - adj.page_size());
+                            }
+                        }
+                    });
                 }
             }
         ));
+        // Reaching the bottom, by any means, follows new messages again.
         adj.connect_value_changed(glib::clone!(
             #[weak]
             ui,
             move |adj| {
-                let at_bottom = adj.value() + adj.page_size() >= adj.upper() - 1.0;
-                ui.stick_bottom.set(at_bottom);
+                if adj.value() + adj.page_size() >= adj.upper() - 1.0 {
+                    ui.stick_bottom.set(true);
+                }
             }
         ));
+        // Only the user stops following: the list also moves the view itself,
+        // e.g. when a new row turns out taller than estimated, and that must
+        // not count as scrolling away.
+        let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+        wheel.set_propagation_phase(gtk::PropagationPhase::Capture);
+        wheel.connect_scroll(glib::clone!(
+            #[weak]
+            ui,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, _, dy| {
+                if dy < 0.0 {
+                    ui.stick_bottom.set(false);
+                }
+                glib::Propagation::Proceed
+            }
+        ));
+        ui.message_scroll.add_controller(wheel);
+        let grab = gtk::GestureClick::new();
+        grab.connect_pressed(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _, _, _| ui.stick_bottom.set(false)
+        ));
+        ui.message_scroll.vscrollbar().add_controller(grab);
         ui.message_scroll.connect_edge_reached(glib::clone!(
             #[weak]
             ui,
