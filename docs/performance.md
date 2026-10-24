@@ -38,3 +38,20 @@ when it opens the display, whichever renderer draws afterwards.
 
 Daemon and UI together: about 100–110 MB PSS. For reference, Whats4Linux
 uses about 140 MB with one account.
+
+### Rendering benchmark
+
+A test copy of the UI scrolled a 200-message chat with 40 photos for
+8 seconds at about 1500 px/s, on a HiDPI screen (scale 2) with Intel and
+NVIDIA graphics. Two runs gave the same figures; the medians:
+
+| Rendering | Frames | 95th percentile frame | CPU while scrolling | USS | RSS | PSS |
+|---|---|---|---|---|---|---|
+| GTK default (GPU) | 59.0 fps | 16.7 ms | 12–13 % | 75 MB | 175 MB | 110 MB |
+| GPU through Mesa only | 59.0 fps | 16.7 ms | 12–13 % | 62 MB | 137 MB | 85 MB |
+| Software (cairo) | 59.6 fps | 16.7 ms | 30 % | 38 MB | 99 MB | 55 MB |
+
+All three keep 60 fps. Software rendering spends about 2.4 times the CPU
+while scrolling, and none at rest. PSS depends on what other processes
+share, so USS (memory only this process holds) is the fairer comparison.
+
