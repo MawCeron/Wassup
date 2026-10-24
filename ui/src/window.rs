@@ -33,6 +33,15 @@ type BoundRows = Rc<RefCell<std::collections::HashMap<String, RowWidgets>>>;
 struct RowWidgets {
     status: glib::WeakRef<gtk::Label>,
     picture: glib::WeakRef<gtk::Picture>,
+    audio: glib::WeakRef<gtk::Box>,
+}
+
+/// The audio being played. Only one plays at a time, and the stream exists
+/// only while it does.
+struct Player {
+    msg_id: String,
+    duration: u32,
+    media: gtk::MediaFile,
 }
 
 /// Lets the row factory, built before the window, reach it later.
@@ -52,6 +61,9 @@ pub struct Window {
     avatar_requested: RefCell<std::collections::HashSet<String>>,
     header_avatar: adw::Avatar,
     header_title: gtk::Label,
+    player: RefCell<Option<Player>>,
+    /// Audio to play as soon as its download ends.
+    play_when_ready: RefCell<std::collections::HashSet<String>>,
     /// Files to open as soon as their download ends.
     open_when_ready: RefCell<std::collections::HashSet<String>>,
     /// "Sending…" notice of each upload, by request id.
@@ -330,6 +342,8 @@ impl Window {
             rows,
             media_requested: RefCell::default(),
             open_when_ready: RefCell::default(),
+            player: RefCell::default(),
+            play_when_ready: RefCell::default(),
             avatar_requested: RefCell::default(),
             header_avatar,
             header_title,
@@ -816,6 +830,7 @@ impl Window {
         if self.current_chat.borrow().as_deref() == Some(chat.jid.as_str()) {
             return;
         }
+        self.stop_audio();
         self.current_chat.replace(Some(chat.jid.clone()));
         self.content.set_title(&chat_title(chat));
         self.show_header(chat);
@@ -890,6 +905,111 @@ impl Window {
             self.request_media(msg);
         } else {
             self.launch(&media.path);
+        }
+    }
+
+    /// Plays or pauses a message's audio, downloading it first if needed.
+    fn toggle_audio(self: &Rc<Self>, msg: &ipc::Message) {
+        let Some(media) = &msg.media else { return };
+        let current = self
+            .player
+            .borrow()
+            .as_ref()
+            .filter(|p| p.msg_id == msg.id)
+            .map(|p| p.media.clone());
+        if let Some(stream) = current {
+            stream.set_playing(!stream.is_playing());
+        } else if media.path.is_empty() {
+            self.play_when_ready.borrow_mut().insert(msg.id.clone());
+            self.request_media(msg);
+        } else {
+            self.start_audio(&msg.id, &media.path);
+        }
+    }
+
+    fn start_audio(self: &Rc<Self>, msg_id: &str, path: &str) {
+        self.stop_audio();
+        let duration = (0..self.messages.n_items())
+            .filter_map(|i| self.messages.item(i).and_downcast::<glib::BoxedAnyObject>())
+            .find_map(|item| {
+                let m = item.borrow::<ipc::Message>();
+                (m.id == msg_id).then(|| m.media.as_ref().map_or(0, |a| a.duration_seconds))
+            })
+            .unwrap_or(0);
+        let media = gtk::MediaFile::for_filename(path);
+        let ui = Rc::downgrade(self);
+        let refresh = {
+            let ui = ui.clone();
+            move || {
+                if let Some(ui) = ui.upgrade() {
+                    ui.show_audio_state();
+                }
+            }
+        };
+        media.connect_timestamp_notify({
+            let refresh = refresh.clone();
+            move |_| refresh()
+        });
+        media.connect_playing_notify(move |_| refresh());
+        media.connect_ended_notify(move |stream| {
+            if let Some(ui) = ui.upgrade().filter(|_| stream.is_ended()) {
+                ui.stop_audio();
+            }
+        });
+        media.connect_error_notify(glib::clone!(
+            #[weak(rename_to = ui)]
+            self,
+            move |stream| {
+                if let Some(e) = stream.error() {
+                    ui.toast(&format!("Couldn't play the audio: {e}"));
+                    ui.stop_audio();
+                }
+            }
+        ));
+        media.play();
+        self.player.replace(Some(Player {
+            msg_id: msg_id.to_owned(),
+            duration,
+            media,
+        }));
+        self.show_audio_state();
+    }
+
+    /// Frees the player; its row goes back to the start.
+    fn stop_audio(&self) {
+        let Some(player) = self.player.take() else {
+            return;
+        };
+        player.media.pause();
+        let row = self
+            .rows
+            .borrow()
+            .get(&player.msg_id)
+            .and_then(|r| r.audio.upgrade());
+        if let Some(row) = row {
+            show_audio(&row, player.duration, None);
+        }
+    }
+
+    fn seek_audio(&self, msg_id: &str, seconds: f64) {
+        if let Some(player) = self.player.borrow().as_ref().filter(|p| p.msg_id == msg_id) {
+            player.media.seek((seconds * 1_000_000.0) as i64);
+        }
+    }
+
+    /// Updates the playing message's row, if it is on screen.
+    fn show_audio_state(&self) {
+        let player = self.player.borrow();
+        let Some(player) = player.as_ref() else {
+            return;
+        };
+        let row = self
+            .rows
+            .borrow()
+            .get(&player.msg_id)
+            .and_then(|r| r.audio.upgrade());
+        if let Some(row) = row {
+            show_audio(&row, player.duration, Some(&player.media));
         }
     }
 
@@ -1144,7 +1264,7 @@ impl Window {
         }));
     }
 
-    fn media_ready(&self, ready: ipc::MediaReady) {
+    fn media_ready(self: &Rc<Self>, ready: ipc::MediaReady) {
         self.media_requested.borrow_mut().remove(&ready.message_id);
         let waiting = self.sticker_pictures.borrow_mut().remove(&ready.message_id);
         if let Some(picture) = waiting.and_then(|p| p.upgrade())
@@ -1163,6 +1283,9 @@ impl Window {
         if open {
             self.launch(&ready.path);
         }
+        if self.play_when_ready.borrow_mut().remove(&ready.message_id) {
+            self.start_audio(&ready.message_id, &ready.path);
+        }
         for pos in 0..self.messages.n_items() {
             let Some(item) = self
                 .messages
@@ -1179,7 +1302,10 @@ impl Window {
                 break;
             };
             media.path = ready.path.clone();
-            if media.kind() == ipc::MediaKind::Document {
+            if matches!(
+                media.kind(),
+                ipc::MediaKind::Document | ipc::MediaKind::Audio
+            ) {
                 break; // Nothing to draw.
             }
             let size = media_size(media);
@@ -1532,6 +1658,54 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
         bubble.append(&sender);
         bubble.append(&picture);
         bubble.append(&document);
+        let voice_icon = gtk::Image::builder()
+            .icon_name("audio-input-microphone-symbolic")
+            .tooltip_text("Voice message")
+            .build();
+        let play = gtk::Button::builder()
+            .icon_name("media-playback-start-symbolic")
+            .tooltip_text("Play")
+            .css_classes(["circular"])
+            .build();
+        let progress = gtk::Scale::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .hexpand(true)
+            .draw_value(false)
+            .build();
+        let length = gtk::Label::builder()
+            .css_classes(["caption", "dim-label", "numeric"])
+            .build();
+        let audio = gtk::Box::builder()
+            .spacing(8)
+            .width_request(240)
+            .css_classes(["document"])
+            .build();
+        audio.append(&voice_icon);
+        audio.append(&play);
+        audio.append(&progress);
+        audio.append(&length);
+        let with_message = {
+            let (list_item, owner) = (item.downgrade(), opener.clone());
+            move |f: &dyn Fn(&Rc<Window>, &ipc::Message)| {
+                let msg = list_item
+                    .upgrade()
+                    .and_then(|i| i.item())
+                    .and_downcast::<glib::BoxedAnyObject>();
+                if let (Some(msg), Some(ui)) = (msg, owner.get().and_then(std::rc::Weak::upgrade)) {
+                    f(&ui, &msg.borrow::<ipc::Message>());
+                }
+            }
+        };
+        play.connect_clicked({
+            let with_message = with_message.clone();
+            move |_| with_message(&|ui, msg| ui.toggle_audio(msg))
+        });
+        // Only user drags seek; progress updates set the value directly.
+        progress.connect_change_value(move |_, _, value| {
+            with_message(&|ui, msg| ui.seek_audio(&msg.id, value));
+            glib::Propagation::Proceed
+        });
+        bubble.append(&audio);
         bubble.append(&text);
         bubble.append(&footer);
         let row = gtk::Box::builder()
@@ -1573,10 +1747,8 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             .next_sibling()
             .and_downcast::<gtk::Label>()
             .unwrap();
-        let text = document
-            .next_sibling()
-            .and_downcast::<gtk::Label>()
-            .unwrap();
+        let audio = document.next_sibling().and_downcast::<gtk::Box>().unwrap();
+        let text = audio.next_sibling().and_downcast::<gtk::Label>().unwrap();
         let footer = text.next_sibling().unwrap();
         let time = footer.first_child().and_downcast::<gtk::Label>().unwrap();
         let status = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
@@ -1597,12 +1769,28 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             RowWidgets {
                 status: status.downgrade(),
                 picture: picture.downgrade(),
+                audio: audio.downgrade(),
             },
         );
         let kind = msg.media.as_ref().map(|m| m.kind());
         let is_document = kind == Some(ipc::MediaKind::Document);
-        picture.set_visible(kind.is_some() && !is_document);
+        let is_audio = kind == Some(ipc::MediaKind::Audio);
+        let is_picture = matches!(kind, Some(ipc::MediaKind::Image | ipc::MediaKind::Sticker));
+        picture.set_visible(is_picture);
         document.set_visible(is_document);
+        audio.set_visible(is_audio);
+        if let Some(media) = msg.media.as_ref().filter(|_| is_audio) {
+            audio.first_child().unwrap().set_visible(media.voice_note);
+            // The playing message keeps its progress when scrolled back to.
+            let playing = owner.get().and_then(std::rc::Weak::upgrade).and_then(|ui| {
+                ui.player
+                    .borrow()
+                    .as_ref()
+                    .filter(|p| p.msg_id == msg.id)
+                    .map(|p| p.media.clone())
+            });
+            show_audio(&audio, media.duration_seconds, playing.as_ref());
+        }
         if let Some(media) = msg.media.as_ref().filter(|_| is_document) {
             doc_name.set_label(&media.file_name);
             doc_size.set_label(&glib::format_size(media.size));
@@ -1620,7 +1808,7 @@ fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFact
             bubble.remove_css_class("sticker");
             picture.add_css_class("media");
         }
-        if let Some(media) = msg.media.as_ref().filter(|_| !is_document) {
+        if let Some(media) = msg.media.as_ref().filter(|_| is_picture) {
             // Reserve the final size now so the row does not grow later.
             let (width, height) = media_size(media);
             picture.set_size_request(width, height);
@@ -1777,6 +1965,45 @@ fn avatar_placeholder(avatar: &adw::Avatar, chat: &ipc::Chat) {
     }));
 }
 
+/// Draws an audio row: play or pause, how far it got, and the time.
+fn show_audio(row: &gtk::Box, duration: u32, playing: Option<&gtk::MediaFile>) {
+    let play = row
+        .first_child()
+        .and_then(|w| w.next_sibling())
+        .and_downcast::<gtk::Button>()
+        .unwrap();
+    let progress = play.next_sibling().and_downcast::<gtk::Scale>().unwrap();
+    let length = progress
+        .next_sibling()
+        .and_downcast::<gtk::Label>()
+        .unwrap();
+    let total = match playing.map(|m| m.duration()) {
+        Some(us) if us > 0 => us as f64 / 1e6,
+        _ => f64::from(duration.max(1)),
+    };
+    let at = playing.map_or(0.0, |m| m.timestamp() as f64 / 1e6);
+    let running = playing.is_some_and(|m| m.is_playing());
+    play.set_icon_name(if running {
+        "media-playback-pause-symbolic"
+    } else {
+        "media-playback-start-symbolic"
+    });
+    play.set_tooltip_text(Some(if running { "Pause" } else { "Play" }));
+    progress.set_range(0.0, total);
+    progress.set_value(at);
+    length.set_label(&clock(if playing.is_some() {
+        at
+    } else {
+        f64::from(duration)
+    }));
+}
+
+/// "m:ss", the way chat apps show audio lengths.
+fn clock(seconds: f64) -> String {
+    let s = seconds.max(0.0) as u64;
+    format!("{}:{:02}", s / 60, s % 60)
+}
+
 /// Size of a sticker in the picker, in pixels.
 const STICKER_THUMB: i32 = 64;
 
@@ -1889,6 +2116,13 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(media_size(&sticker), (160, 160));
+    }
+
+    #[test]
+    fn audio_clock() {
+        assert_eq!(clock(0.0), "0:00");
+        assert_eq!(clock(7.9), "0:07");
+        assert_eq!(clock(125.0), "2:05");
     }
 
     #[test]

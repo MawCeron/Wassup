@@ -157,6 +157,10 @@ The UI decodes images already scaled to their on-screen size, through
 gdk-pixbuf, which on Fedora runs glycin's sandboxed loaders. Clicking an
 image opens the cached file in the default image viewer.
 
+Audio and voice notes download when their play button is pressed, and
+play through GTK's media support, which uses GStreamer. One plays at a
+time, and the player only exists while it does.
+
 Profile and group pictures are fetched when a chat first shows up on
 screen, as small previews cached in `$XDG_CACHE_HOME/wassup/avatars/`.
 The daemon asks the server again only after a picture change event or a
