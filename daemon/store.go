@@ -61,6 +61,9 @@ CREATE TABLE wassup_meta (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
 );
+`, `
+-- Favorites whose file is no longer on WhatsApp's servers; not retried.
+ALTER TABLE wassup_favorite_stickers ADD COLUMN gone INTEGER NOT NULL DEFAULT 0;
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {

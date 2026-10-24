@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -71,21 +73,25 @@ func TestFavoriteStickers(t *testing.T) {
 			StickerAction: &waSyncAction.StickerAction{IsFavorite: proto.Bool(on), DirectPath: proto.String("/x")},
 		})
 	}
-	favorite("old", 1, true)
-	favorite("new", 2, true)
-	favorite("gone", 3, true)
-	favorite("gone", 4, false)
+	id := func(b byte) string { return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{b}, 32)) }
+	old, recent, removed := id(1), id(2), id(3)
+	favorite(old, 1, true)
+	favorite(recent, 2, true)
+	favorite(removed, 3, true)
+	favorite(removed, 4, false)
+	favorite("not-a-hash", 5, true)                                             // Ignored.
 	a.onAppState(ctx, []string{"pin_v1", "x"}, &waSyncAction.SyncActionValue{}) // Unrelated.
 
 	got, err := a.listStickers(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].FavoriteId != "new" || got[1].FavoriteId != "old" {
-		t.Fatalf("favorites %v; want new, old", got)
+	if len(got) != 2 || got[0].FavoriteId != recent || got[1].FavoriteId != old {
+		t.Fatalf("favorites %v; want recent, old", got)
 	}
-	// Not downloaded (no connection here), so it cannot be sent yet.
-	if _, err := a.favoriteSticker(ctx, "new"); err == nil {
-		t.Fatal("built a favorite without its file hash")
+	// Built from its own upload, with the hash taken from the id.
+	s, err := a.favoriteSticker(ctx, recent)
+	if err != nil || len(s.GetFileSHA256()) != 32 || s.GetDirectPath() != "/x" {
+		t.Fatalf("favorite sticker %v, %v", s, err)
 	}
 }

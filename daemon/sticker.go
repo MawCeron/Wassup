@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"os"
@@ -100,10 +101,16 @@ func (a *account) onAppState(ctx context.Context, index []string, value *waSyncA
 		}
 		return
 	}
+	hash, err := favoriteHash(id)
+	if err != nil {
+		a.log.Warn("favorite sticker", "id", id, "err", err)
+		return
+	}
 	blob, err := proto.Marshal(action)
 	if err == nil {
-		_, err = a.db.ExecContext(ctx, `INSERT INTO wassup_favorite_stickers (id, action, added_ms) VALUES (?, ?, ?)
-			ON CONFLICT (id) DO UPDATE SET action = excluded.action`, id, blob, value.GetTimestamp())
+		_, err = a.db.ExecContext(ctx, `INSERT INTO wassup_favorite_stickers (id, action, file_sha256, added_ms)
+			VALUES (?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET action = excluded.action, gone = 0`,
+			id, blob, hash, value.GetTimestamp())
 	}
 	if err != nil {
 		a.log.Warn("save favorite sticker", "err", err)
@@ -132,31 +139,48 @@ func (a *account) resyncFavorites(ctx context.Context) {
 	a.db.ExecContext(ctx, `INSERT OR REPLACE INTO wassup_meta (key, value) VALUES ('favorites_synced', '1')`)
 }
 
-// fetchFavorite downloads a favorite in the background. The sync does not
-// carry the decrypted file's hash, so it is computed here: integrity is
-// still checked against the encrypted hash and the MAC.
+// favoriteHash recovers the decrypted file's hash, which the sync carries
+// only as the favorite's id, base64 encoded.
+func favoriteHash(id string) ([]byte, error) {
+	hash, err := base64.StdEncoding.DecodeString(id)
+	if err != nil || len(hash) != sha256.Size {
+		return nil, errors.New("id is not a file hash")
+	}
+	return hash, nil
+}
+
+// fetchFavorite downloads a favorite in the background, verified against
+// the hash in its id.
 func (a *account) fetchFavorite(id string, action *waSyncAction.StickerAction) {
 	a.inBackground("favorite/"+id, func() {
 		ctx := context.Background()
-		var known []byte
-		a.db.QueryRowContext(ctx, `SELECT file_sha256 FROM wassup_favorite_stickers WHERE id = ?`, id).Scan(&known)
-		if known != nil {
-			if _, err := os.Stat(a.favoritePath(known)); err == nil {
-				return
-			}
-		}
-		data, err := a.client.DownloadMediaWithPath(ctx, action.GetDirectPath(), action.GetFileEncSHA256(), nil,
-			action.GetMediaKey(), whatsmeow.MediaImage, "", true)
+		fileHash, err := favoriteHash(id)
 		if err != nil {
+			return
+		}
+		if _, err := os.Stat(a.favoritePath(fileHash)); err == nil {
+			return // Cached, maybe because it was also received in a chat.
+		}
+		if action.GetDirectPath() == "" {
+			// Some favorites carry only their hash; the phone keeps the file.
+			a.db.ExecContext(ctx, `UPDATE wassup_favorite_stickers SET gone = 1 WHERE id = ?`, id)
+			return
+		}
+		data, err := a.client.DownloadMediaWithPath(ctx, action.GetDirectPath(), action.GetFileEncSHA256(), fileHash,
+			action.GetMediaKey(), whatsmeow.MediaImage, "", false)
+		if errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith403) || errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith404) ||
+			errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith410) {
+			// Expired on the servers. Only a message's media can be asked
+			// from the phone again, and a favorite is not tied to one.
+			a.db.ExecContext(ctx, `UPDATE wassup_favorite_stickers SET gone = 1 WHERE id = ?`, id)
+			return
+		} else if err != nil {
 			a.log.Warn("download favorite sticker", "id", id, "err", err)
 			return
 		}
-		sum := sha256.Sum256(data)
-		if err := writeAtomic(a.mediaDir, a.favoritePath(sum[:]), data); err != nil {
+		if err := writeAtomic(a.mediaDir, a.favoritePath(fileHash), data); err != nil {
 			a.log.Warn("save favorite sticker", "id", id, "err", err)
-			return
 		}
-		a.db.ExecContext(ctx, `UPDATE wassup_favorite_stickers SET file_sha256 = ? WHERE id = ?`, sum[:], id)
 	})
 }
 
@@ -170,7 +194,7 @@ func (a *account) favoritePath(fileSHA256 []byte) string {
 }
 
 func (a *account) listFavorites(ctx context.Context, seen map[string]bool) ([]*ipc.Sticker, error) {
-	rows, err := a.db.QueryContext(ctx, `SELECT id, action, file_sha256 FROM wassup_favorite_stickers
+	rows, err := a.db.QueryContext(ctx, `SELECT id, action, file_sha256, gone FROM wassup_favorite_stickers
 		ORDER BY added_ms DESC LIMIT ?`, maxFavorites)
 	if err != nil {
 		return nil, err
@@ -180,10 +204,12 @@ func (a *account) listFavorites(ctx context.Context, seen map[string]bool) ([]*i
 	for rows.Next() {
 		var id string
 		var blob, hash []byte
-		if err := rows.Scan(&id, &blob, &hash); err != nil {
+		var gone bool
+		if err := rows.Scan(&id, &blob, &hash, &gone); err != nil {
 			return nil, err
 		}
 		s := &ipc.Sticker{FavoriteId: id}
+		hash, _ = favoriteHash(id) // Rows saved before the hash was stored lack it.
 		if hash != nil {
 			seen[hex.EncodeToString(hash)] = true
 			if path := a.favoritePath(hash); path != "" {
@@ -191,6 +217,9 @@ func (a *account) listFavorites(ctx context.Context, seen map[string]bool) ([]*i
 					s.Path = path
 				}
 			}
+		}
+		if s.Path == "" && gone {
+			continue // Nothing to show or send.
 		}
 		if s.Path == "" {
 			// Not downloaded yet, or the download failed: try again now
@@ -214,12 +243,19 @@ func (a *account) favoriteSticker(ctx context.Context, id string) (*waE2E.Sticke
 	} else if err != nil {
 		return nil, err
 	}
-	if hash == nil {
-		return nil, errors.New("favorite sticker is still downloading")
-	}
 	var action waSyncAction.StickerAction
 	if err := proto.Unmarshal(blob, &action); err != nil {
 		return nil, err
+	}
+	if hash, err = favoriteHash(id); err != nil {
+		return nil, err
+	}
+	if action.GetDirectPath() == "" {
+		// Only the phone has its upload; reuse a message carrying the same file.
+		if s := a.stickerWithHash(ctx, hash); s != nil {
+			return s, nil
+		}
+		return nil, errors.New("this favorite can only be sent from the phone")
 	}
 	return &waE2E.StickerMessage{
 		URL: proto.String(action.GetURL()), DirectPath: proto.String(action.GetDirectPath()),
@@ -245,4 +281,26 @@ func writeAtomic(dir, dest string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), dest)
+}
+
+// stickerWithHash finds a received or sent sticker with the given file.
+func (a *account) stickerWithHash(ctx context.Context, hash []byte) *waE2E.StickerMessage {
+	rows, err := a.db.QueryContext(ctx, `SELECT media FROM wassup_messages WHERE media IS NOT NULL ORDER BY timestamp_ms DESC`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var blob []byte
+		var m waE2E.Message
+		if rows.Scan(&blob) != nil || proto.Unmarshal(blob, &m) != nil {
+			continue
+		}
+		if s := m.GetStickerMessage(); s != nil && string(s.GetFileSHA256()) == string(hash) {
+			s = proto.Clone(s).(*waE2E.StickerMessage)
+			s.ContextInfo = nil
+			return s
+		}
+	}
+	return nil
 }
