@@ -16,17 +16,29 @@ const PAGE_SIZE: u32 = 50;
 
 const CSS: &str = "
 .bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
+.bubble.sticker { background: none; padding: 0; }
+.media { border-radius: 8px; background: alpha(currentColor, 0.08); }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
 .composer { border-radius: 10px; background: var(--card-bg-color); }
 ";
 
-/// Status label of each bound message row, by message id, so receipts
-/// update a row in place instead of replacing it in the model, which makes
-/// the list re-measure and lose its scroll position.
-type StatusLabels = Rc<RefCell<std::collections::HashMap<String, glib::WeakRef<gtk::Label>>>>;
+/// Widgets of each bound message row, by message id, so receipts and
+/// downloads update a row in place instead of replacing it in the model,
+/// which makes the list re-measure and lose its scroll position.
+type BoundRows = Rc<RefCell<std::collections::HashMap<String, RowWidgets>>>;
+
+struct RowWidgets {
+    status: glib::WeakRef<gtk::Label>,
+    picture: glib::WeakRef<gtk::Picture>,
+}
+
+/// Lets the row factory, built before the window, reach it later.
+type Owner = Rc<std::cell::OnceCell<std::rc::Weak<Window>>>;
 
 pub struct Window {
-    status_labels: StatusLabels,
+    rows: BoundRows,
+    /// Messages whose media was asked for and has not arrived yet.
+    media_requested: RefCell<std::collections::HashSet<String>>,
     window: adw::ApplicationWindow,
     /// Last chat reported to the daemon as being looked at, as "account/chat".
     reported_active: RefCell<String>,
@@ -117,11 +129,12 @@ impl Window {
             .icon_name("chat-message-new-symbolic")
             .title("No Chat Selected")
             .build();
-        let status_labels = StatusLabels::default();
+        let rows = BoundRows::default();
+        let owner = Owner::default();
         let messages = gio::ListStore::new::<glib::BoxedAnyObject>();
         let message_list = gtk::ListView::builder()
             .model(&gtk::NoSelection::new(Some(messages.clone())))
-            .factory(&message_row_factory(status_labels.clone()))
+            .factory(&message_row_factory(rows.clone(), owner.clone()))
             .build();
         let message_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -207,7 +220,8 @@ impl Window {
         window.add_breakpoint(narrow);
 
         let ui = Rc::new(Self {
-            status_labels,
+            rows,
+            media_requested: RefCell::default(),
             window: window.clone(),
             reported_active: RefCell::new(String::new()),
             stack,
@@ -349,6 +363,7 @@ impl Window {
             move |_| report()
         });
         ui.split.connect_collapsed_notify(move |_| report());
+        owner.set(Rc::downgrade(&ui)).ok();
         ui.connect();
         ui
     }
@@ -422,6 +437,7 @@ impl Window {
         self.conn.replace(Some(conn));
         // Events may have been missed while disconnected.
         self.chats_loaded.set(false);
+        self.media_requested.borrow_mut().clear();
         // The daemon forgets the active chat of a closed connection.
         self.reported_active.replace("/".to_owned());
         self.show_status("Connecting…", "", false);
@@ -491,6 +507,7 @@ impl Window {
             Some(event::Kind::Messages(list)) => self.add_page(list.messages),
             Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => self.add_message(msg),
             Some(event::Kind::MessageStatusChanged(change)) => self.update_status(change),
+            Some(event::Kind::MediaReady(ready)) => self.media_ready(ready),
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
                 self.link.set_description(Some(
@@ -686,6 +703,54 @@ impl Window {
         }
     }
 
+    /// Asks the daemon to download a message's media, once.
+    fn request_media(&self, msg: &ipc::Message) {
+        if !self.media_requested.borrow_mut().insert(msg.id.clone()) {
+            return;
+        }
+        self.send(request::Kind::DownloadMedia(ipc::DownloadMedia {
+            account_id: msg.account_id.clone(),
+            chat_jid: msg.chat_jid.clone(),
+            message_id: msg.id.clone(),
+        }));
+    }
+
+    fn media_ready(&self, ready: ipc::MediaReady) {
+        self.media_requested.borrow_mut().remove(&ready.message_id);
+        if !ready.error.is_empty() {
+            eprintln!("wassup: couldn't download media: {}", ready.error);
+            return;
+        }
+        for pos in 0..self.messages.n_items() {
+            let Some(item) = self
+                .messages
+                .item(pos)
+                .and_downcast::<glib::BoxedAnyObject>()
+            else {
+                continue;
+            };
+            let mut msg = item.borrow_mut::<ipc::Message>();
+            if msg.id != ready.message_id || msg.chat_jid != ready.chat_jid {
+                continue;
+            }
+            let Some(media) = msg.media.as_mut() else {
+                break;
+            };
+            media.path = ready.path.clone();
+            let size = media_size(media);
+            let picture = self
+                .rows
+                .borrow()
+                .get(&msg.id)
+                .and_then(|r| r.picture.upgrade());
+            if let Some(picture) = picture {
+                let (width, height) = size;
+                show_media(&picture, &ready.path, width, height, &msg.id, &self.rows);
+            }
+            break;
+        }
+    }
+
     fn update_status(&self, change: ipc::MessageStatusChanged) {
         let open = self.is_current(&change.account_id)
             && self.current_chat.borrow().as_deref() == Some(change.chat_jid.as_str());
@@ -707,10 +772,10 @@ impl Window {
                 let mut msg = item.borrow_mut::<ipc::Message>();
                 msg.status = change.status;
                 let label = self
-                    .status_labels
+                    .rows
                     .borrow()
                     .get(&msg.id)
-                    .and_then(|l| l.upgrade());
+                    .and_then(|r| r.status.upgrade());
                 if let Some(label) = label {
                     show_status(&label, change.status());
                 }
@@ -915,7 +980,7 @@ fn show_status(label: &gtk::Label, status: ipc::MessageStatus) {
     });
 }
 
-fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactory {
+fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
@@ -927,6 +992,46 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
             .xalign(0.0)
             .css_classes(["caption-heading", "accent"])
             .build();
+        let picture = gtk::Picture::builder()
+            .can_shrink(true)
+            .content_fit(gtk::ContentFit::Contain)
+            .halign(gtk::Align::Start)
+            .css_classes(["media"])
+            .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
+            .build();
+        // Clicking opens the full image in the user's image viewer.
+        let open = gtk::GestureClick::new();
+        let list_item = item.downgrade();
+        open.connect_released(move |gesture, _, _, _| {
+            let Some(msg) = list_item
+                .upgrade()
+                .and_then(|i| i.item())
+                .and_downcast::<glib::BoxedAnyObject>()
+            else {
+                return;
+            };
+            let path = msg
+                .borrow::<ipc::Message>()
+                .media
+                .as_ref()
+                .map(|m| m.path.clone());
+            if let Some(path) = path.filter(|p| !p.is_empty()) {
+                let window = gesture
+                    .widget()
+                    .and_then(|w| w.root())
+                    .and_downcast::<gtk::Window>();
+                gtk::FileLauncher::new(Some(&gio::File::for_path(path))).launch(
+                    window.as_ref(),
+                    None::<&gio::Cancellable>,
+                    |result| {
+                        if let Err(e) = result {
+                            eprintln!("wassup: couldn't open image: {e}");
+                        }
+                    },
+                );
+            }
+        });
+        picture.add_controller(open);
         let text = gtk::Label::builder()
             .xalign(0.0)
             .wrap(true)
@@ -948,6 +1053,7 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
             .css_classes(["bubble"])
             .build();
         bubble.append(&sender);
+        bubble.append(&picture);
         bubble.append(&text);
         bubble.append(&footer);
         let row = gtk::Box::builder()
@@ -967,7 +1073,7 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
         row.append(&clamp);
         item.set_child(Some(&row));
     });
-    let bound = status_labels.clone();
+    let bound = rows.clone();
     factory.connect_bind(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         let msg = item.item().and_downcast::<glib::BoxedAnyObject>().unwrap();
@@ -975,7 +1081,11 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
         let clamp = item.child().and_then(|row| row.first_child()).unwrap();
         let bubble = clamp.first_child().unwrap();
         let sender = bubble.first_child().and_downcast::<gtk::Label>().unwrap();
-        let text = sender.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let picture = sender
+            .next_sibling()
+            .and_downcast::<gtk::Picture>()
+            .unwrap();
+        let text = picture.next_sibling().and_downcast::<gtk::Label>().unwrap();
         let footer = text.next_sibling().unwrap();
         let time = footer.first_child().and_downcast::<gtk::Label>().unwrap();
         let status = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
@@ -988,11 +1098,42 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
             sender.set_label(&msg.sender_name);
         }
         text.set_label(&msg.text);
+        text.set_visible(!msg.text.is_empty());
         time.set_label(&time_of_day(msg.timestamp_ms));
         show_status(&status, msg.status());
-        bound
-            .borrow_mut()
-            .insert(msg.id.clone(), status.downgrade());
+        bound.borrow_mut().insert(
+            msg.id.clone(),
+            RowWidgets {
+                status: status.downgrade(),
+                picture: picture.downgrade(),
+            },
+        );
+        picture.set_visible(msg.media.is_some());
+        picture.set_paintable(None::<&gdk::Paintable>);
+        let sticker = msg
+            .media
+            .as_ref()
+            .is_some_and(|m| m.kind() == ipc::MediaKind::Sticker);
+        // Stickers are transparent: no bubble, and no placeholder behind them.
+        if sticker {
+            bubble.add_css_class("sticker");
+            picture.remove_css_class("media");
+        } else {
+            bubble.remove_css_class("sticker");
+            picture.add_css_class("media");
+        }
+        if let Some(media) = &msg.media {
+            // Reserve the final size now so the row does not grow later.
+            let (width, height) = media_size(media);
+            picture.set_size_request(width, height);
+            if media.path.is_empty() {
+                if let Some(ui) = owner.get().and_then(std::rc::Weak::upgrade) {
+                    ui.request_media(&msg);
+                }
+            } else {
+                show_media(&picture, &media.path, width, height, &msg.id, &bound);
+            }
+        }
         clamp.set_halign(if msg.from_me {
             gtk::Align::End
         } else {
@@ -1007,12 +1148,113 @@ fn message_row_factory(status_labels: StatusLabels) -> gtk::SignalListItemFactor
     factory.connect_unbind(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         if let Some(msg) = item.item().and_downcast::<glib::BoxedAnyObject>() {
-            status_labels
-                .borrow_mut()
-                .remove(&msg.borrow::<ipc::Message>().id);
+            rows.borrow_mut().remove(&msg.borrow::<ipc::Message>().id);
         }
     });
     factory
+}
+
+/// Largest an image or sticker is shown in a conversation, in pixels.
+const IMAGE_MAX: i32 = 280;
+const STICKER_MAX: i32 = 160;
+
+/// On-screen size of media, scaled down to fit and keeping its proportions.
+fn media_size(media: &ipc::Media) -> (i32, i32) {
+    let max = if media.kind() == ipc::MediaKind::Sticker {
+        STICKER_MAX
+    } else {
+        IMAGE_MAX
+    };
+    let (w, h) = (media.width as f64, media.height as f64);
+    if w <= 0.0 || h <= 0.0 {
+        return (max, max * 3 / 4);
+    }
+    let scale = (max as f64 / w).min(max as f64 / h).min(1.0);
+    (
+        (w * scale).round().max(1.0) as i32,
+        (h * scale).round().max(1.0) as i32,
+    )
+}
+
+thread_local! {
+    /// Recently shown images, so scrolling back does not decode them again.
+    static TEXTURES: RefCell<std::collections::VecDeque<(String, gdk::Texture)>> = RefCell::default();
+}
+const TEXTURE_CACHE: usize = 32;
+
+/// Shows a cached file in a row's picture. The file is decoded already
+/// scaled to its on-screen size: a full 1600 px photo would take about
+/// 8 MB of memory, a 280 px one about 0.3 MB. Decoding runs in glycin's
+/// sandboxed loaders, off the main loop.
+fn show_media(
+    picture: &gtk::Picture,
+    path: &str,
+    width: i32,
+    height: i32,
+    msg_id: &str,
+    rows: &BoundRows,
+) {
+    let cached = TEXTURES.with(|c| {
+        c.borrow()
+            .iter()
+            .find(|(p, _)| p == path)
+            .map(|(_, t)| t.clone())
+    });
+    if let Some(texture) = cached {
+        picture.set_paintable(Some(&texture));
+        return;
+    }
+    let scale = picture.scale_factor().max(1);
+    let (picture, path, msg_id, rows) = (
+        picture.downgrade(),
+        path.to_owned(),
+        msg_id.to_owned(),
+        rows.clone(),
+    );
+    glib::spawn_future_local(async move {
+        let file = gio::File::for_path(&path);
+        let decoded = match file.read_future(glib::Priority::DEFAULT).await {
+            Ok(stream) => {
+                gtk::gdk_pixbuf::Pixbuf::from_stream_at_scale_future(
+                    &stream,
+                    width * scale,
+                    height * scale,
+                    true,
+                )
+                .await
+            }
+            Err(e) => Err(e),
+        };
+        let pixbuf = match decoded {
+            Ok(pixbuf) => pixbuf,
+            Err(e) => return eprintln!("wassup: couldn't load {path}: {e}"),
+        };
+        let format = if pixbuf.has_alpha() {
+            gdk::MemoryFormat::R8g8b8a8
+        } else {
+            gdk::MemoryFormat::R8g8b8
+        };
+        let texture: gdk::Texture = gdk::MemoryTexture::new(
+            pixbuf.width(),
+            pixbuf.height(),
+            format,
+            &pixbuf.read_pixel_bytes(),
+            pixbuf.rowstride() as usize,
+        )
+        .upcast();
+        TEXTURES.with(|c| {
+            let mut c = c.borrow_mut();
+            c.push_front((path, texture.clone()));
+            c.truncate(TEXTURE_CACHE);
+        });
+        // The row may show another message by now.
+        let still_bound = rows.borrow().get(&msg_id).and_then(|r| r.picture.upgrade());
+        if let (Some(picture), Some(bound)) = (picture.upgrade(), still_bound)
+            && picture == bound
+        {
+            picture.set_paintable(Some(&texture));
+        }
+    });
 }
 
 /// Pixels per QR module, and the blank margin the QR spec asks for, in modules.
@@ -1070,6 +1312,35 @@ mod tests {
         state.save(&path).unwrap();
         assert_eq!(SavedState::load(&path), state);
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn media_fits_its_box_keeping_proportions() {
+        let photo = |width, height| ipc::Media {
+            kind: ipc::MediaKind::Image as i32,
+            width,
+            height,
+            ..Default::default()
+        };
+        assert_eq!(media_size(&photo(1600, 1200)), (280, 210));
+        assert_eq!(media_size(&photo(900, 1600)), (158, 280));
+        assert_eq!(
+            media_size(&photo(100, 50)),
+            (100, 50),
+            "small images are not enlarged"
+        );
+        assert_eq!(
+            media_size(&photo(0, 0)),
+            (280, 210),
+            "unknown size gets a default box"
+        );
+        let sticker = ipc::Media {
+            kind: ipc::MediaKind::Sticker as i32,
+            width: 512,
+            height: 512,
+            ..Default::default()
+        };
+        assert_eq!(media_size(&sticker), (160, 160));
     }
 
     #[test]
