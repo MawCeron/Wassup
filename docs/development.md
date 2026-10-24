@@ -155,6 +155,14 @@ The UI decodes images already scaled to their on-screen size, through
 gdk-pixbuf, which on Fedora runs glycin's sandboxed loaders. Clicking an
 image opens the cached file in the default image viewer.
 
+Profile and group pictures are fetched when a chat first shows up on
+screen, as small previews cached in `$XDG_CACHE_HOME/wassup/avatars/`.
+The daemon asks the server again only after a picture change event or a
+day, and remembers when a chat has no picture, since frequent picture
+requests are among the easiest ways for an unofficial client to get rate
+limited. Until a picture arrives, or when there is none, the avatar shows
+the contact's initials or an icon.
+
 To send a file, the UI passes the daemon its path, never its content.
 JPEG and PNG files go as photos, anything else as a document, with the
 composer's text as caption. The daemon uploads through a temporary file,

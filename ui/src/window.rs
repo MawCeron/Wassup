@@ -41,6 +41,10 @@ pub struct Window {
     rows: BoundRows,
     /// Messages whose media was asked for and has not arrived yet.
     media_requested: RefCell<std::collections::HashSet<String>>,
+    /// Chats whose picture was asked for in this connection.
+    avatar_requested: RefCell<std::collections::HashSet<String>>,
+    header_avatar: adw::Avatar,
+    header_title: gtk::Label,
     /// Files to open as soon as their download ends.
     open_when_ready: RefCell<std::collections::HashSet<String>>,
     /// "Sending…" notice of each upload, by request id.
@@ -62,7 +66,7 @@ pub struct Window {
     chats: gio::ListStore,
     chat_selection: gtk::SingleSelection,
     chats_loaded: Cell<bool>,
-    current_chat: RefCell<Option<String>>,
+    current_chat: Rc<RefCell<Option<String>>>,
     content_stack: gtk::Stack,
     messages: gio::ListStore,
     message_list: gtk::ListView,
@@ -109,6 +113,7 @@ impl Window {
             .child(&link_box)
             .build();
 
+        let owner = Owner::default();
         let chats = gio::ListStore::new::<glib::BoxedAnyObject>();
         let chat_selection = gtk::SingleSelection::builder()
             .model(&chats)
@@ -117,7 +122,7 @@ impl Window {
             .build();
         let chat_list = gtk::ListView::builder()
             .model(&chat_selection)
-            .factory(&chat_row_factory())
+            .factory(&chat_row_factory(owner.clone()))
             .css_classes(["navigation-sidebar"])
             .build();
         let sidebar_title = adw::WindowTitle::new("Chats", "");
@@ -136,7 +141,6 @@ impl Window {
             .title("No Chat Selected")
             .build();
         let rows = BoundRows::default();
-        let owner = Owner::default();
         let messages = gio::ListStore::new::<glib::BoxedAnyObject>();
         let message_list = gtk::ListView::builder()
             .model(&gtk::NoSelection::new(Some(messages.clone())))
@@ -193,7 +197,20 @@ impl Window {
         composer_bar.append(&attach);
         composer_bar.append(&composer_scroll);
         composer_bar.append(&send_button);
-        let content_view = with_header(&content_stack);
+        // The conversation's header shows the chat's picture next to its name.
+        let header_avatar = adw::Avatar::builder().size(28).show_initials(true).build();
+        let header_title = gtk::Label::builder()
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["heading"])
+            .build();
+        let header_box = gtk::Box::builder().spacing(8).visible(false).build();
+        header_box.append(&header_avatar);
+        header_box.append(&header_title);
+        let content_header = adw::HeaderBar::new();
+        content_header.set_title_widget(Some(&header_box));
+        let content_view = adw::ToolbarView::new();
+        content_view.add_top_bar(&content_header);
+        content_view.set_content(Some(&content_stack));
         content_view.add_bottom_bar(&composer_bar);
         content_view.set_reveal_bottom_bars(false);
         let content = adw::NavigationPage::new(&content_view, "Wassup");
@@ -236,6 +253,9 @@ impl Window {
             rows,
             media_requested: RefCell::default(),
             open_when_ready: RefCell::default(),
+            avatar_requested: RefCell::default(),
+            header_avatar,
+            header_title,
             uploads: RefCell::default(),
             window: window.clone(),
             reported_active: RefCell::new(String::new()),
@@ -253,7 +273,7 @@ impl Window {
             chats,
             chat_selection,
             chats_loaded: Cell::new(false),
-            current_chat: RefCell::new(None),
+            current_chat: Rc::default(),
             content_stack,
             messages,
             message_list,
@@ -458,6 +478,7 @@ impl Window {
         // Events may have been missed while disconnected.
         self.chats_loaded.set(false);
         self.media_requested.borrow_mut().clear();
+        self.avatar_requested.borrow_mut().clear();
         // The daemon forgets the active chat of a closed connection.
         self.reported_active.replace("/".to_owned());
         self.show_status("Connecting…", "", false);
@@ -595,8 +616,36 @@ impl Window {
         })
     }
 
+    fn show_header(&self, chat: &ipc::Chat) {
+        self.header_title.set_label(&chat_title(chat));
+        avatar_placeholder(&self.header_avatar, chat);
+        if let Some(header) = self.header_title.parent() {
+            header.set_visible(true);
+        }
+        if !chat.avatar_path.is_empty() {
+            let (current, jid) = (self.current_chat.clone(), chat.jid.clone());
+            show_avatar(&self.header_avatar, &chat.avatar_path, move || {
+                current.borrow().as_deref() == Some(jid.as_str())
+            });
+        }
+    }
+
+    /// Asks the daemon for a chat's picture, once per connection.
+    fn request_avatar(&self, chat: &ipc::Chat) {
+        if !self.avatar_requested.borrow_mut().insert(chat.jid.clone()) {
+            return;
+        }
+        self.send(request::Kind::FetchAvatar(ipc::FetchAvatar {
+            account_id: chat.account_id.clone(),
+            chat_jid: chat.jid.clone(),
+        }));
+    }
+
     /// Moves or inserts a chat, keeping the list newest first.
     fn upsert_chat(&self, chat: ipc::Chat) {
+        if self.current_chat.borrow().as_deref() == Some(chat.jid.as_str()) {
+            self.show_header(&chat);
+        }
         if let Some(pos) = self.position_of(&chat.jid) {
             self.chats.remove(pos);
         }
@@ -625,6 +674,7 @@ impl Window {
         }
         self.current_chat.replace(Some(chat.jid.clone()));
         self.content.set_title(&chat_title(chat));
+        self.show_header(chat);
         self.report_active();
         self.content_stack.set_visible_child_name("messages");
         self.content_view.set_reveal_bottom_bars(true);
@@ -1027,9 +1077,10 @@ fn time_of_day(ms: i64) -> String {
         .unwrap_or_default()
 }
 
-fn chat_row_factory() -> gtk::SignalListItemFactory {
+fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {
+        let avatar = adw::Avatar::builder().size(40).show_initials(true).build();
         let title = gtk::Label::builder()
             .xalign(0.0)
             .hexpand(true)
@@ -1047,6 +1098,7 @@ fn chat_row_factory() -> gtk::SignalListItemFactory {
             .margin_top(6)
             .margin_bottom(6)
             .build();
+        row.append(&avatar);
         row.append(&title);
         row.append(&time);
         row.append(&unread);
@@ -1054,12 +1106,28 @@ fn chat_row_factory() -> gtk::SignalListItemFactory {
             .unwrap()
             .set_child(Some(&row));
     });
-    factory.connect_bind(|_, item| {
+    factory.connect_bind(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         let chat = item.item().and_downcast::<glib::BoxedAnyObject>().unwrap();
         let chat = chat.borrow::<ipc::Chat>();
         let row = item.child().unwrap();
-        let title = row.first_child().and_downcast::<gtk::Label>().unwrap();
+        let avatar = row.first_child().and_downcast::<adw::Avatar>().unwrap();
+        let title = avatar.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        avatar_placeholder(&avatar, &chat);
+        if chat.avatar_path.is_empty() {
+            if let Some(ui) = owner.get().and_then(std::rc::Weak::upgrade) {
+                ui.request_avatar(&chat);
+            }
+        } else {
+            let (list_item, jid) = (item.downgrade(), chat.jid.clone());
+            show_avatar(&avatar, &chat.avatar_path, move || {
+                list_item
+                    .upgrade()
+                    .and_then(|i| i.item())
+                    .and_downcast::<glib::BoxedAnyObject>()
+                    .is_some_and(|c| c.borrow::<ipc::Chat>().jid == jid)
+            });
+        }
         let time = title.next_sibling().and_downcast::<gtk::Label>().unwrap();
         let unread = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
         title.set_label(&chat_title(&chat));
@@ -1324,17 +1392,16 @@ thread_local! {
 }
 const TEXTURE_CACHE: usize = 32;
 
-/// Shows a cached file in a row's picture. The file is decoded already
-/// scaled to its on-screen size: a full 1600 px photo would take about
-/// 8 MB of memory, a 280 px one about 0.3 MB. Decoding runs in glycin's
-/// sandboxed loaders, off the main loop.
-fn show_media(
-    picture: &gtk::Picture,
+/// Decodes an image file already scaled to fit width x height logical
+/// pixels: a full 1600 px photo would take about 8 MB of memory, a 280 px
+/// one about 0.3 MB. Decoding runs in glycin's sandboxed loaders, off the
+/// main loop. Recently decoded files come from a small cache.
+fn load_texture(
     path: &str,
     width: i32,
     height: i32,
-    msg_id: &str,
-    rows: &BoundRows,
+    scale: i32,
+    done: impl FnOnce(gdk::Texture) + 'static,
 ) {
     let cached = TEXTURES.with(|c| {
         c.borrow()
@@ -1343,16 +1410,9 @@ fn show_media(
             .map(|(_, t)| t.clone())
     });
     if let Some(texture) = cached {
-        picture.set_paintable(Some(&texture));
-        return;
+        return done(texture);
     }
-    let scale = picture.scale_factor().max(1);
-    let (picture, path, msg_id, rows) = (
-        picture.downgrade(),
-        path.to_owned(),
-        msg_id.to_owned(),
-        rows.clone(),
-    );
+    let path = path.to_owned();
     glib::spawn_future_local(async move {
         let file = gio::File::for_path(&path);
         let decoded = match file.read_future(glib::Priority::DEFAULT).await {
@@ -1389,12 +1449,57 @@ fn show_media(
             c.push_front((path, texture.clone()));
             c.truncate(TEXTURE_CACHE);
         });
+        done(texture);
+    });
+}
+
+/// Shows a cached file in a message row's picture.
+fn show_media(
+    picture: &gtk::Picture,
+    path: &str,
+    width: i32,
+    height: i32,
+    msg_id: &str,
+    rows: &BoundRows,
+) {
+    let scale = picture.scale_factor().max(1);
+    let (picture, msg_id, rows) = (picture.downgrade(), msg_id.to_owned(), rows.clone());
+    load_texture(path, width, height, scale, move |texture| {
         // The row may show another message by now.
         let still_bound = rows.borrow().get(&msg_id).and_then(|r| r.picture.upgrade());
         if let (Some(picture), Some(bound)) = (picture.upgrade(), still_bound)
             && picture == bound
         {
             picture.set_paintable(Some(&texture));
+        }
+    });
+}
+
+/// What an avatar shows until, or instead of, a picture: initials of a
+/// named contact, a group icon, or a person icon. A phone number has no
+/// meaningful initials.
+fn avatar_placeholder(avatar: &adw::Avatar, chat: &ipc::Chat) {
+    avatar.set_custom_image(None::<&gdk::Paintable>);
+    avatar.set_text(Some(&chat.name));
+    avatar.set_show_initials(!chat.is_group && !chat.name.is_empty());
+    avatar.set_icon_name(Some(if chat.is_group {
+        "system-users-symbolic"
+    } else {
+        "avatar-default-symbolic"
+    }));
+}
+
+/// Puts a chat's cached picture in an avatar, unless by the time it is
+/// decoded the avatar shows another chat (`still_for` says whether it does).
+fn show_avatar(avatar: &adw::Avatar, path: &str, still_for: impl Fn() -> bool + 'static) {
+    let size = avatar.size();
+    let scale = avatar.scale_factor().max(1);
+    let avatar = avatar.downgrade();
+    load_texture(path, size, size, scale, move |texture| {
+        if let Some(avatar) = avatar.upgrade()
+            && still_for()
+        {
+            avatar.set_custom_image(Some(&texture));
         }
     });
 }
