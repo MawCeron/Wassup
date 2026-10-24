@@ -5,7 +5,7 @@
 Fedora 44 packages:
 
 ```sh
-sudo dnf install golang rust cargo rustfmt clippy protobuf-compiler gtk4-devel libadwaita-devel
+sudo dnf install golang rust cargo rustfmt clippy protobuf-compiler gtk4-devel libadwaita-devel libwebp-devel
 ```
 
 Versions in use: Go 1.26, Rust 1.99, protoc 3.19, GTK 4.22, libadwaita 1.9.
@@ -168,3 +168,10 @@ JPEG and PNG files go as photos, anything else as a document, with the
 composer's text as caption. The daemon uploads through a temporary file,
 so large files are not held in memory, and replies when the upload ends.
 Photos are sent as they are, without being recompressed.
+
+The sticker button offers the stickers recently sent or received, which
+are sent again by reusing the file already on WhatsApp's servers, so
+nothing is uploaded. It can also turn an image into a sticker: the UI
+centres it on a transparent 512x512 canvas and encodes it as WebP with
+the system's libwebp, lowering the quality until it fits WhatsApp's
+100 KB limit for stickers.

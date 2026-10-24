@@ -1,4 +1,5 @@
 mod ipc;
+mod sticker;
 mod window;
 
 use std::cell::RefCell;

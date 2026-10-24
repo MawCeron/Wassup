@@ -1,6 +1,7 @@
 //! The main window and its reaction to daemon events.
 
 use std::cell::{Cell, RefCell};
+use std::os::unix::fs::DirBuilderExt;
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -52,6 +53,8 @@ pub struct Window {
     sticker_popover: gtk::Popover,
     sticker_grid: gtk::FlowBox,
     sticker_empty: gtk::Label,
+    /// Stickers made here, deleted once the daemon has them, by request id.
+    sticker_files: RefCell<std::collections::HashMap<u64, std::path::PathBuf>>,
     /// Picker pictures waiting for their sticker's download, by message id.
     sticker_pictures: RefCell<std::collections::HashMap<String, glib::WeakRef<gtk::Picture>>>,
     window: adw::ApplicationWindow,
@@ -211,7 +214,12 @@ impl Window {
             .wrap(true)
             .css_classes(["dim-label"])
             .build();
+        let create_sticker = gtk::Button::builder()
+            .label("Create from Image…")
+            .css_classes(["flat"])
+            .build();
         let sticker_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        sticker_box.append(&create_sticker);
         sticker_box.append(&sticker_empty);
         sticker_box.append(
             &gtk::ScrolledWindow::builder()
@@ -297,6 +305,7 @@ impl Window {
             sticker_popover,
             sticker_grid,
             sticker_empty,
+            sticker_files: RefCell::default(),
             sticker_pictures: RefCell::default(),
             window: window.clone(),
             reported_active: RefCell::new(String::new()),
@@ -450,6 +459,11 @@ impl Window {
                 }
             }
         ));
+        create_sticker.connect_clicked(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.choose_sticker_image()
+        ));
         attach.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -562,6 +576,9 @@ impl Window {
     fn handle(self: &Rc<Self>, event: ipc::Event) {
         if let Some(toast) = self.uploads.borrow_mut().remove(&event.request_id) {
             toast.dismiss();
+        }
+        if let Some(file) = self.sticker_files.borrow_mut().remove(&event.request_id) {
+            std::fs::remove_file(file).ok();
         }
         let pending = self.sending.borrow_mut().remove(&event.request_id);
         if let Some(text) = pending {
@@ -962,6 +979,73 @@ impl Window {
                 move |_| ui.send_sticker(&sticker)
             ));
             self.sticker_grid.append(&button);
+        }
+    }
+
+    fn choose_sticker_image(self: &Rc<Self>) {
+        self.sticker_popover.popdown();
+        let images = gtk::FileFilter::new();
+        images.set_name(Some("Images"));
+        images.add_mime_type("image/*");
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&images);
+        let dialog = gtk::FileDialog::builder()
+            .title("Create a Sticker")
+            .modal(true)
+            .filters(&filters)
+            .build();
+        let ui = Rc::downgrade(self);
+        dialog.open(
+            Some(&self.window),
+            None::<&gio::Cancellable>,
+            move |result| {
+                if let (Some(ui), Some(path)) = (ui.upgrade(), result.ok().and_then(|f| f.path())) {
+                    glib::spawn_future_local(async move { ui.send_new_sticker(&path).await });
+                }
+            },
+        );
+    }
+
+    /// Makes a sticker from an image and sends it to the open chat.
+    async fn send_new_sticker(&self, image: &std::path::Path) {
+        let webp = match crate::sticker::from_file(image).await {
+            Ok(webp) => webp,
+            Err(e) => return self.toast(&format!("Couldn't make a sticker: {e}")),
+        };
+        let Some((account_id, chat_jid)) = self.open_ids() else {
+            return;
+        };
+        // The daemon reads the file from disk; media never goes over the socket.
+        let dir = glib::user_cache_dir().join("wassup").join("outgoing");
+        let file = dir.join(format!("sticker-{}.webp", glib::monotonic_time()));
+        let written = std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&dir)
+            .and_then(|_| std::fs::write(&file, webp));
+        if let Err(e) = written {
+            return self.toast(&format!("Couldn't make a sticker: {e}"));
+        }
+        let request = request::Kind::SendMedia(ipc::SendMedia {
+            account_id,
+            chat_jid,
+            path: file.to_string_lossy().into_owned(),
+            caption: String::new(),
+            as_sticker: true,
+        });
+        match self.send(request) {
+            Some(id) => {
+                let toast = adw::Toast::builder()
+                    .title("Sending sticker…")
+                    .timeout(0)
+                    .build();
+                self.toasts.add_toast(toast.clone());
+                self.uploads.borrow_mut().insert(id, toast);
+                self.sticker_files.borrow_mut().insert(id, file);
+            }
+            None => {
+                std::fs::remove_file(file).ok();
+            }
         }
     }
 
