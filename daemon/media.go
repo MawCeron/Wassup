@@ -244,8 +244,8 @@ func evictMedia(root string, limit int64) error {
 }
 
 // sendMedia uploads a local file and sends it: JPEG and PNG as a photo,
-// anything else as a document.
-func (a *account) sendMedia(ctx context.Context, chat, path, caption string) (*ipc.Message, *ipc.Chat, error) {
+// anything else as a document, or a WebP file as a sticker if asked.
+func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asSticker bool) (*ipc.Message, *ipc.Chat, error) {
 	if !a.client.IsLoggedIn() {
 		return nil, nil, errors.New("account is not connected")
 	}
@@ -262,7 +262,10 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string) (*i
 	head := make([]byte, 512)
 	n, _ := io.ReadFull(f, head)
 	sniffed := http.DetectContentType(head[:n])
-	photo := sniffed == "image/jpeg" || sniffed == "image/png"
+	photo := !asSticker && (sniffed == "image/jpeg" || sniffed == "image/png")
+	if asSticker && sniffed != "image/webp" {
+		return nil, nil, errors.New("stickers must be WebP images")
+	}
 	mimeType := sniffed
 	if byName := mime.TypeByExtension(filepath.Ext(path)); !photo && byName != "" {
 		mimeType = byName
@@ -279,8 +282,8 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string) (*i
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
 	kind := whatsmeow.MediaDocument
-	if photo {
-		kind = whatsmeow.MediaImage
+	if photo || asSticker {
+		kind = whatsmeow.MediaImage // Stickers use the image keys too.
 	}
 	up, err := a.client.UploadReader(ctx, f, tmp, kind)
 	if err != nil {
@@ -292,7 +295,14 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string) (*i
 		text = proto.String(caption)
 	}
 	var content *waE2E.Message
-	if photo {
+	if asSticker {
+		// The UI makes stickers at WhatsApp's fixed size.
+		content = &waE2E.Message{StickerMessage: &waE2E.StickerMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String("image/webp"),
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			Width: proto.Uint32(512), Height: proto.Uint32(512),
+		}}
+	} else if photo {
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
 			return nil, nil, err
 		}

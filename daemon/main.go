@@ -368,7 +368,7 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		// connection's other requests.
 		go func() {
 			done := &ipc.Event{RequestId: req.GetId()}
-			msg, chat, err := a.sendMedia(context.Background(), r.GetChatJid(), r.GetPath(), r.GetCaption())
+			msg, chat, err := a.sendMedia(context.Background(), r.GetChatJid(), r.GetPath(), r.GetCaption(), r.GetAsSticker())
 			if err != nil {
 				done.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
 			} else {
@@ -384,6 +384,24 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 			}
 		}()
 		return nil
+	case *ipc.Request_ListStickers:
+		if a := d.find(k.ListStickers.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else if stickers, err := a.listStickers(context.Background()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Stickers{Stickers: &ipc.StickerList{Stickers: stickers}}
+		}
+	case *ipc.Request_SendSticker:
+		r := k.SendSticker
+		if a := d.find(r.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else if msg, chat, err := a.sendSticker(context.Background(), r.GetChatJid(), r.GetSourceChatJid(), r.GetSourceMessageId()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}
+			d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+		}
 	case *ipc.Request_FetchAvatar:
 		if a := d.find(k.FetchAvatar.GetAccountId()); a == nil {
 			fail(errors.New("unknown account"))

@@ -21,6 +21,8 @@ message Request {
     DownloadMedia download_media = 9;
     SendMedia send_media = 10;
     FetchAvatar fetch_avatar = 11;
+    ListStickers list_stickers = 12;
+    SendSticker send_sticker = 13;
   }
 }
 
@@ -41,6 +43,7 @@ message Event {
     MessageStatusChanged message_status_changed = 11;
     Ack ack = 12;
     MediaReady media_ready = 13;
+    StickerList stickers = 14;
   }
 }
 
@@ -193,6 +196,36 @@ message SendMedia {
   string chat_jid = 2;
   string path = 3;
   string caption = 4;
+  // Send a 512x512 WebP file as a sticker instead.
+  bool as_sticker = 5;
+}
+
+// Stickers recently sent or received in any chat, newest first, without
+// repeats. Answered with stickers.
+message ListStickers {
+  string account_id = 1;
+}
+
+message StickerList {
+  repeated Sticker stickers = 1;
+}
+
+// A sticker known from a message. The message identifies it for download
+// and for sending it again.
+message Sticker {
+  string chat_jid = 1;
+  string message_id = 2;
+  // Cached file; empty until downloaded like any other media.
+  string path = 3;
+}
+
+// Sends a known sticker again, reusing the uploaded file. Answered with
+// message_received, or error.
+message SendSticker {
+  string account_id = 1;
+  string chat_jid = 2;
+  string source_chat_jid = 3;
+  string source_message_id = 4;
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with

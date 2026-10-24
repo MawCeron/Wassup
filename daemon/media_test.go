@@ -56,7 +56,7 @@ func TestSendMediaNeedsConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer closeAccounts(accounts)
-	if _, _, err := accounts[0].sendMedia(t.Context(), "x@s.whatsapp.net", "/etc/hostname", ""); err == nil {
+	if _, _, err := accounts[0].sendMedia(t.Context(), "x@s.whatsapp.net", "/etc/hostname", "", false); err == nil {
 		t.Fatal("sent from an unlinked account")
 	}
 }
