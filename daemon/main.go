@@ -78,12 +78,16 @@ func run() error {
 	for _, a := range accounts {
 		a.mediaDir = filepath.Join(cache, "media", a.id)
 		a.avatarDir = filepath.Join(cache, "avatars", a.id)
+		a.mediaCacheMB = cfg.MediaCacheMB
 		for _, dir := range []string{a.mediaDir, a.avatarDir} {
 			if err := os.MkdirAll(dir, 0o700); err != nil {
 				closeAccounts(accounts)
 				return err
 			}
 		}
+	}
+	for _, a := range accounts {
+		removeLeftovers(a.mediaDir, a.avatarDir)
 	}
 	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
 	for _, a := range accounts {

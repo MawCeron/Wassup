@@ -43,6 +43,14 @@ func TestLoadConfig(t *testing.T) {
 	if c, err := loadConfig(dir); err != nil || !c.HideNotificationContent {
 		t.Fatalf("valid file: %+v, %v", c, err)
 	}
+	write(`{"media_cache_mb": 200}`)
+	if c, err := loadConfig(dir); err != nil || c.MediaCacheMB != 200 {
+		t.Fatalf("cache size: %+v, %v", c, err)
+	}
+	write(`{"media_cache_mb": -1}`)
+	if _, err := loadConfig(dir); err == nil {
+		t.Fatal("accepted a negative cache size")
+	}
 	write(`{"hide_notification_contents": true}`)
 	if _, err := loadConfig(dir); err == nil {
 		t.Fatal("a misspelled option was silently ignored")

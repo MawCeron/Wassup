@@ -89,13 +89,15 @@ file is optional; every option defaults to off.
 
 ```json
 {
-  "hide_notification_content": true
+  "hide_notification_content": true,
+  "media_cache_mb": 500
 }
 ```
 
 | Option | Effect |
 |---|---|
 | `hide_notification_content` | Notifications show the chat but not the message text. |
+| `media_cache_mb` | Size of the media cache; the least recently used files go first. Default 500. |
 
 An unknown option or a syntax error stops the daemon instead of being
 ignored, so a misspelled privacy option cannot silently turn itself off.
@@ -151,7 +153,9 @@ needs to fetch them, and the UI asks for a file only when its message is
 on screen. Documents are downloaded when clicked, then opened with the
 default application. Files are cached in `$XDG_CACHE_HOME/wassup/media/<account>/`,
 named after their content hash, and the least recently used ones are
-deleted once the cache passes 500 MB; they download again if shown.
+deleted once the cache passes `media_cache_mb` (500 MB by default); they
+download again if shown. Temporary files left by an interrupted download
+or upload are removed when the daemon or the UI starts.
 
 The UI decodes images already scaled to their on-screen size, through
 gdk-pixbuf, which on Fedora runs glycin's sandboxed loaders. Clicking an

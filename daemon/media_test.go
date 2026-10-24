@@ -60,3 +60,21 @@ func TestSendMediaNeedsConnection(t *testing.T) {
 		t.Fatal("sent from an unlinked account")
 	}
 }
+
+func TestRemoveLeftovers(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{".download-123", ".upload-9", "abc.jpg"} {
+		os.WriteFile(filepath.Join(dir, name), nil, 0o600)
+	}
+	removeLeftovers(dir)
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 || entries[0].Name() != "abc.jpg" {
+		t.Fatalf("left %v; want only abc.jpg", entries)
+	}
+	if got := (&account{}).cacheLimit(); got != defaultMediaCacheMB<<20 {
+		t.Fatalf("default cache limit %d", got)
+	}
+	if got := (&account{mediaCacheMB: 50}).cacheLimit(); got != 50<<20 {
+		t.Fatalf("configured cache limit %d", got)
+	}
+}

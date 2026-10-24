@@ -27,9 +27,10 @@ import (
 )
 
 const (
-	// mediaCacheLimit bounds all cached media; the least recently used
-	// files go first. A removed file is downloaded again when shown.
-	mediaCacheLimit = 500 << 20
+	// defaultMediaCacheMB bounds all cached media unless the config says
+	// otherwise; the least recently used files go first. A removed file is
+	// downloaded again when shown.
+	defaultMediaCacheMB = 500
 	// Downloads running at once per account.
 	parallelDownloads = 3
 )
@@ -207,10 +208,32 @@ func (a *account) fetchMedia(ctx context.Context, chatJID, msgID string) (string
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return "", err
 	}
-	if err := evictMedia(filepath.Dir(a.mediaDir), mediaCacheLimit); err != nil {
+	if err := evictMedia(filepath.Dir(a.mediaDir), a.cacheLimit()); err != nil {
 		slog.Warn("media cache cleanup", "err", err)
 	}
 	return path, nil
+}
+
+// cacheLimit is the media cache size in bytes.
+func (a *account) cacheLimit() int64 {
+	mb := a.mediaCacheMB
+	if mb <= 0 {
+		mb = defaultMediaCacheMB
+	}
+	return int64(mb) << 20
+}
+
+// removeLeftovers deletes temporary files that an interrupted download,
+// upload or write left behind. They all start with a dot.
+func removeLeftovers(dirs ...string) {
+	for _, dir := range dirs {
+		entries, _ := os.ReadDir(dir)
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), ".") && !e.IsDir() {
+				os.Remove(filepath.Join(dir, e.Name()))
+			}
+		}
+	}
 }
 
 // evictMedia deletes the least recently used files under root until they
@@ -361,5 +384,5 @@ func (a *account) cacheCopy(f *os.File, content *waE2E.Message) error {
 	if err != nil {
 		return err
 	}
-	return evictMedia(filepath.Dir(a.mediaDir), mediaCacheLimit)
+	return evictMedia(filepath.Dir(a.mediaDir), a.cacheLimit())
 }

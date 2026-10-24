@@ -30,9 +30,10 @@ type account struct {
 	// Messages sent before it are backlog delivered on connect, not news.
 	connectedAt atomic.Int64
 	// Where this account's media is cached; empty disables downloads.
-	mediaDir  string
-	avatarDir string
-	downloads *downloads
+	mediaDir     string
+	avatarDir    string
+	mediaCacheMB int
+	downloads    *downloads
 }
 
 // openAccounts opens every account under dataDir/accounts.

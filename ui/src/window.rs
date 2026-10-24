@@ -521,6 +521,12 @@ impl Window {
             move |_| ui.choose_file()
         ));
         owner.set(Rc::downgrade(&ui)).ok();
+        // Stickers made by a previous run that never reached the daemon.
+        if let Ok(entries) = std::fs::read_dir(outgoing_dir()) {
+            for entry in entries.flatten() {
+                std::fs::remove_file(entry.path()).ok();
+            }
+        }
         ui.connect();
         ui
     }
@@ -1217,7 +1223,7 @@ impl Window {
             return;
         };
         // The daemon reads the file from disk; media never goes over the socket.
-        let dir = glib::user_cache_dir().join("wassup").join("outgoing");
+        let dir = outgoing_dir();
         let file = dir.join(format!("sticker-{}.webp", glib::monotonic_time()));
         let written = std::fs::DirBuilder::new()
             .recursive(true)
@@ -2002,6 +2008,11 @@ fn show_audio(row: &gtk::Box, duration: u32, playing: Option<&gtk::MediaFile>) {
 fn clock(seconds: f64) -> String {
     let s = seconds.max(0.0) as u64;
     format!("{}:{:02}", s / 60, s % 60)
+}
+
+/// Where stickers made here wait for the daemon to send them.
+fn outgoing_dir() -> std::path::PathBuf {
+    glib::user_cache_dir().join("wassup").join("outgoing")
 }
 
 /// Size of a sticker in the picker, in pixels.

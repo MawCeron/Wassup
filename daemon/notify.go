@@ -19,6 +19,8 @@ const appID = "io.github.MawCeron.Wassup"
 type config struct {
 	// Notifications say who wrote but not what, for screens others can see.
 	HideNotificationContent bool `json:"hide_notification_content"`
+	// Size of the media cache in MB; 0 means the default.
+	MediaCacheMB int `json:"media_cache_mb"`
 }
 
 // loadConfig reads configDir/config.json; a missing file means defaults.
@@ -37,6 +39,9 @@ func loadConfig(configDir string) (config, error) {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&c); err != nil {
 		return c, errors.New(f.Name() + ": " + err.Error())
+	}
+	if c.MediaCacheMB < 0 {
+		return c, errors.New(f.Name() + ": media_cache_mb cannot be negative")
 	}
 	return c, nil
 }
