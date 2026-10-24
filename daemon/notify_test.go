@@ -20,6 +20,10 @@ func TestNotificationText(t *testing.T) {
 	if _, body := notificationText(&ipc.Chat{Name: "Ana"}, photo, false); body != "Photo: look" {
 		t.Fatalf("photo body: %q", body)
 	}
+	voice := &ipc.Message{Media: &ipc.Media{Kind: ipc.MediaKind_MEDIA_KIND_AUDIO, VoiceNote: true}}
+	if _, body := notificationText(&ipc.Chat{Name: "Ana"}, voice, false); body != "Voice message" {
+		t.Fatalf("voice note body: %q", body)
+	}
 	if _, body := notificationText(group, msg, true); body != "New message" {
 		t.Fatalf("hidden content leaked: %q", body)
 	}

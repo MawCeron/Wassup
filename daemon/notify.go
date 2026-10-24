@@ -139,7 +139,11 @@ func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title
 			ipc.MediaKind_MEDIA_KIND_IMAGE:    "Photo",
 			ipc.MediaKind_MEDIA_KIND_STICKER:  "Sticker",
 			ipc.MediaKind_MEDIA_KIND_DOCUMENT: "Document",
+			ipc.MediaKind_MEDIA_KIND_AUDIO:    "Audio",
 		}[kind]
+		if msg.GetMedia().GetVoiceNote() {
+			label = "Voice message"
+		}
 		if body == "" {
 			body = msg.GetMedia().GetFileName()
 		}

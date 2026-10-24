@@ -56,6 +56,13 @@ func TestSaveAndListMessages(t *testing.T) {
 	if save(&events.Message{Info: text("C", 3, false).Info, Message: &waE2E.Message{}}) {
 		t.Fatal("empty message saved")
 	}
+	voice := &events.Message{Message: &waE2E.Message{AudioMessage: &waE2E.AudioMessage{PTT: proto.Bool(true), Seconds: proto.Uint32(7)}}}
+	if got := messageText(voice); got != "" || mediaOf(voice.Message) == nil {
+		t.Fatalf("voice note text %q, media %v; want no text and media", got, mediaOf(voice.Message))
+	}
+	if m := a.ipcMedia(mustMarshal(t, mediaOf(voice.Message))); m.GetKind() != ipc.MediaKind_MEDIA_KIND_AUDIO || !m.GetVoiceNote() || m.GetDurationSeconds() != 7 {
+		t.Fatalf("voice note media %v", m)
+	}
 	other := types.NewJID("5215551111111", types.DefaultUserServer)
 	stickerInfo := text("S", 9, false).Info
 	stickerInfo.Chat, stickerInfo.Sender = other, other
@@ -175,4 +182,13 @@ func TestBacklogIsNotNews(t *testing.T) {
 	if a.isNews(msg) {
 		t.Fatal("notified an own message")
 	}
+}
+
+func mustMarshal(t *testing.T, m proto.Message) []byte {
+	t.Helper()
+	b, err := proto.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

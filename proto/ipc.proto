@@ -161,7 +161,7 @@ message Message {
   string sender_name = 8;
   // Delivery progress of own messages; unspecified for received ones.
   MessageStatus status = 9;
-  // Attached image, sticker or document; text is then its caption,
+  // Attached image, sticker, document or audio; text is then its caption,
   // possibly empty.
   Media media = 10;
 }
@@ -171,6 +171,7 @@ enum MediaKind {
   MEDIA_KIND_IMAGE = 1;
   MEDIA_KIND_STICKER = 2;
   MEDIA_KIND_DOCUMENT = 3;
+  MEDIA_KIND_AUDIO = 4;
 }
 
 message Media {
@@ -185,6 +186,10 @@ message Media {
   string file_name = 5;
   // In bytes.
   uint64 size = 6;
+  // Length of audio.
+  uint32 duration_seconds = 7;
+  // Audio recorded in the chat, rather than an audio file.
+  bool voice_note = 8;
 }
 
 // Sends a local file chosen by the user: JPEG and PNG as a photo, anything

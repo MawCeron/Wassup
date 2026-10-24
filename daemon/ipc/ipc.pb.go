@@ -83,6 +83,7 @@ const (
 	MediaKind_MEDIA_KIND_IMAGE       MediaKind = 1
 	MediaKind_MEDIA_KIND_STICKER     MediaKind = 2
 	MediaKind_MEDIA_KIND_DOCUMENT    MediaKind = 3
+	MediaKind_MEDIA_KIND_AUDIO       MediaKind = 4
 )
 
 // Enum value maps for MediaKind.
@@ -92,12 +93,14 @@ var (
 		1: "MEDIA_KIND_IMAGE",
 		2: "MEDIA_KIND_STICKER",
 		3: "MEDIA_KIND_DOCUMENT",
+		4: "MEDIA_KIND_AUDIO",
 	}
 	MediaKind_value = map[string]int32{
 		"MEDIA_KIND_UNSPECIFIED": 0,
 		"MEDIA_KIND_IMAGE":       1,
 		"MEDIA_KIND_STICKER":     2,
 		"MEDIA_KIND_DOCUMENT":    3,
+		"MEDIA_KIND_AUDIO":       4,
 	}
 )
 
@@ -1568,7 +1571,7 @@ type Message struct {
 	SenderName string `protobuf:"bytes,8,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
 	// Delivery progress of own messages; unspecified for received ones.
 	Status MessageStatus `protobuf:"varint,9,opt,name=status,proto3,enum=wassup.ipc.v1.MessageStatus" json:"status,omitempty"`
-	// Attached image, sticker or document; text is then its caption,
+	// Attached image, sticker, document or audio; text is then its caption,
 	// possibly empty.
 	Media         *Media `protobuf:"bytes,10,opt,name=media,proto3" json:"media,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1687,7 +1690,11 @@ type Media struct {
 	// Name the sender gave a document.
 	FileName string `protobuf:"bytes,5,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
 	// In bytes.
-	Size          uint64 `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
+	Size uint64 `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
+	// Length of audio.
+	DurationSeconds uint32 `protobuf:"varint,7,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
+	// Audio recorded in the chat, rather than an audio file.
+	VoiceNote     bool `protobuf:"varint,8,opt,name=voice_note,json=voiceNote,proto3" json:"voice_note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1762,6 +1769,20 @@ func (x *Media) GetSize() uint64 {
 		return x.Size
 	}
 	return 0
+}
+
+func (x *Media) GetDurationSeconds() uint32 {
+	if x != nil {
+		return x.DurationSeconds
+	}
+	return 0
+}
+
+func (x *Media) GetVoiceNote() bool {
+	if x != nil {
+		return x.VoiceNote
+	}
+	return false
 }
 
 // Sends a local file chosen by the user: JPEG and PNG as a photo, anything
@@ -2468,14 +2489,17 @@ const file_ipc_proto_rawDesc = "" +
 	"senderName\x124\n" +
 	"\x06status\x18\t \x01(\x0e2\x1c.wassup.ipc.v1.MessageStatusR\x06status\x12*\n" +
 	"\x05media\x18\n" +
-	" \x01(\v2\x14.wassup.ipc.v1.MediaR\x05media\"\xa8\x01\n" +
+	" \x01(\v2\x14.wassup.ipc.v1.MediaR\x05media\"\xf2\x01\n" +
 	"\x05Media\x12,\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x18.wassup.ipc.v1.MediaKindR\x04kind\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
 	"\x05width\x18\x03 \x01(\rR\x05width\x12\x16\n" +
 	"\x06height\x18\x04 \x01(\rR\x06height\x12\x1b\n" +
 	"\tfile_name\x18\x05 \x01(\tR\bfileName\x12\x12\n" +
-	"\x04size\x18\x06 \x01(\x04R\x04size\"\x92\x01\n" +
+	"\x04size\x18\x06 \x01(\x04R\x04size\x12)\n" +
+	"\x10duration_seconds\x18\a \x01(\rR\x0fdurationSeconds\x12\x1d\n" +
+	"\n" +
+	"voice_note\x18\b \x01(\bR\tvoiceNote\"\x92\x01\n" +
 	"\tSendMedia\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -2535,12 +2559,13 @@ const file_ipc_proto_rawDesc = "" +
 	"\x1dCONNECTION_STATE_DISCONNECTED\x10\x01\x12\x1f\n" +
 	"\x1bCONNECTION_STATE_CONNECTING\x10\x02\x12\x1e\n" +
 	"\x1aCONNECTION_STATE_CONNECTED\x10\x03\x12\x1f\n" +
-	"\x1bCONNECTION_STATE_LOGGED_OUT\x10\x04*n\n" +
+	"\x1bCONNECTION_STATE_LOGGED_OUT\x10\x04*\x84\x01\n" +
 	"\tMediaKind\x12\x1a\n" +
 	"\x16MEDIA_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MEDIA_KIND_IMAGE\x10\x01\x12\x16\n" +
 	"\x12MEDIA_KIND_STICKER\x10\x02\x12\x17\n" +
-	"\x13MEDIA_KIND_DOCUMENT\x10\x03*\x7f\n" +
+	"\x13MEDIA_KIND_DOCUMENT\x10\x03\x12\x14\n" +
+	"\x10MEDIA_KIND_AUDIO\x10\x04*\x7f\n" +
 	"\rMessageStatus\x12\x1e\n" +
 	"\x1aMESSAGE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MESSAGE_STATUS_SENT\x10\x01\x12\x1c\n" +

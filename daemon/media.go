@@ -55,6 +55,8 @@ func mediaOf(m *waE2E.Message) *waE2E.Message {
 		return &waE2E.Message{StickerMessage: m.GetStickerMessage()}
 	case m.GetDocumentMessage() != nil:
 		return &waE2E.Message{DocumentMessage: m.GetDocumentMessage()}
+	case m.GetAudioMessage() != nil:
+		return &waE2E.Message{AudioMessage: m.GetAudioMessage()}
 	}
 	return nil
 }
@@ -68,6 +70,8 @@ func downloadable(m *waE2E.Message) (whatsmeow.DownloadableMessage, string) {
 	case m.GetDocumentMessage() != nil:
 		d := m.GetDocumentMessage()
 		return d, extension(d.GetFileName(), d.GetMimetype())
+	case m.GetAudioMessage() != nil:
+		return m.GetAudioMessage(), extension("", m.GetAudioMessage().GetMimetype())
 	}
 	return m.GetStickerMessage(), ".webp"
 }
@@ -113,6 +117,10 @@ func (a *account) ipcMedia(blob []byte) *ipc.Media {
 	case m.GetDocumentMessage() != nil:
 		d := m.GetDocumentMessage()
 		media.Kind, media.FileName, media.Size = ipc.MediaKind_MEDIA_KIND_DOCUMENT, d.GetFileName(), d.GetFileLength()
+	case m.GetAudioMessage() != nil:
+		au := m.GetAudioMessage()
+		media.Kind, media.Size = ipc.MediaKind_MEDIA_KIND_AUDIO, au.GetFileLength()
+		media.DurationSeconds, media.VoiceNote = au.GetSeconds(), au.GetPTT()
 	default:
 		i := m.GetImageMessage()
 		media.Kind, media.Width, media.Height, media.Size = ipc.MediaKind_MEDIA_KIND_IMAGE, i.GetWidth(), i.GetHeight(), i.GetFileLength()
