@@ -20,6 +20,7 @@ message Request {
     SetActiveChat set_active_chat = 8;
     DownloadMedia download_media = 9;
     SendMedia send_media = 10;
+    FetchAvatar fetch_avatar = 11;
   }
 }
 
@@ -138,6 +139,9 @@ message Chat {
   bool is_group = 4;
   uint32 unread_count = 5;
   int64 last_message_at_ms = 6;
+  // Profile or group picture in the daemon's cache; empty when there is
+  // none or it has not been fetched yet.
+  string avatar_path = 7;
 }
 
 message Message {
@@ -189,6 +193,13 @@ message SendMedia {
   string chat_jid = 2;
   string path = 3;
   string caption = 4;
+}
+
+// Fetches a chat's profile or group picture into the cache. Answered with
+// ack; if a picture is found, chat_changed follows with its avatar_path.
+message FetchAvatar {
+  string account_id = 1;
+  string chat_jid = 2;
 }
 
 // Fetches a message's media into the cache. Answered with ack at once;

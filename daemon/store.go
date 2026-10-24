@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -41,6 +42,11 @@ UPDATE wassup_messages SET status = 1 WHERE from_me = 1;
 `, `
 -- Serialized waE2E.Message holding just what is needed to download it.
 ALTER TABLE wassup_messages ADD COLUMN media BLOB;
+`, `
+-- Profile or group picture: the server's id for it, and when it was last
+-- checked, so it is not asked for again on every start.
+ALTER TABLE wassup_chats ADD COLUMN avatar_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE wassup_chats ADD COLUMN avatar_checked_ms INTEGER NOT NULL DEFAULT 0;
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -194,7 +200,7 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	if err != nil {
 		return nil, nil, err
 	}
-	chat, err := scanChat(a.id, tx.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, msg.ChatJid))
+	chat, err := a.scanChat(tx.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, msg.ChatJid))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -272,11 +278,20 @@ func (a *account) named(ctx context.Context, chat *ipc.Chat) *ipc.Chat {
 	return chat
 }
 
-const chatQuery = `SELECT jid, name, is_group, unread_count, last_message_at_ms FROM wassup_chats`
+const chatQuery = `SELECT jid, name, is_group, unread_count, last_message_at_ms, avatar_id FROM wassup_chats`
 
-func scanChat(accountID string, row interface{ Scan(...any) error }) (*ipc.Chat, error) {
-	c := &ipc.Chat{AccountId: accountID}
-	return c, row.Scan(&c.Jid, &c.Name, &c.IsGroup, &c.UnreadCount, &c.LastMessageAtMs)
+func (a *account) scanChat(row interface{ Scan(...any) error }) (*ipc.Chat, error) {
+	c := &ipc.Chat{AccountId: a.id}
+	var avatarID string
+	if err := row.Scan(&c.Jid, &c.Name, &c.IsGroup, &c.UnreadCount, &c.LastMessageAtMs, &avatarID); err != nil {
+		return nil, err
+	}
+	if path := a.avatarPath(c.Jid, avatarID); path != "" {
+		if _, err := os.Stat(path); err == nil {
+			c.AvatarPath = path
+		}
+	}
+	return c, nil
 }
 
 func (a *account) listChats(ctx context.Context) ([]*ipc.Chat, error) {
@@ -287,7 +302,7 @@ func (a *account) listChats(ctx context.Context) ([]*ipc.Chat, error) {
 	defer rows.Close()
 	var chats []*ipc.Chat
 	for rows.Next() {
-		c, err := scanChat(a.id, rows)
+		c, err := a.scanChat(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -419,7 +434,7 @@ func (a *account) markRead(ctx context.Context, chatJID string) (*ipc.Chat, erro
 	if _, err := a.db.ExecContext(ctx, `UPDATE wassup_chats SET unread_count = 0 WHERE jid = ?`, chatJID); err != nil {
 		return nil, err
 	}
-	c, err := scanChat(a.id, a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
+	c, err := a.scanChat(a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
 	if err != nil {
 		return nil, err
 	}

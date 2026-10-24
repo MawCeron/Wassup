@@ -31,6 +31,7 @@ type account struct {
 	connectedAt atomic.Int64
 	// Where this account's media is cached; empty disables downloads.
 	mediaDir  string
+	avatarDir string
 	downloads *downloads
 }
 

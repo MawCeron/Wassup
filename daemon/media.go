@@ -125,10 +125,9 @@ func (a *account) ipcMedia(blob []byte) *ipc.Media {
 	return media
 }
 
-// download fetches a message's media in the background and tells every UI
-// when it is done. Repeated requests for a running download are ignored.
-func (d *daemon) download(a *account, chatJID, msgID string) {
-	key := chatKey(chatJID, msgID)
+// inBackground runs a download, at most parallelDownloads at a time, and
+// ignores repeated requests for one that is still running.
+func (a *account) inBackground(key string, work func()) {
 	a.downloads.mu.Lock()
 	if a.downloads.inFlight[key] {
 		a.downloads.mu.Unlock()
@@ -139,19 +138,26 @@ func (d *daemon) download(a *account, chatJID, msgID string) {
 
 	go func() {
 		a.downloads.slots <- struct{}{}
-		path, err := a.fetchMedia(context.Background(), chatJID, msgID)
+		work()
 		<-a.downloads.slots
 		a.downloads.mu.Lock()
 		delete(a.downloads.inFlight, key)
 		a.downloads.mu.Unlock()
+	}()
+}
 
+// download fetches a message's media in the background and tells every UI
+// when it is done.
+func (d *daemon) download(a *account, chatJID, msgID string) {
+	a.inBackground("media/"+chatKey(chatJID, msgID), func() {
+		path, err := a.fetchMedia(context.Background(), chatJID, msgID)
 		ready := &ipc.MediaReady{AccountId: a.id, ChatJid: chatJID, MessageId: msgID, Path: path}
 		if err != nil {
 			a.log.Warn("download media", "id", msgID, "err", err)
 			ready.Error = err.Error()
 		}
 		d.broadcast(&ipc.Event{Kind: &ipc.Event_MediaReady{MediaReady: ready}})
-	}()
+	})
 }
 
 func (a *account) fetchMedia(ctx context.Context, chatJID, msgID string) (string, error) {

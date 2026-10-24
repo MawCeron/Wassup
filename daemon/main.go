@@ -75,9 +75,12 @@ func run() error {
 	defer closeAccounts(accounts)
 	for _, a := range accounts {
 		a.mediaDir = filepath.Join(cache, "media", a.id)
-		if err := os.MkdirAll(a.mediaDir, 0o700); err != nil {
-			closeAccounts(accounts)
-			return err
+		a.avatarDir = filepath.Join(cache, "avatars", a.id)
+		for _, dir := range []string{a.mediaDir, a.avatarDir} {
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				closeAccounts(accounts)
+				return err
+			}
 		}
 	}
 	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
@@ -172,6 +175,12 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 					a.connectedAt.Store(0)
 				}
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
+			case *events.Picture:
+				// One request for the new picture, so open UIs show it right away.
+				if err := a.forgetAvatar(context.Background(), e.JID.String()); err != nil {
+					a.log.Warn("picture changed", "chat", e.JID, "err", err)
+				}
+				d.fetchAvatar(a, e.JID.String())
 			case *events.Receipt:
 				// TODO: in groups WhatsApp waits for every member; this takes the first receipt.
 				status := receiptStatus(e.Type)
@@ -375,6 +384,13 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 			}
 		}()
 		return nil
+	case *ipc.Request_FetchAvatar:
+		if a := d.find(k.FetchAvatar.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else {
+			d.fetchAvatar(a, k.FetchAvatar.GetChatJid())
+			ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
+		}
 	case *ipc.Request_DownloadMedia:
 		r := k.DownloadMedia
 		if a := d.find(r.GetAccountId()); a == nil {
