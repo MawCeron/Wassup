@@ -21,6 +21,9 @@ type config struct {
 	HideNotificationContent bool `json:"hide_notification_content"`
 	// Size of the media cache in MB; 0 means the default.
 	MediaCacheMB int `json:"media_cache_mb"`
+	// Read by the UI: draw with the GPU instead of in software. Declared
+	// here so the daemon's strict parsing accepts it.
+	GPURendering bool `json:"gpu_rendering"`
 }
 
 // loadConfig reads configDir/config.json; a missing file means defaults.

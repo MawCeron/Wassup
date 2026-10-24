@@ -47,6 +47,10 @@ func TestLoadConfig(t *testing.T) {
 	if c, err := loadConfig(dir); err != nil || c.MediaCacheMB != 200 {
 		t.Fatalf("cache size: %+v, %v", c, err)
 	}
+	write(`{"gpu_rendering": true}`)
+	if _, err := loadConfig(dir); err != nil {
+		t.Fatalf("the UI's option was rejected: %v", err)
+	}
 	write(`{"media_cache_mb": -1}`)
 	if _, err := loadConfig(dir); err == nil {
 		t.Fatal("accepted a negative cache size")

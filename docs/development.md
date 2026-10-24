@@ -90,7 +90,8 @@ file is optional; every option defaults to off.
 ```json
 {
   "hide_notification_content": true,
-  "media_cache_mb": 500
+  "media_cache_mb": 500,
+  "gpu_rendering": false
 }
 ```
 
@@ -98,9 +99,17 @@ file is optional; every option defaults to off.
 |---|---|
 | `hide_notification_content` | Notifications show the chat but not the message text. |
 | `media_cache_mb` | Size of the media cache; the least recently used files go first. Default 500. |
+| `gpu_rendering` | The UI draws with the GPU instead of in software. Off by default; see below. |
 
 An unknown option or a syntax error stops the daemon instead of being
 ignored, so a misspelled privacy option cannot silently turn itself off.
+
+The UI draws in software by default: GPU rendering loads the graphics
+drivers into its process, over 50 MB on some machines, and software
+rendering keeps scrolling at 60 fps, at the cost of more CPU while
+scrolling. `gpu_rendering` switches back, from the next time the UI
+starts. Setting `GSK_RENDERER` or `GDK_DISABLE` in the environment also
+overrides the default. Figures are in [`performance.md`](performance.md).
 
 Notifications go through `org.freedesktop.Notifications` on the session
 bus. The chat open in a focused UI window is not notified, and neither

@@ -28,7 +28,39 @@ fn window(app: &adw::Application, slot: &Slot) -> Rc<window::Window> {
     w
 }
 
+/// Whether config.json asks for GPU rendering. The daemon validates the
+/// file strictly and refuses to start on a malformed one, so a plain scan
+/// for the key is enough here.
+fn wants_gpu(config: &str) -> bool {
+    config
+        .split_once("\"gpu_rendering\"")
+        .is_some_and(|(_, rest)| {
+            rest.trim_start()
+                .strip_prefix(':')
+                .is_some_and(|v| v.trim_start().starts_with("true"))
+        })
+}
+
+/// Draws in software unless the user enabled the GPU. GPU rendering loads
+/// the graphics drivers into the process, which on some machines costs
+/// over 50 MB, while software rendering keeps 60 fps for a chat window.
+/// See docs/performance.md.
+fn choose_renderer() {
+    let config = glib::user_config_dir().join("wassup").join("config.json");
+    let gpu = std::fs::read_to_string(config).is_ok_and(|c| wants_gpu(&c));
+    let user_chose =
+        std::env::var_os("GSK_RENDERER").is_some() || std::env::var_os("GDK_DISABLE").is_some();
+    if !gpu && !user_chose {
+        // SAFETY: called first thing in main, before any other thread exists.
+        unsafe {
+            std::env::set_var("GDK_DISABLE", "gl,vulkan");
+            std::env::set_var("GSK_RENDERER", "cairo");
+        }
+    }
+}
+
 fn main() -> glib::ExitCode {
+    choose_renderer();
     // Every launch is forwarded to the running instance, if there is one.
     let app = adw::Application::builder()
         .application_id(APP_ID)
@@ -74,4 +106,20 @@ fn main() -> glib::ExitCode {
     });
     app.add_action(&open_chat);
     app.run()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wants_gpu;
+
+    #[test]
+    fn reads_the_gpu_option() {
+        assert!(wants_gpu(r#"{"gpu_rendering": true}"#));
+        assert!(wants_gpu(
+            "{\n  \"media_cache_mb\": 200,\n  \"gpu_rendering\" :true\n}"
+        ));
+        assert!(!wants_gpu(r#"{"gpu_rendering": false}"#));
+        assert!(!wants_gpu(r#"{"media_cache_mb": 200}"#));
+        assert!(!wants_gpu(""));
+    }
 }
