@@ -44,6 +44,7 @@ message Event {
     Ack ack = 12;
     MediaReady media_ready = 13;
     StickerList stickers = 14;
+    MessagesExpired messages_expired = 15;
   }
 }
 
@@ -282,6 +283,14 @@ enum MessageStatus {
   MESSAGE_STATUS_SENT = 1;
   MESSAGE_STATUS_DELIVERED = 2;
   MESSAGE_STATUS_READ = 3;
+}
+
+// Messages of a chat with disappearing messages whose time ran out. The
+// daemon has already deleted them and their media.
+message MessagesExpired {
+  string account_id = 1;
+  string chat_jid = 2;
+  repeated string message_ids = 3;
 }
 
 // Own messages that moved forward to a new status.

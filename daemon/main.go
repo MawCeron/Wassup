@@ -90,6 +90,7 @@ func run() error {
 		removeLeftovers(a.mediaDir, a.avatarDir)
 	}
 	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
+	go d.sweepExpired(context.Background())
 	for _, a := range accounts {
 		if a.client.Store.ID != nil {
 			// Without network at login, keep retrying in the background.
@@ -184,6 +185,14 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
 			case *events.AppState:
 				a.onAppState(context.Background(), e.Index, e.SyncActionValue)
+			case *events.GroupInfo:
+				if g := e.Ephemeral; g != nil {
+					timer := g.DisappearingTimer
+					if !g.IsEphemeral {
+						timer = 0
+					}
+					a.setDisappearing(context.Background(), e.JID.String(), timer)
+				}
 			case *events.Picture:
 				// One request for the new picture, so open UIs show it right away.
 				if err := a.forgetAvatar(context.Background(), e.JID.String()); err != nil {
@@ -295,6 +304,10 @@ const viewOncePlaceholder = "[View once] Open it on your phone"
 // onMessage stores a message and tells the UIs and, if it is news, the user.
 func (d *daemon) onMessage(a *account, e *events.Message) {
 	ctx := context.Background()
+	if isEphemeralSetting(e.Message) {
+		a.setDisappearing(ctx, e.Info.Chat.String(), e.Message.GetProtocolMessage().GetEphemeralExpiration())
+		return
+	}
 	msg, chat, err := a.saveMessage(ctx, e)
 	if err != nil {
 		a.log.Error("save message", "id", e.Info.ID, "err", err)

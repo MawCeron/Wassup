@@ -12,9 +12,10 @@ import (
 // maxQuoteRunes keeps stored quotes short; the UI shows two lines at most.
 const maxQuoteRunes = 200
 
-// contextOf is the reply information of whichever part a message has.
-func contextOf(m *waE2E.Message) *waE2E.ContextInfo {
-	for _, c := range []*waE2E.ContextInfo{
+// contextsOf lists the context of whichever parts a message has; most
+// messages have one part, so at most one is non-nil.
+func contextsOf(m *waE2E.Message) []*waE2E.ContextInfo {
+	return []*waE2E.ContextInfo{
 		m.GetExtendedTextMessage().GetContextInfo(),
 		m.GetImageMessage().GetContextInfo(),
 		m.GetVideoMessage().GetContextInfo(),
@@ -23,7 +24,12 @@ func contextOf(m *waE2E.Message) *waE2E.ContextInfo {
 		m.GetStickerMessage().GetContextInfo(),
 		m.GetContactMessage().GetContextInfo(),
 		m.GetLocationMessage().GetContextInfo(),
-	} {
+	}
+}
+
+// contextOf is the reply information of whichever part a message has.
+func contextOf(m *waE2E.Message) *waE2E.ContextInfo {
+	for _, c := range contextsOf(m) {
 		if c.GetStanzaID() != "" {
 			return c
 		}

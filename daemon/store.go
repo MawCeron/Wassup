@@ -67,6 +67,11 @@ ALTER TABLE wassup_favorite_stickers ADD COLUMN gone INTEGER NOT NULL DEFAULT 0;
 `, `
 -- Serialized ipc.Quote of a reply, without the quoted sender's name.
 ALTER TABLE wassup_messages ADD COLUMN quote BLOB;
+`, `
+-- Disappearing messages: each chat's timer, and when each message goes.
+ALTER TABLE wassup_chats ADD COLUMN disappearing_seconds INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE wassup_messages ADD COLUMN expires_at_ms INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX wassup_messages_by_expiry ON wassup_messages (expires_at_ms) WHERE expires_at_ms > 0;
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -193,9 +198,15 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
-	name := ""
+	name, timer := "", uint32(0)
 	if !known {
-		name = a.chatName(ctx, evt)
+		name, timer = a.chatName(ctx, evt)
+	}
+	expiration := expirationOf(evt.Message)
+	var expiresAt int64
+	if expiration > 0 {
+		expiresAt = msg.TimestampMs + int64(expiration)*1000
+		timer = expiration // The latest message tells the chat's timer best.
 	}
 
 	tx, err := a.db.BeginTx(ctx, nil)
@@ -203,15 +214,22 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 		return nil, nil, err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO wassup_chats (jid, name, is_group) VALUES (?, ?, ?)`,
-		msg.ChatJid, name, info.IsGroup)
+	_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO wassup_chats (jid, name, is_group, disappearing_seconds)
+		VALUES (?, ?, ?, ?)`, msg.ChatJid, name, info.IsGroup, timer)
 	if err != nil {
 		return nil, nil, err
 	}
+	if expiration > 0 {
+		if _, err := tx.ExecContext(ctx, `UPDATE wassup_chats SET disappearing_seconds = ? WHERE jid = ?`,
+			expiration, msg.ChatJid); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO wassup_messages
-		(chat_jid, id, sender_jid, from_me, timestamp_ms, text, status, media, quote) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text, msg.Status, mediaBlob, quoteBlob)
+		(chat_jid, id, sender_jid, from_me, timestamp_ms, text, status, media, quote, expires_at_ms)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text, msg.Status, mediaBlob, quoteBlob, expiresAt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -238,22 +256,27 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 }
 
 // chatName looks up a display name for a chat seen for the first time.
-func (a *account) chatName(ctx context.Context, evt *events.Message) string {
+// For groups it also returns their disappearing timer.
+func (a *account) chatName(ctx context.Context, evt *events.Message) (string, uint32) {
 	if evt.Info.IsGroup {
 		group, err := a.client.GetGroupInfo(ctx, evt.Info.Chat)
 		if err != nil {
 			a.log.Warn("group info", "chat", evt.Info.Chat, "err", err)
-			return ""
+			return "", 0
 		}
-		return group.Name
+		var timer uint32
+		if group.IsEphemeral {
+			timer = group.DisappearingTimer
+		}
+		return group.Name, timer
 	}
 	if name := a.contactName(ctx, evt.Info.Chat); name != "" {
-		return name
+		return name, 0
 	}
 	if !evt.Info.IsFromMe {
-		return evt.Info.PushName
+		return evt.Info.PushName, 0
 	}
-	return ""
+	return "", 0
 }
 
 // contactName returns the best known name for a user: the address book
@@ -395,6 +418,10 @@ func (a *account) send(ctx context.Context, chat string, content *waE2E.Message)
 	to, err := types.ParseJID(chat)
 	if err != nil {
 		return nil, nil, err
+	}
+	// Own messages follow the chat's timer, as the other members expect.
+	if timer := a.disappearing(ctx, chat); timer > 0 {
+		content = withExpiration(content, timer)
 	}
 	resp, err := a.client.SendMessage(ctx, to, content)
 	if err != nil {

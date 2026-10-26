@@ -455,6 +455,7 @@ type Event struct {
 	//	*Event_Ack
 	//	*Event_MediaReady
 	//	*Event_Stickers
+	//	*Event_MessagesExpired
 	Kind          isEvent_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -621,6 +622,15 @@ func (x *Event) GetStickers() *StickerList {
 	return nil
 }
 
+func (x *Event) GetMessagesExpired() *MessagesExpired {
+	if x != nil {
+		if x, ok := x.Kind.(*Event_MessagesExpired); ok {
+			return x.MessagesExpired
+		}
+	}
+	return nil
+}
+
 type isEvent_Kind interface {
 	isEvent_Kind()
 }
@@ -677,6 +687,10 @@ type Event_Stickers struct {
 	Stickers *StickerList `protobuf:"bytes,14,opt,name=stickers,proto3,oneof"`
 }
 
+type Event_MessagesExpired struct {
+	MessagesExpired *MessagesExpired `protobuf:"bytes,15,opt,name=messages_expired,json=messagesExpired,proto3,oneof"`
+}
+
 func (*Event_Error) isEvent_Kind() {}
 
 func (*Event_Accounts) isEvent_Kind() {}
@@ -702,6 +716,8 @@ func (*Event_Ack) isEvent_Kind() {}
 func (*Event_MediaReady) isEvent_Kind() {}
 
 func (*Event_Stickers) isEvent_Kind() {}
+
+func (*Event_MessagesExpired) isEvent_Kind() {}
 
 type ListAccounts struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2391,6 +2407,68 @@ func (x *MediaReady) GetError() string {
 	return ""
 }
 
+// Messages of a chat with disappearing messages whose time ran out. The
+// daemon has already deleted them and their media.
+type MessagesExpired struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ChatJid       string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
+	MessageIds    []string               `protobuf:"bytes,3,rep,name=message_ids,json=messageIds,proto3" json:"message_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MessagesExpired) Reset() {
+	*x = MessagesExpired{}
+	mi := &file_ipc_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MessagesExpired) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessagesExpired) ProtoMessage() {}
+
+func (x *MessagesExpired) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessagesExpired.ProtoReflect.Descriptor instead.
+func (*MessagesExpired) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *MessagesExpired) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *MessagesExpired) GetChatJid() string {
+	if x != nil {
+		return x.ChatJid
+	}
+	return ""
+}
+
+func (x *MessagesExpired) GetMessageIds() []string {
+	if x != nil {
+		return x.MessageIds
+	}
+	return nil
+}
+
 // Own messages that moved forward to a new status.
 type MessageStatusChanged struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2404,7 +2482,7 @@ type MessageStatusChanged struct {
 
 func (x *MessageStatusChanged) Reset() {
 	*x = MessageStatusChanged{}
-	mi := &file_ipc_proto_msgTypes[29]
+	mi := &file_ipc_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2416,7 +2494,7 @@ func (x *MessageStatusChanged) String() string {
 func (*MessageStatusChanged) ProtoMessage() {}
 
 func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[29]
+	mi := &file_ipc_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2429,7 +2507,7 @@ func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageStatusChanged.ProtoReflect.Descriptor instead.
 func (*MessageStatusChanged) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{29}
+	return file_ipc_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *MessageStatusChanged) GetAccountId() string {
@@ -2482,7 +2560,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\ffetch_avatar\x18\v \x01(\v2\x1a.wassup.ipc.v1.FetchAvatarH\x00R\vfetchAvatar\x12B\n" +
 	"\rlist_stickers\x18\f \x01(\v2\x1b.wassup.ipc.v1.ListStickersH\x00R\flistStickers\x12?\n" +
 	"\fsend_sticker\x18\r \x01(\v2\x1a.wassup.ipc.v1.SendStickerH\x00R\vsendStickerB\x06\n" +
-	"\x04kind\"\xb0\x06\n" +
+	"\x04kind\"\xfd\x06\n" +
 	"\x05Event\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12,\n" +
@@ -2501,7 +2579,8 @@ const file_ipc_proto_rawDesc = "" +
 	"\x03ack\x18\f \x01(\v2\x12.wassup.ipc.v1.AckH\x00R\x03ack\x12<\n" +
 	"\vmedia_ready\x18\r \x01(\v2\x19.wassup.ipc.v1.MediaReadyH\x00R\n" +
 	"mediaReady\x128\n" +
-	"\bstickers\x18\x0e \x01(\v2\x1a.wassup.ipc.v1.StickerListH\x00R\bstickersB\x06\n" +
+	"\bstickers\x18\x0e \x01(\v2\x1a.wassup.ipc.v1.StickerListH\x00R\bstickers\x12K\n" +
+	"\x10messages_expired\x18\x0f \x01(\v2\x1e.wassup.ipc.v1.MessagesExpiredH\x00R\x0fmessagesExpiredB\x06\n" +
 	"\x04kind\"\x0e\n" +
 	"\fListAccounts\"*\n" +
 	"\tListChats\x12\x1d\n" +
@@ -2645,7 +2724,13 @@ const file_ipc_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x03 \x01(\tR\tmessageId\x12\x12\n" +
 	"\x04path\x18\x04 \x01(\tR\x04path\x12\x14\n" +
-	"\x05error\x18\x05 \x01(\tR\x05error\"\xa7\x01\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\"l\n" +
+	"\x0fMessagesExpired\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12\x1f\n" +
+	"\vmessage_ids\x18\x03 \x03(\tR\n" +
+	"messageIds\"\xa7\x01\n" +
 	"\x14MessageStatusChanged\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -2684,7 +2769,7 @@ func file_ipc_proto_rawDescGZIP() []byte {
 }
 
 var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_ipc_proto_goTypes = []any{
 	(ConnectionState)(0),         // 0: wassup.ipc.v1.ConnectionState
 	(MediaKind)(0),               // 1: wassup.ipc.v1.MediaKind
@@ -2718,7 +2803,8 @@ var file_ipc_proto_goTypes = []any{
 	(*FetchAvatar)(nil),          // 29: wassup.ipc.v1.FetchAvatar
 	(*DownloadMedia)(nil),        // 30: wassup.ipc.v1.DownloadMedia
 	(*MediaReady)(nil),           // 31: wassup.ipc.v1.MediaReady
-	(*MessageStatusChanged)(nil), // 32: wassup.ipc.v1.MessageStatusChanged
+	(*MessagesExpired)(nil),      // 32: wassup.ipc.v1.MessagesExpired
+	(*MessageStatusChanged)(nil), // 33: wassup.ipc.v1.MessageStatusChanged
 }
 var file_ipc_proto_depIdxs = []int32{
 	5,  // 0: wassup.ipc.v1.Request.list_accounts:type_name -> wassup.ipc.v1.ListAccounts
@@ -2742,25 +2828,26 @@ var file_ipc_proto_depIdxs = []int32{
 	21, // 18: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
 	10, // 19: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
 	11, // 20: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
-	32, // 21: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
+	33, // 21: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
 	14, // 22: wassup.ipc.v1.Event.ack:type_name -> wassup.ipc.v1.Ack
 	31, // 23: wassup.ipc.v1.Event.media_ready:type_name -> wassup.ipc.v1.MediaReady
 	26, // 24: wassup.ipc.v1.Event.stickers:type_name -> wassup.ipc.v1.StickerList
-	19, // 25: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
-	20, // 26: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
-	21, // 27: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
-	0,  // 28: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
-	2,  // 29: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
-	23, // 30: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
-	22, // 31: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
-	1,  // 32: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
-	27, // 33: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
-	2,  // 34: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
-	35, // [35:35] is the sub-list for method output_type
-	35, // [35:35] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	32, // 25: wassup.ipc.v1.Event.messages_expired:type_name -> wassup.ipc.v1.MessagesExpired
+	19, // 26: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
+	20, // 27: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
+	21, // 28: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
+	0,  // 29: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
+	2,  // 30: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
+	23, // 31: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
+	22, // 32: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
+	1,  // 33: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
+	27, // 34: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
+	2,  // 35: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_ipc_proto_init() }
@@ -2796,6 +2883,7 @@ func file_ipc_proto_init() {
 		(*Event_Ack)(nil),
 		(*Event_MediaReady)(nil),
 		(*Event_Stickers)(nil),
+		(*Event_MessagesExpired)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2803,7 +2891,7 @@ func file_ipc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipc_proto_rawDesc), len(file_ipc_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   30,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
