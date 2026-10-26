@@ -175,6 +175,16 @@ Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
 
+## Disappearing messages
+
+Chats with disappearing messages are respected. Each message keeps the
+timer it was sent with, and once that time has passed since it was sent,
+the daemon deletes it and its cached photo, document or audio; it checks
+at startup and then every minute, and open UIs drop the messages too.
+Stickers stay cached, since other chats and favorites share them. Own
+messages are sent with the chat's timer. Messages stored before Wassup
+learned about timers kept none and do not expire.
+
 Profile and group pictures are fetched when a chat first shows up on
 screen, as small previews cached in `$XDG_CACHE_HOME/wassup/avatars/`.
 The daemon asks the server again only after a picture change event or a

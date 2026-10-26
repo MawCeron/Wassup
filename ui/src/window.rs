@@ -772,6 +772,7 @@ impl Window {
             Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => self.add_message(msg),
             Some(event::Kind::MessageStatusChanged(change)) => self.update_status(change),
             Some(event::Kind::MediaReady(ready)) => self.media_ready(ready),
+            Some(event::Kind::MessagesExpired(gone)) => self.remove_expired(gone),
             Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
@@ -1140,6 +1141,30 @@ impl Window {
                 show_media(&picture, &ready.path, width, height, &msg.id, &self.rows);
             }
             break;
+        }
+    }
+
+    /// Drops disappearing messages whose time ran out from the open chat.
+    fn remove_expired(&self, gone: ipc::MessagesExpired) {
+        let open = self.is_current(&gone.account_id)
+            && self.current_chat.borrow().as_deref() == Some(gone.chat_jid.as_str());
+        if !open {
+            return;
+        }
+        let playing = self.player.borrow().as_ref().map(|p| p.msg_id.clone());
+        if playing.is_some_and(|id| gone.message_ids.contains(&id)) {
+            self.stop_audio();
+        }
+        // From the end, so earlier positions stay valid while removing.
+        for pos in (0..self.messages.n_items()).rev() {
+            let hit = self
+                .messages
+                .item(pos)
+                .and_downcast::<glib::BoxedAnyObject>()
+                .is_some_and(|item| gone.message_ids.contains(&item.borrow::<ipc::Message>().id));
+            if hit {
+                self.messages.remove(pos);
+            }
         }
     }
 
