@@ -36,8 +36,8 @@ The same chat, with images, in a test copy of the UI:
 The renderer alone does not matter: GDK initializes OpenGL and Vulkan
 when it opens the display, whichever renderer draws afterwards.
 
-Daemon and UI together: about 100–110 MB PSS. For reference, Whats4Linux
-uses about 140 MB with one account.
+Daemon and UI together: about 100–110 MB PSS with GPU rendering; see
+[Other clients](#other-clients) for how that compares.
 
 ### Rendering benchmark
 
@@ -55,3 +55,40 @@ All three keep 60 fps. Software rendering spends about 2.4 times the CPU
 while scrolling, and none at rest. PSS depends on what other processes
 share, so USS (memory only this process holds) is the fairer comparison.
 
+## Other clients
+
+The same method (PSS, median of three samples, taken at least five
+minutes after launch, idle) applied to the other WhatsApp clients
+installed on the test machine, on 2026-10-26. Each ran alone, with the
+window open and the account already linked, and PSS is summed over the
+whole process tree.
+
+| Client | Version | Kind | Processes | PSS | RSS | USS |
+|---|---|---|---|---|---|---|
+| Wassup, realistic history | 21eedc9 | Go daemon + GTK4, GPU rendering, debug build | 2 | 164 MB | 198 MB | |
+| Wassup, new account | 7f38e22 | Go daemon + GTK4, software rendering, release build | 2 | 64 MB | 107 MB | 59 MB |
+| Whats4Linux | AppImage | Go + WebKitGTK | 4 | 384 MB | 594 MB | 319 MB |
+| whatRust 0.6.7 | Flatpak | Rust + WebKitGTK, WhatsApp Web | 4 | 1022 MB | 1241 MB | 925 MB |
+| Karere 4.3.4 | Flatpak | Chromium, WhatsApp Web | 8 | 1356 MB | 2016 MB | 1162 MB |
+
+The two Wassup rows differ in build, rendering and history, so neither
+is the figure to quote alone.
+
+- **Realistic history:** the daemon (25.9 MB) and the UI (138.3 MB) from
+  2026-10-23, 14 minutes of use with 8 chats, 235 messages and 48 cached
+  media files. It was a debug build with GTK's default GPU rendering,
+  which was the default then.
+- **New account:** the daemon (35.0 MB) and the UI (29.3 MB), release
+  builds with software rendering, five minutes after linking, one chat
+  open and one chat stored. The daemon is larger than in the first row,
+  possibly because of the history WhatsApp sends on linking, which Wassup
+  processes but does not store; this was not checked.
+
+A release build with software rendering and a realistic history, the
+configuration users will run, has not been measured yet.
+
+Caveats: the accounts are different and hold different amounts of chat
+history, so the figures show the order of magnitude, not an exact ratio.
+The WhatsApp Web clients load the whole web app in a browser engine,
+which is where most of their memory goes. This replaces the earlier
+"about 140 MB" figure for Whats4Linux, which had no method behind it.
