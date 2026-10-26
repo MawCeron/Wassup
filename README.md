@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="data/icons/hicolor/scalable/apps/io.github.MawCeron.Wassup.svg" alt="Wassup icon" width="128">
+</p>
+
 # Wassup
 
 An **unofficial** WhatsApp client for Linux (GNOME), with a native protocol
