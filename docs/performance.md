@@ -90,5 +90,4 @@ configuration users will run, has not been measured yet.
 Caveats: the accounts are different and hold different amounts of chat
 history, so the figures show the order of magnitude, not an exact ratio.
 The WhatsApp Web clients load the whole web app in a browser engine,
-which is where most of their memory goes. This replaces the earlier
-"about 140 MB" figure for Whats4Linux, which had no method behind it.
+which is where most of their memory goes.
