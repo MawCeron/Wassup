@@ -65,7 +65,8 @@ Formatting and lint rules are the tools' defaults; no config files.
 ## Test client
 
 `wassupctl` talks to a running daemon over IPC, so an account can be
-linked and used before the UI exists. Run from `daemon/`:
+linked and used without the UI, for example to debug the daemon. Run
+from `daemon/`:
 
 ```sh
 go run . -debug                            # terminal 1: the daemon
