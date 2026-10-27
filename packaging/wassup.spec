@@ -1,5 +1,7 @@
 # Go binaries carry no debug data Fedora's tools can split out.
 %global debug_package %{nil}
+# The emoji font, built by https://github.com/MawCeron/twemoji-cbdt.
+%global font_version 17.0.3.1
 
 Name:           wassup
 Version:        0.1.0
@@ -9,11 +11,16 @@ Summary:        Unofficial WhatsApp client for GNOME
 # Wassup is GPL-3.0-or-later. Bundled Go modules: GPL-3.0-only (libsignal),
 # MPL-2.0 (whatsmeow), BSD-3-Clause, BSD-2-Clause, MIT, Apache-2.0, ISC,
 # and SQLite's blessing. Bundled Rust crates: MIT, Apache-2.0,
-# (MIT OR Apache-2.0), (Unlicense OR MIT) and Unicode-3.0.
-License:        GPL-3.0-or-later AND GPL-3.0-only AND MPL-2.0 AND BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND ISC AND blessing AND (MIT OR Apache-2.0) AND (Unlicense OR MIT) AND Unicode-3.0
+# (MIT OR Apache-2.0), (Unlicense OR MIT) and Unicode-3.0. The emoji font
+# is CC-BY-4.0: the Twemoji graphics of Twitter and the Twemoji contributors.
+License:        GPL-3.0-or-later AND GPL-3.0-only AND MPL-2.0 AND BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND ISC AND blessing AND (MIT OR Apache-2.0) AND (Unlicense OR MIT) AND Unicode-3.0 AND CC-BY-4.0
 URL:            https://github.com/MawCeron/Wassup
 Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.xz
+# The font and its license, which packaging/tarballs.sh downloads.
+Source2:        TwemojiCBDT-%{font_version}.ttf
+Source3:        twemoji-cbdt-NOTICE
+Source4:        twemoji-cbdt-LICENSE-GRAPHICS
 
 ExclusiveArch:  x86_64 aarch64
 
@@ -40,10 +47,6 @@ Requires:       gstreamer1-plugins-good
 # setpriv keeps a recording from outliving the window.
 Requires:       util-linux
 Recommends:     gstreamer1-plugin-openh264
-# Emoji are drawn with Twemoji when it is installed. Without it Pango uses
-# Noto Color Emoji, whose glyph cache makes the UI grow by hundreds of
-# megabytes as soon as emoji are shown. See docs/performance.md.
-Recommends:     twitter-twemoji-fonts
 # GNOME shows the status icon only with this extension.
 Suggests:       gnome-shell-extension-appindicator
 
@@ -57,6 +60,8 @@ Wassup is not affiliated with, endorsed by or connected to WhatsApp or Meta.
 %prep
 %autosetup -n %{name}-%{version}
 tar -xJf %{SOURCE1}
+cp -p %{SOURCE3} NOTICE-twemoji-cbdt
+cp -p %{SOURCE4} LICENSE-twemoji-cbdt-graphics
 
 %build
 (cd daemon && GOFLAGS=-mod=vendor go build -trimpath -ldflags "-B gobuildid" -o wassupd .)
@@ -79,6 +84,7 @@ install -Dm0644 data/icons/hicolor/scalable/apps/io.github.MawCeron.Wassup.svg \
     %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.MawCeron.Wassup.svg
 install -Dm0644 data/icons/hicolor/symbolic/apps/io.github.MawCeron.Wassup-symbolic.svg \
     %{buildroot}%{_datadir}/icons/hicolor/symbolic/apps/io.github.MawCeron.Wassup-symbolic.svg
+install -Dm0644 %{SOURCE2} %{buildroot}%{_datadir}/wassup/fonts/TwemojiCBDT.ttf
 po/i18n.sh install %{buildroot}%{_datadir}/locale
 %find_lang %{name}
 
@@ -95,7 +101,7 @@ appstreamcli validate --no-net %{buildroot}%{_metainfodir}/io.github.MawCeron.Wa
 %systemd_user_preun wassupd.socket wassupd.service
 
 %files -f %{name}.lang
-%license LICENSE
+%license LICENSE NOTICE-twemoji-cbdt LICENSE-twemoji-cbdt-graphics
 %doc README.md
 %{_bindir}/wassup
 %{_bindir}/wassupd
@@ -107,6 +113,7 @@ appstreamcli validate --no-net %{buildroot}%{_metainfodir}/io.github.MawCeron.Wa
 %{_metainfodir}/io.github.MawCeron.Wassup.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/io.github.MawCeron.Wassup.svg
 %{_datadir}/icons/hicolor/symbolic/apps/io.github.MawCeron.Wassup-symbolic.svg
+%{_datadir}/wassup
 
 %changelog
 * Tue Oct 27 2026 Mauricio Cerón Medina <ceron.maw@gmail.com> - 0.1.0-1
