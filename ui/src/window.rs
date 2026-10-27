@@ -73,6 +73,9 @@ const CSS: &str = "
 .composer:focus-within { outline: 2px solid color-mix(in srgb, var(--accent-color) 50%, transparent); }
 /* Clipped by the widget's overflow, so opaque stickers get round corners too. */
 .sticker-image { border-radius: 12px; }
+/* The picker's size is set on the label inside each emoji, which GTK scales by x-large. */
+popover.emoji-picker emoji { padding: 4px; }
+popover.emoji-picker emoji label { font-size: 0.75em; }
 /* The doodles stay put while messages scroll over them. White bubbles
    need a darker backdrop than the white view. */
 .chat-bg-light { background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color)) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-light.svg\") repeat; }
