@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.MawCeron.Wassup</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Wassup</name>
+  <summary>Unofficial WhatsApp client</summary>
+  <description>
+    <p>
+      Wassup is a WhatsApp client for GNOME that speaks the protocol
+      natively, without a web view, and stays light on memory. It links
+      to your phone like WhatsApp Web, and a background service keeps
+      notifications coming while its window is closed.
+    </p>
+    <ul>
+      <li>Chats and groups, with photos, videos, documents, stickers and voice notes</li>
+      <li>Replies, reactions and link previews</li>
+      <li>Search across chats and inside a chat</li>
+      <li>Disappearing messages and chats locked behind your secret code</li>
+      <li>History from your phone, loaded as you scroll</li>
+    </ul>
+    <p>
+      Wassup is not affiliated with, endorsed by or connected to WhatsApp
+      or Meta.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.MawCeron.Wassup.desktop</launchable>
+  <developer id="io.github.mawceron">
+    <name>Mauricio Cerón Medina</name>
+  </developer>
+  <url type="homepage">https://github.com/MawCeron/Wassup</url>
+  <url type="bugtracker">https://github.com/MawCeron/Wassup/issues</url>
+  <url type="vcs-browser">https://github.com/MawCeron/Wassup</url>
+  <url type="translate">https://github.com/MawCeron/Wassup/blob/main/docs/translating.md</url>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-audio">intense</content_attribute>
+    <content_attribute id="social-contacts">intense</content_attribute>
+  </content_rating>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <releases>
+    <release version="0.1.0" date="2026-10-27">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

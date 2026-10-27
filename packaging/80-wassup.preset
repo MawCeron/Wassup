@@ -1,0 +1,4 @@
+# Wassup's background service starts at login, so notifications arrive
+# without opening the window; the socket starts it again after quitting.
+enable wassupd.socket
+enable wassupd.service
