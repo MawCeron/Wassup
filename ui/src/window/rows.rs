@@ -242,14 +242,6 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .wrap(true)
             .wrap_mode(gtk::pango::WrapMode::WordChar)
             .build();
-        // A mention is a link only to take the accent color: it goes nowhere.
-        text.connect_activate_link(|_, uri| {
-            if uri.starts_with("mention:") {
-                glib::Propagation::Stop
-            } else {
-                glib::Propagation::Proceed
-            }
-        });
         let time = gtk::Label::builder()
             .css_classes(["caption", "dim-label"])
             .build();
@@ -653,7 +645,11 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
                 );
             }
         }
-        text.set_markup(&message_markup(&msg.text, &msg.mentions));
+        text.set_markup(&message_markup(
+            &msg.text,
+            &msg.mentions,
+            &accent_text_color(),
+        ));
         text.set_visible(!msg.text.is_empty());
         time.set_label(&time_of_day(msg.timestamp_ms));
         show_status(&status, msg.status());
@@ -872,10 +868,23 @@ pub(super) fn link_host(url: &str) -> String {
         .unwrap_or_else(|| url.to_owned())
 }
 
+/// The accent color for text in the current style, as a Pango color.
+fn accent_text_color() -> String {
+    let style = adw::StyleManager::default();
+    let c = style.accent_color().to_standalone_rgba(style.is_dark());
+    let byte = |v: f32| (v * 255.0).round() as u8;
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        byte(c.red()),
+        byte(c.green()),
+        byte(c.blue())
+    )
+}
+
 /// Message text as Pango markup: web addresses are links, and the mention of
-/// a person the daemon knows shows their name, as a link that goes nowhere so
-/// that it takes the accent color. The rest is escaped.
-pub(super) fn message_markup(text: &str, mentions: &[ipc::Mention]) -> String {
+/// a person the daemon knows shows their name, in bold and in `color`, the
+/// accent. The rest is escaped.
+pub(super) fn message_markup(text: &str, mentions: &[ipc::Mention], color: &str) -> String {
     let word = |c: char| c.is_alphanumeric() || c == '_';
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
@@ -900,8 +909,7 @@ pub(super) fn message_markup(text: &str, mentions: &[ipc::Mention]) -> String {
         };
         out += &linkify(&rest[..at]);
         out += &format!(
-            "<a href=\"mention:{}\">@{}</a>",
-            mention.token,
+            "<span foreground=\"{color}\" weight=\"bold\">@{}</span>",
             glib::markup_escape_text(&mention.name)
         );
         rest = &rest[end..];
@@ -1151,26 +1159,29 @@ mod tests {
         assert_eq!(
             message_markup(
                 "hi @5215551111111, see https://a.b!",
-                std::slice::from_ref(&ana)
+                std::slice::from_ref(&ana),
+                "#3584e4"
             ),
-            "hi <a href=\"mention:5215551111111\">@Ana &lt;&amp;&gt;</a>, see <a href=\"https://a.b\">https://a.b</a>!"
+            "hi <span foreground=\"#3584e4\" weight=\"bold\">@Ana &lt;&amp;&gt;</span>, see <a href=\"https://a.b\">https://a.b</a>!"
         );
         assert_eq!(
             message_markup(
                 "@5215551111111 and @5215559999999",
-                std::slice::from_ref(&ana)
+                std::slice::from_ref(&ana),
+                "#3584e4"
             ),
-            "<a href=\"mention:5215551111111\">@Ana &lt;&amp;&gt;</a> and @5215559999999"
+            "<span foreground=\"#3584e4\" weight=\"bold\">@Ana &lt;&amp;&gt;</span> and @5215559999999"
         );
         assert_eq!(
             message_markup(
                 "a@5215551111111 or @52155511111119",
-                std::slice::from_ref(&ana)
+                std::slice::from_ref(&ana),
+                "#3584e4"
             ),
             "a@5215551111111 or @52155511111119",
             "an address and a longer number are not mentions"
         );
-        assert_eq!(message_markup("<b>", &[]), "&lt;b&gt;");
+        assert_eq!(message_markup("<b>", &[], "#3584e4"), "&lt;b&gt;");
     }
 
     #[test]
