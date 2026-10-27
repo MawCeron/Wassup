@@ -104,6 +104,8 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .can_shrink(true)
             .content_fit(gtk::ContentFit::Contain)
             .css_classes(["media"])
+            // Clips the image to the rounded corners.
+            .overflow(gtk::Overflow::Hidden)
             .build();
         // Videos show their thumbnail with a play badge and their length.
         let play_badge = gtk::Image::builder()
@@ -120,7 +122,14 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .margin_bottom(6)
             .css_classes(["osd", "caption", "numeric", "video-length"])
             .build();
-        let media_overlay = gtk::Overlay::builder().child(&picture).build();
+        // A picture grows to keep its image's proportions; the two clamps cap
+        // it at its box, so a wide or tall sticker stays in its square.
+        let clamp_width = adw::Clamp::builder().child(&picture).build();
+        let clamp_height = adw::Clamp::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .child(&clamp_width)
+            .build();
+        let media_overlay = gtk::Overlay::builder().child(&clamp_height).build();
         media_overlay.add_overlay(&play_badge);
         media_overlay.add_overlay(&video_length);
         // Buttons, so photos and documents also open from the keyboard.
@@ -306,13 +315,17 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .and_downcast::<gtk::Label>()
             .unwrap();
         let media_button = quote.next_sibling().and_downcast::<gtk::Button>().unwrap();
-        let picture = media_button
+        let clamps = media_button
             .child()
             .and_downcast::<gtk::Overlay>()
-            .and_then(|o| o.child())
+            .and_then(|o| o.child()) // The height clamp, then the width clamp.
+            .unwrap();
+        let picture = clamps
+            .first_child()
+            .and_then(|c| c.first_child())
             .and_downcast::<gtk::Picture>()
             .unwrap();
-        let play_badge = picture.next_sibling().unwrap();
+        let play_badge = clamps.next_sibling().unwrap();
         let video_length = play_badge
             .next_sibling()
             .and_downcast::<gtk::Label>()
@@ -404,14 +417,16 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         if sticker {
             bubble.add_css_class("sticker");
             picture.remove_css_class("media");
+            picture.add_css_class("sticker-image");
         } else {
             bubble.remove_css_class("sticker");
+            picture.remove_css_class("sticker-image");
             picture.add_css_class("media");
         }
         if let Some(media) = msg.media.as_ref().filter(|_| is_video) {
             // Only the thumbnail: the video downloads when played.
             let (width, height) = media_size(media);
-            picture.set_size_request(width, height);
+            fit_picture(&picture, width, height, false);
             video_length.set_label(&clock(media.duration_seconds as f64));
             if !media.thumbnail_path.is_empty() {
                 show_media(
@@ -427,7 +442,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         if let Some(media) = msg.media.as_ref().filter(|_| is_picture) {
             // Reserve the final size now so the row does not grow later.
             let (width, height) = media_size(media);
-            picture.set_size_request(width, height);
+            fit_picture(&picture, width, height, sticker);
             if media.path.is_empty() {
                 if let Some(ui) = owner.get().and_then(std::rc::Weak::upgrade) {
                     ui.request_media(&msg);
@@ -456,11 +471,30 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
     factory
 }
 
+/// Sizes a message's picture to width x height, at least and, through its
+/// two clamps, at most, so its rounded corners are the image's. Stickers
+/// sit centered in a fixed square around it, as in WhatsApp.
+fn fit_picture(picture: &gtk::Picture, width: i32, height: i32, sticker: bool) {
+    picture.set_size_request(width, height);
+    if let Some(outer) = picture.parent().and_then(|c| c.parent()) {
+        let side = if sticker { STICKER_MAX } else { -1 };
+        outer.set_size_request(side, side);
+    }
+    let clamps = [picture.parent(), picture.parent().and_then(|c| c.parent())];
+    for (clamp, max) in clamps.into_iter().zip([width, height]) {
+        if let Some(clamp) = clamp.and_downcast::<adw::Clamp>() {
+            clamp.set_maximum_size(max);
+            clamp.set_tightening_threshold(max);
+        }
+    }
+}
+
 /// Largest an image or sticker is shown in a conversation, in pixels.
 pub(super) const IMAGE_MAX: i32 = 280;
 pub(super) const STICKER_MAX: i32 = 160;
 
 /// On-screen size of media, scaled down to fit and keeping its proportions.
+/// Stickers then sit centered in a fixed square; see fit_picture.
 pub(super) fn media_size(media: &ipc::Media) -> (i32, i32) {
     let max = if media.kind() == ipc::MediaKind::Sticker {
         STICKER_MAX

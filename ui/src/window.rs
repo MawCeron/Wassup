@@ -53,7 +53,11 @@ const CSS: &str = "
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
 /* After .mine, which has the same weight: own stickers have no bubble either. */
 .bubble.sticker { background: none; padding: 0; }
-.composer { border-radius: 10px; background: var(--card-bg-color); }
+.composer { border-radius: 10px; background: var(--card-bg-color); outline: 0 solid transparent; outline-offset: -2px; }
+/* The focus ring libadwaita draws on entries. */
+.composer:focus-within { outline: 2px solid color-mix(in srgb, var(--accent-color) 50%, transparent); }
+/* Clipped by the widget's overflow, so opaque stickers get round corners too. */
+.sticker-image { border-radius: 12px; }
 /* The doodles stay put while messages scroll over them. White bubbles
    need a darker backdrop than the white view. */
 .chat-bg-light { background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color)) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-light.svg\") repeat; }

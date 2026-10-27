@@ -26,6 +26,8 @@ impl Window {
                 .content_fit(gtk::ContentFit::Contain)
                 .width_request(STICKER_THUMB)
                 .height_request(STICKER_THUMB)
+                .css_classes(["sticker-image"])
+                .overflow(gtk::Overflow::Hidden)
                 .build();
             let button = gtk::Button::builder()
                 .child(&picture)
