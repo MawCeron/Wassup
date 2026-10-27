@@ -2479,7 +2479,10 @@ type SendMedia struct {
 	Path      string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
 	Caption   string                 `protobuf:"bytes,4,opt,name=caption,proto3" json:"caption,omitempty"`
 	// Send a 512x512 WebP file as a sticker instead.
-	AsSticker     bool `protobuf:"varint,5,opt,name=as_sticker,json=asSticker,proto3" json:"as_sticker,omitempty"`
+	AsSticker bool `protobuf:"varint,5,opt,name=as_sticker,json=asSticker,proto3" json:"as_sticker,omitempty"`
+	// Send as a document whatever the file is, so photos and videos keep
+	// their full quality.
+	AsDocument    bool `protobuf:"varint,6,opt,name=as_document,json=asDocument,proto3" json:"as_document,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2545,6 +2548,13 @@ func (x *SendMedia) GetCaption() string {
 func (x *SendMedia) GetAsSticker() bool {
 	if x != nil {
 		return x.AsSticker
+	}
+	return false
+}
+
+func (x *SendMedia) GetAsDocument() bool {
+	if x != nil {
+		return x.AsDocument
 	}
 	return false
 }
@@ -3573,7 +3583,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\x10duration_seconds\x18\a \x01(\rR\x0fdurationSeconds\x12\x1d\n" +
 	"\n" +
 	"voice_note\x18\b \x01(\bR\tvoiceNote\x12%\n" +
-	"\x0ethumbnail_path\x18\t \x01(\tR\rthumbnailPath\"\x92\x01\n" +
+	"\x0ethumbnail_path\x18\t \x01(\tR\rthumbnailPath\"\xb3\x01\n" +
 	"\tSendMedia\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -3581,7 +3591,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04path\x18\x03 \x01(\tR\x04path\x12\x18\n" +
 	"\acaption\x18\x04 \x01(\tR\acaption\x12\x1d\n" +
 	"\n" +
-	"as_sticker\x18\x05 \x01(\bR\tasSticker\"-\n" +
+	"as_sticker\x18\x05 \x01(\bR\tasSticker\x12\x1f\n" +
+	"\vas_document\x18\x06 \x01(\bR\n" +
+	"asDocument\"-\n" +
 	"\fListStickers\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\"A\n" +

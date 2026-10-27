@@ -317,7 +317,7 @@ func evictMedia(root string, limit int64) error {
 
 // sendMedia uploads a local file and sends it: JPEG and PNG as a photo,
 // anything else as a document, or a WebP file as a sticker if asked.
-func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asSticker bool) (*ipc.Message, *ipc.Chat, error) {
+func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asSticker, asDocument bool) (*ipc.Message, *ipc.Chat, error) {
 	if !a.client.IsLoggedIn() {
 		return nil, nil, errors.New("account is not connected")
 	}
@@ -334,8 +334,8 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asS
 	head := make([]byte, 512)
 	n, _ := io.ReadFull(f, head)
 	sniffed := http.DetectContentType(head[:n])
-	photo := !asSticker && (sniffed == "image/jpeg" || sniffed == "image/png")
-	video := !asSticker && sniffed == "video/mp4"
+	photo := !asSticker && !asDocument && (sniffed == "image/jpeg" || sniffed == "image/png")
+	video := !asSticker && !asDocument && sniffed == "video/mp4"
 	if asSticker && sniffed != "image/webp" {
 		return nil, nil, errors.New("stickers must be WebP images")
 	}

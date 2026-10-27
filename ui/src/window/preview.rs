@@ -11,9 +11,10 @@ const PREVIEW_HEIGHT: i32 = 360;
 impl Window {
     /// Shows a chosen file over the conversation, with a caption field.
     /// Nothing is sent until the user presses Send; Escape discards it.
-    pub(super) fn preview_file(self: &Rc<Self>, path: &str) {
-        let photo = is_photo(path);
-        let video = !photo && is_video(path);
+    pub(super) fn preview_file(self: &Rc<Self>, path: &str, as_document: bool) {
+        // As a document, a photo or video goes as a file, like any other.
+        let photo = !as_document && is_photo(path);
+        let video = !as_document && !photo && is_video(path);
         let preview: gtk::Widget = if photo {
             let picture = gtk::Picture::builder()
                 .content_fit(gtk::ContentFit::Contain)
@@ -88,7 +89,7 @@ impl Window {
             #[strong(rename_to = path)]
             path.to_owned(),
             move || {
-                if ui.send_file(&path, caption.text().trim()) {
+                if ui.send_file(&path, caption.text().trim(), as_document) {
                     ui.composer.buffer().set_text("");
                 }
                 dialog.close();

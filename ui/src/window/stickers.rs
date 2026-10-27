@@ -115,6 +115,7 @@ impl Window {
             path: file.to_string_lossy().into_owned(),
             caption: String::new(),
             as_sticker: true,
+            as_document: false,
         });
         match self.send(request) {
             Some(id) => {

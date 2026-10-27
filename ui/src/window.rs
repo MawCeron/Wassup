@@ -437,10 +437,36 @@ impl Window {
             .margin_start(12)
             .margin_end(12)
             .build();
-        let attach = gtk::Button::builder()
+        // Attach menu: photos and videos go as such, documents as files.
+        let attach_media = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name("wassup-media-symbolic")
+                    .label(gettext("Photos & Videos"))
+                    .halign(gtk::Align::Start)
+                    .build(),
+            )
+            .css_classes(["flat"])
+            .build();
+        let attach_document = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name("wassup-document-symbolic")
+                    .label(gettext("Document"))
+                    .halign(gtk::Align::Start)
+                    .build(),
+            )
+            .css_classes(["flat"])
+            .build();
+        let attach_items = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        attach_items.append(&attach_media);
+        attach_items.append(&attach_document);
+        let attach_popover = gtk::Popover::builder().child(&attach_items).build();
+        let attach = gtk::MenuButton::builder()
             .icon_name("wassup-attach-symbolic")
-            .tooltip_text(gettext("Send a File"))
+            .tooltip_text(gettext("Attach"))
             .valign(gtk::Align::End)
+            .popover(&attach_popover)
             .css_classes(["circular", "flat"])
             .build();
         // Sticker picker: stickers recently sent or received.
@@ -964,11 +990,18 @@ impl Window {
             ui,
             move |_| ui.choose_sticker_image()
         ));
-        attach.connect_clicked(glib::clone!(
-            #[weak]
-            ui,
-            move |_| ui.choose_file()
-        ));
+        for (button, as_document) in [(&attach_media, false), (&attach_document, true)] {
+            button.connect_clicked(glib::clone!(
+                #[weak]
+                ui,
+                #[weak]
+                attach_popover,
+                move |_| {
+                    attach_popover.popdown();
+                    ui.choose_file(as_document);
+                }
+            ));
+        }
         owner.set(Rc::downgrade(&ui)).ok();
         // Stickers made by a previous run that never reached the daemon.
         if let Ok(entries) = std::fs::read_dir(outgoing_dir()) {
@@ -1752,11 +1785,24 @@ impl Window {
         }
     }
 
-    fn choose_file(self: &Rc<Self>) {
+    fn choose_file(self: &Rc<Self>, as_document: bool) {
         let dialog = gtk::FileDialog::builder()
-            .title(gettext("Send a File"))
+            .title(if as_document {
+                gettext("Send a Document")
+            } else {
+                gettext("Send Photos or Videos")
+            })
             .modal(true)
             .build();
+        if !as_document {
+            let media = gtk::FileFilter::new();
+            media.set_name(Some(&gettext("Photos and videos")));
+            media.add_mime_type("image/*");
+            media.add_mime_type("video/*");
+            let filters = gio::ListStore::new::<gtk::FileFilter>();
+            filters.append(&media);
+            dialog.set_filters(Some(&filters));
+        }
         let ui = Rc::downgrade(self);
         dialog.open(
             Some(&self.window),
@@ -1766,14 +1812,14 @@ impl Window {
                     return; // Closed, or cancelled.
                 };
                 if let Some(path) = file.path() {
-                    ui.preview_file(&path.to_string_lossy());
+                    ui.preview_file(&path.to_string_lossy(), as_document);
                 }
             },
         );
     }
 
     /// Sends a file with a caption. Returns whether the request went out.
-    fn send_file(&self, path: &str, caption: &str) -> bool {
+    fn send_file(&self, path: &str, caption: &str, as_document: bool) -> bool {
         let Some((account_id, chat_jid)) = self.open_ids() else {
             return false;
         };
@@ -1784,6 +1830,7 @@ impl Window {
             path: path.to_owned(),
             caption: caption.clone(),
             as_sticker: false,
+            as_document,
         });
         let Some(id) = self.send(request) else {
             return false;

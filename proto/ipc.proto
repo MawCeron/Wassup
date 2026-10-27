@@ -299,6 +299,9 @@ message SendMedia {
   string caption = 4;
   // Send a 512x512 WebP file as a sticker instead.
   bool as_sticker = 5;
+  // Send as a document whatever the file is, so photos and videos keep
+  // their full quality.
+  bool as_document = 6;
 }
 
 // The user's favorite stickers, synced from the phone, then the stickers

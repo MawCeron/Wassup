@@ -489,7 +489,7 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		// connection's other requests.
 		go func() {
 			done := &ipc.Event{RequestId: req.GetId()}
-			msg, chat, err := a.sendMedia(context.Background(), r.GetChatJid(), r.GetPath(), r.GetCaption(), r.GetAsSticker())
+			msg, chat, err := a.sendMedia(context.Background(), r.GetChatJid(), r.GetPath(), r.GetCaption(), r.GetAsSticker(), r.GetAsDocument())
 			if err != nil {
 				done.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
 			} else {
