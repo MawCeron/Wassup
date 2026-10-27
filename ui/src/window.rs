@@ -494,7 +494,25 @@ impl Window {
             .popover(&sticker_popover)
             .css_classes(["circular", "flat"])
             .build();
+        // GTK's own emoji picker, inserting at the cursor.
+        let emoji_chooser = gtk::EmojiChooser::new();
+        let emoji_button = gtk::MenuButton::builder()
+            .icon_name("wassup-emoji-symbolic")
+            .tooltip_text(gettext("Emoji"))
+            .valign(gtk::Align::End)
+            .popover(&emoji_chooser)
+            .css_classes(["circular", "flat"])
+            .build();
+        emoji_chooser.connect_emoji_picked(glib::clone!(
+            #[weak]
+            composer,
+            move |_, emoji| {
+                composer.buffer().insert_at_cursor(emoji);
+                composer.grab_focus();
+            }
+        ));
         composer_bar.append(&attach);
+        composer_bar.append(&emoji_button);
         composer_bar.append(&stickers_button);
         composer_bar.append(&composer_scroll);
         composer_bar.append(&send_button);
