@@ -384,7 +384,8 @@ func (d *daemon) onMessage(a *account, e *events.Message) {
 	}
 	d.broadcast(&ipc.Event{Kind: &ipc.Event_MessageReceived{MessageReceived: msg}})
 	d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
-	if a.isNews(msg) && !d.isActive(chatKey(a.id, chat.Jid)) && !a.muted(ctx, e.Info.Chat) {
+	// A mention of the user notifies even in a chat the user muted, as on the phone.
+	if a.isNews(msg) && !d.isActive(chatKey(a.id, chat.Jid)) && (!a.muted(ctx, e.Info.Chat) || a.mentionsMe(e.Message)) {
 		d.notify.message(chat, msg)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
@@ -80,4 +81,34 @@ func (a *account) namedMentions(ctx context.Context, text string) string {
 		return text
 	}
 	return withMentionNames(text, a.mentionsIn(ctx, text, map[string]string{}))
+}
+
+// mentionsUser reports whether a message mentions any of these users, given
+// as the user part of an id: the ids a message lists as mentioned may be
+// phone numbers or LIDs.
+func mentionsUser(m *waE2E.Message, users ...string) bool {
+	for _, c := range contextsOf(m) {
+		for _, id := range c.GetMentionedJID() {
+			jid, err := types.ParseJID(id)
+			if err != nil || jid.User == "" {
+				continue
+			}
+			for _, user := range users {
+				if user != "" && jid.User == user {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// mentionsMe reports whether a message mentions the account's user.
+func (a *account) mentionsMe(m *waE2E.Message) bool {
+	store := a.client.Store
+	var phone string
+	if store.ID != nil {
+		phone = store.ID.User
+	}
+	return mentionsUser(m, phone, store.LID.User)
 }

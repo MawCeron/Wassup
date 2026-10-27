@@ -4,6 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"go.mau.fi/whatsmeow/proto/waE2E"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/MawCeron/Wassup/daemon/ipc"
 )
 
@@ -40,5 +43,32 @@ func TestMentionsOfUnknownPeopleAreLeftOut(t *testing.T) {
 	}
 	if got := a.namedMentions(ctx, "hola @5215551111111"); got != "hola @5215551111111" {
 		t.Errorf("an unknown number changed: %q", got)
+	}
+}
+
+func TestMentionsUser(t *testing.T) {
+	mentioning := func(ids ...string) *waE2E.Message {
+		return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text: proto.String("hola"), ContextInfo: &waE2E.ContextInfo{MentionedJID: ids},
+		}}
+	}
+	phone, lid := "5215551111111", "98765432109876"
+	for name, tc := range map[string]struct {
+		message *waE2E.Message
+		want    bool
+	}{
+		"by phone number": {mentioning("5215551111111@s.whatsapp.net"), true},
+		"by LID":          {mentioning("5215550000000@s.whatsapp.net", "98765432109876@lid"), true},
+		"somebody else":   {mentioning("5215550000000@s.whatsapp.net"), false},
+		"nobody":          {mentioning(), false},
+		"no context":      {&waE2E.Message{Conversation: proto.String("hola")}, false},
+		"a bad id":        {mentioning("not an id"), false},
+	} {
+		if got := mentionsUser(tc.message, phone, lid); got != tc.want {
+			t.Errorf("%s: mentionsUser = %v, want %v", name, got, tc.want)
+		}
+	}
+	if mentionsUser(mentioning("@s.whatsapp.net"), "") {
+		t.Error("an empty user matched")
 	}
 }
