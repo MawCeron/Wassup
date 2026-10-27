@@ -3271,8 +3271,10 @@ func (x *ParticipantList) GetParticipants() []*Participant {
 type Participant struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The id to mention: the one the group uses to address the person.
-	Jid           string `protobuf:"bytes,1,opt,name=jid,proto3" json:"jid,omitempty"`
-	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Jid  string `protobuf:"bytes,1,opt,name=jid,proto3" json:"jid,omitempty"`
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Cached picture, empty when the person has none here.
+	AvatarPath    string `protobuf:"bytes,3,opt,name=avatar_path,json=avatarPath,proto3" json:"avatar_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3317,6 +3319,13 @@ func (x *Participant) GetJid() string {
 func (x *Participant) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *Participant) GetAvatarPath() string {
+	if x != nil {
+		return x.AvatarPath
 	}
 	return ""
 }
@@ -4181,10 +4190,12 @@ const file_ipc_proto_rawDesc = "" +
 	"\bchat_jid\x18\x02 \x01(\tR\achatJid\"l\n" +
 	"\x0fParticipantList\x12\x19\n" +
 	"\bchat_jid\x18\x01 \x01(\tR\achatJid\x12>\n" +
-	"\fparticipants\x18\x02 \x03(\v2\x1a.wassup.ipc.v1.ParticipantR\fparticipants\"3\n" +
+	"\fparticipants\x18\x02 \x03(\v2\x1a.wassup.ipc.v1.ParticipantR\fparticipants\"T\n" +
 	"\vParticipant\x12\x10\n" +
 	"\x03jid\x18\x01 \x01(\tR\x03jid\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"M\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vavatar_path\x18\x03 \x01(\tR\n" +
+	"avatarPath\"M\n" +
 	"\vUnlockChats\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1f\n" +

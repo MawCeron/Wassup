@@ -402,6 +402,8 @@ message Participant {
   // The id to mention: the one the group uses to address the person.
   string jid = 1;
   string name = 2;
+  // Cached picture, empty when the person has none here.
+  string avatar_path = 3;
 }
 
 // Checks the secret code set on the phone for locked chats. Answered with

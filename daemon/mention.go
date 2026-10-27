@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -139,8 +140,10 @@ func mentionedIn(text string, ids []string) []string {
 }
 
 // participantList names the members of a group, without the user, in
-// alphabetical order. name gives the best known name of a member, or "".
-func participantList(members []types.GroupParticipant, self []string, name func(types.JID) string) []*ipc.Participant {
+// alphabetical order. name gives the best known name of a member, or "", and
+// phone the phone number of an id that is not one, or "", and
+// avatar the cached picture of the first of some ids that has one, or "".
+func participantList(members []types.GroupParticipant, self []string, name func(types.JID) string, phone func(types.JID) string, avatar func(...types.JID) string) []*ipc.Participant {
 	var people []*ipc.Participant
 	for _, m := range members {
 		jid := m.JID.ToNonAD()
@@ -148,16 +151,27 @@ func participantList(members []types.GroupParticipant, self []string, name func(
 			continue
 		}
 		shown := name(jid)
+		for _, other := range []types.JID{m.PhoneNumber, m.LID} {
+			if shown == "" && !other.IsEmpty() {
+				shown = name(other.ToNonAD())
+			}
+		}
 		if shown == "" {
 			shown = m.DisplayName
 		}
 		if shown == "" {
-			shown = m.PhoneNumber.User
+			// No name at all: the phone number, as WhatsApp shows it.
+			if shown = m.PhoneNumber.User; shown == "" {
+				shown = phone(jid)
+			}
+			if shown != "" {
+				shown = "+" + shown
+			}
 		}
 		if shown == "" {
 			shown = jid.User
 		}
-		people = append(people, &ipc.Participant{Jid: jid.String(), Name: shown})
+		people = append(people, &ipc.Participant{Jid: jid.String(), Name: shown, AvatarPath: avatar(jid, m.PhoneNumber, m.LID)})
 	}
 	sort.Slice(people, func(i, j int) bool {
 		return strings.ToLower(people[i].Name) < strings.ToLower(people[j].Name)
@@ -205,7 +219,42 @@ func (a *account) listParticipants(ctx context.Context, chat string) ([]*ipc.Par
 		self = append(self, store.ID.User)
 	}
 	self = append(self, store.LID.User)
-	people := participantList(info.Participants, self, func(j types.JID) string { return a.contactName(ctx, j) })
+	people := participantList(info.Participants, self, func(j types.JID) string { return a.contactName(ctx, j) },
+		func(j types.JID) string { return a.phoneOf(ctx, j) },
+		func(ids ...types.JID) string { return a.cachedAvatar(ctx, ids...) })
 	participantsCache.Store(key, cachedParticipants{at: time.Now(), people: people})
 	return people, nil
+}
+
+// cachedAvatar is the cached picture of the chat of the first of these ids
+// that has one: a member's picture is only kept when they have a chat here.
+func (a *account) cachedAvatar(ctx context.Context, ids ...types.JID) string {
+	for _, id := range ids {
+		if id.IsEmpty() {
+			continue
+		}
+		var avatarID string
+		if a.db.QueryRowContext(ctx, `SELECT avatar_id FROM wassup_chats WHERE jid = ?`, id.ToNonAD().String()).Scan(&avatarID) != nil {
+			continue
+		}
+		if path := a.avatarPath(id.ToNonAD().String(), avatarID); path != "" {
+			if _, err := os.Stat(path); err == nil {
+				return path
+			}
+		}
+	}
+	return ""
+}
+
+// phoneOf is the phone number behind a LID, or "" when it is not known.
+func (a *account) phoneOf(ctx context.Context, id types.JID) string {
+	if id.Server == types.DefaultUserServer {
+		return id.User
+	}
+	if lids := a.client.Store.LIDs; lids != nil {
+		if pn, err := lids.GetPNForLID(ctx, id); err == nil {
+			return pn.User
+		}
+	}
+	return ""
 }

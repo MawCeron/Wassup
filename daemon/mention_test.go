@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -89,14 +90,15 @@ func TestParticipantListSkipsTheUserAndSortsByName(t *testing.T) {
 		{JID: types.NewJID("222222", types.HiddenUserServer)},
 		{JID: types.NewJID("333333", types.HiddenUserServer), PhoneNumber: types.NewJID("5215553333333", types.DefaultUserServer)},
 		{JID: types.NewJID("444444", types.HiddenUserServer)},
+		{JID: types.NewJID("555555", types.HiddenUserServer)},
 	}
 	names := map[string]string{"111111": "zoe", "222222": "Ana"}
-	got := participantList(members, []string{"444444"}, func(j types.JID) string { return names[j.User] })
+	got := participantList(members, []string{"444444"}, func(j types.JID) string { return names[j.User] }, func(j types.JID) string { return map[string]string{"555555": "5215555555555"}[j.User] }, func(...types.JID) string { return "" })
 	var order []string
 	for _, p := range got {
 		order = append(order, p.Name)
 	}
-	if want := []string{"5215553333333", "Ana", "zoe"}; len(order) != 3 || order[0] != want[0] || order[1] != want[1] || order[2] != want[2] {
+	if want := []string{"+5215553333333", "+5215555555555", "Ana", "zoe"}; strings.Join(order, ",") != strings.Join(want, ",") {
 		t.Errorf("names = %v, want %v", order, want)
 	}
 }
