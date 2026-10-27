@@ -41,11 +41,14 @@ Two processes talk over a Unix socket with Protocol Buffers:
 
 ## Memory
 
-With one account and one chat, the daemon and the UI together use about
-64 MB (PSS), against 384 MB for Whats4Linux and over 1 GB for the clients
-that wrap WhatsApp Web. The accounts differ in history, so read it as an
-order of magnitude. Method, caveats and every figure are in
-[`docs/performance.md`](docs/performance.md).
+With a real account of 29 chats and about 3,500 messages and no chat open,
+the daemon and the UI together use about 64 MB (PSS), against 384 MB for
+Whats4Linux and over 1 GB for the clients that wrap WhatsApp Web (1.3 GB
+for Karere on the same account). The accounts differ in history, so read
+it as an order of magnitude. Emoji are drawn with Twemoji, which the
+package recommends, because the default emoji font makes the UI grow by
+hundreds of megabytes once emoji are shown. Method, caveats and every
+figure are in [`docs/performance.md`](docs/performance.md).
 
 ## Building
 
