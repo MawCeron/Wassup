@@ -302,6 +302,8 @@ message SendMedia {
   // Send as a document whatever the file is, so photos and videos keep
   // their full quality.
   bool as_document = 6;
+  // Send an Ogg Opus recording as a voice note.
+  bool voice_note = 7;
 }
 
 // The user's favorite stickers, synced from the phone, then the stickers

@@ -317,7 +317,7 @@ func evictMedia(root string, limit int64) error {
 
 // sendMedia uploads a local file and sends it: JPEG and PNG as a photo,
 // anything else as a document, or a WebP file as a sticker if asked.
-func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asSticker, asDocument bool) (*ipc.Message, *ipc.Chat, error) {
+func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asSticker, asDocument, voiceNote bool) (*ipc.Message, *ipc.Chat, error) {
 	if !a.client.IsLoggedIn() {
 		return nil, nil, errors.New("account is not connected")
 	}
@@ -339,6 +339,9 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asS
 	if asSticker && sniffed != "image/webp" {
 		return nil, nil, errors.New("stickers must be WebP images")
 	}
+	if voiceNote && sniffed != "application/ogg" {
+		return nil, nil, errors.New("voice notes must be Ogg Opus recordings")
+	}
 	mimeType := sniffed
 	if byName := mime.TypeByExtension(filepath.Ext(path)); !photo && !video && byName != "" {
 		mimeType = byName
@@ -359,6 +362,8 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asS
 		kind = whatsmeow.MediaImage // Stickers use the image keys too.
 	} else if video {
 		kind = whatsmeow.MediaVideo
+	} else if voiceNote {
+		kind = whatsmeow.MediaAudio
 	}
 	up, err := a.client.UploadReader(ctx, f, tmp, kind)
 	if err != nil {
@@ -388,6 +393,17 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asS
 			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: &mimeType,
 			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
 			Width: proto.Uint32(uint32(size.Width)), Height: proto.Uint32(uint32(size.Height)), Caption: text,
+		}}
+	} else if voiceNote {
+		info, err := f.Stat()
+		if err != nil {
+			return nil, nil, err
+		}
+		content = &waE2E.Message{AudioMessage: &waE2E.AudioMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey,
+			Mimetype:      proto.String("audio/ogg; codecs=opus"),
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			Seconds: proto.Uint32(oggOpusSeconds(f, info.Size())), PTT: proto.Bool(true),
 		}}
 	} else if video {
 		info, err := f.Stat()
