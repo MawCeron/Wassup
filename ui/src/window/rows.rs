@@ -882,18 +882,17 @@ pub(super) const IMAGE_MAX: i32 = 280;
 pub(super) const STICKER_MAX: i32 = 160;
 
 /// On-screen size of media, scaled down to fit and keeping its proportions.
-/// Stickers then sit centered in a fixed square; see fit_picture.
+/// Stickers are always shown in the same square, whatever size the sender
+/// announced: most do not announce one, and some announce a small one.
 pub(super) fn media_size(media: &ipc::Media) -> (i32, i32) {
-    let max = if media.kind() == ipc::MediaKind::Sticker {
-        STICKER_MAX
-    } else {
-        IMAGE_MAX
-    };
+    if media.kind() == ipc::MediaKind::Sticker {
+        return (STICKER_MAX, STICKER_MAX);
+    }
     let (w, h) = (media.width as f64, media.height as f64);
     if w <= 0.0 || h <= 0.0 {
-        return (max, max * 3 / 4);
+        return (IMAGE_MAX, IMAGE_MAX * 3 / 4);
     }
-    let scale = (max as f64 / w).min(max as f64 / h).min(1.0);
+    let scale = (IMAGE_MAX as f64 / w).min(IMAGE_MAX as f64 / h).min(1.0);
     (
         (w * scale).round().max(1.0) as i32,
         (h * scale).round().max(1.0) as i32,
@@ -1087,12 +1086,15 @@ mod tests {
             (280, 210),
             "unknown size gets a default box"
         );
-        let sticker = ipc::Media {
-            kind: ipc::MediaKind::Sticker as i32,
-            width: 512,
-            height: 512,
-            ..Default::default()
-        };
-        assert_eq!(media_size(&sticker), (160, 160));
+        // Stickers have one size, with the dimensions the sender announced or without them.
+        for (width, height) in [(512, 512), (64, 64), (0, 0), (512, 300)] {
+            let sticker = ipc::Media {
+                kind: ipc::MediaKind::Sticker as i32,
+                width,
+                height,
+                ..Default::default()
+            };
+            assert_eq!(media_size(&sticker), (160, 160), "{width}x{height}");
+        }
     }
 }
