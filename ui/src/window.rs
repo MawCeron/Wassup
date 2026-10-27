@@ -154,6 +154,10 @@ pub struct Window {
     restore_chat: RefCell<Option<String>>,
     /// Showing the chats locked on the phone, after their secret code.
     restricted: Rc<Cell<bool>>,
+    chat_search: gtk::SearchEntry,
+    chat_query: Rc<RefCell<String>>,
+    /// The chat list, or a message when the search matches nothing.
+    sidebar_stack: gtk::Stack,
     chat_filter: gtk::CustomFilter,
     shown_chats: gtk::FilterListModel,
     restricted_entry: gtk::Button,
@@ -272,11 +276,15 @@ impl Window {
         let chats = gio::ListStore::new::<glib::BoxedAnyObject>();
         // Locked chats show only in the restricted view, and only there.
         let restricted = Rc::new(Cell::new(false));
+        // What is typed in the chat search, folded by search_key.
+        let chat_query = Rc::new(RefCell::new(String::new()));
         let chat_filter = gtk::CustomFilter::new({
-            let restricted = restricted.clone();
+            let (restricted, query) = (restricted.clone(), chat_query.clone());
             move |item| {
                 let chat = item.downcast_ref::<glib::BoxedAnyObject>().unwrap();
-                chat.borrow::<ipc::Chat>().locked == restricted.get()
+                let chat = chat.borrow::<ipc::Chat>();
+                chat.locked == restricted.get()
+                    && search_key(&chat_title(&chat)).contains(query.borrow().as_str())
             }
         });
         let shown_chats = gtk::FilterListModel::new(Some(chats.clone()), Some(chat_filter.clone()));
@@ -327,14 +335,31 @@ impl Window {
         let chat_column = gtk::Box::new(gtk::Orientation::Vertical, 0);
         chat_column.append(&restricted_entry);
         chat_column.append(&chat_list);
-        let sidebar = adw::ToolbarView::new();
-        sidebar.add_top_bar(&sidebar_header);
-        sidebar.set_content(Some(
+        let chat_search = gtk::SearchEntry::builder()
+            .placeholder_text(gettext("Search chats"))
+            .margin_start(6)
+            .margin_end(6)
+            .margin_bottom(6)
+            .build();
+        let no_chats_found = adw::StatusPage::builder()
+            .icon_name("edit-find-symbolic")
+            .title(gettext("No Chats Found"))
+            .description(gettext("No chat or group has that name"))
+            .css_classes(["compact"])
+            .build();
+        let sidebar_stack = gtk::Stack::new();
+        sidebar_stack.add_named(
             &gtk::ScrolledWindow::builder()
                 .hscrollbar_policy(gtk::PolicyType::Never)
                 .child(&chat_column)
                 .build(),
-        ));
+            Some("chats"),
+        );
+        sidebar_stack.add_named(&no_chats_found, Some("empty"));
+        let sidebar = adw::ToolbarView::new();
+        sidebar.add_top_bar(&sidebar_header);
+        sidebar.add_top_bar(&chat_search);
+        sidebar.set_content(Some(&sidebar_stack));
         let placeholder = adw::StatusPage::builder()
             .icon_name("chat-message-new-symbolic")
             .title(gettext("No Chat Selected"))
@@ -554,6 +579,9 @@ impl Window {
             chat_selection,
             chat_list,
             restricted,
+            chat_search,
+            chat_query,
+            sidebar_stack,
             chat_filter,
             shown_chats,
             restricted_entry,
@@ -607,6 +635,25 @@ impl Window {
         ));
         ui.window.add_action(&preferences);
         app.set_accels_for_action("win.preferences", &["<Control>comma"]);
+        ui.chat_search.connect_search_changed(glib::clone!(
+            #[weak]
+            ui,
+            move |entry| ui.filter_chats(&entry.text())
+        ));
+        // Escape in the search box clears it.
+        ui.chat_search
+            .connect_stop_search(|entry| entry.set_text(""));
+        let search_chats = gio::SimpleAction::new("search-chats", None);
+        search_chats.connect_activate(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _| {
+                ui.split.set_show_content(false);
+                ui.chat_search.grab_focus();
+            }
+        ));
+        ui.window.add_action(&search_chats);
+        app.set_accels_for_action("win.search-chats", &["<Control>f"]);
         let shortcuts = gio::SimpleAction::new("shortcuts", None);
         shortcuts.connect_activate(glib::clone!(
             #[weak]
@@ -1161,6 +1208,22 @@ impl Window {
         })
     }
 
+    fn filter_chats(&self, text: &str) {
+        let query = search_key(text.trim());
+        let wider = query.starts_with(self.chat_query.borrow().as_str());
+        let narrower = self.chat_query.borrow().starts_with(query.as_str());
+        self.chat_query.replace(query);
+        self.chat_filter.changed(match (wider, narrower) {
+            (true, false) => gtk::FilterChange::MoreStrict,
+            (false, true) => gtk::FilterChange::LessStrict,
+            _ => gtk::FilterChange::Different,
+        });
+        let nothing = self.shown_chats.n_items() == 0 && !self.chat_query.borrow().is_empty();
+        self.sidebar_stack
+            .set_visible_child_name(if nothing { "empty" } else { "chats" });
+        self.reselect_current();
+    }
+
     /// Position of a chat in the list on screen, which hides either the
     /// locked chats or the others.
     fn shown_position(&self, jid: &str) -> Option<u32> {
@@ -1337,6 +1400,7 @@ impl Window {
         dialog.add(section(
             Some(gettext("Chats")),
             &[
+                (gettext("Search chats"), "<Control>f"),
                 (gettext("Open the next or previous chat"), "Up Down"),
                 (gettext("Write in the open chat"), "Return"),
                 (gettext("Back to the chat list"), "Escape"),
@@ -1936,6 +2000,16 @@ fn with_header(child: &impl IsA<gtk::Widget>) -> adw::ToolbarView {
     view
 }
 
+/// Text folded for searching: lowercase and without accents, so "noemi"
+/// finds "Noemí".
+fn search_key(text: &str) -> String {
+    glib::normalize(text.to_lowercase(), glib::NormalizeMode::All)
+        .chars()
+        // Combining diacritical marks, left apart by the decomposition.
+        .filter(|c| !('\u{300}'..='\u{36f}').contains(c))
+        .collect()
+}
+
 /// A chat's name, or its phone number when the name is unknown.
 fn chat_title(chat: &ipc::Chat) -> String {
     if chat.name.is_empty() {
@@ -1978,6 +2052,13 @@ fn time_of_day(ms: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn search_ignores_case_and_accents() {
+        assert_eq!(search_key("Noemí Cerón"), "noemi ceron");
+        assert!(search_key("Familia MEDINA").contains(&search_key("medi")));
+        assert_eq!(search_key("Ñandú"), "nandu");
+    }
 
     #[test]
     fn hidden_ids_are_not_shown_as_numbers() {
