@@ -75,9 +75,22 @@ When the font changes, update the version and the three checksums there and
 
 The `License:` tag holds Wassup's own license, GPL-3.0-or-later. The code
 Wassup bundles, the Go modules and Rust crates of the vendored
-dependencies and the emoji font, keeps its own licenses. The package
-installs the emoji font's `NOTICE` and the CC BY 4.0 text of the Twemoji
-graphics with Wassup's own `LICENSE`.
+dependencies and the emoji font, keeps its own licenses, which the About
+dialog lists on its Legal page: one section per license, with the packages
+that use it, their copyright notices and the license text. The package
+also installs the emoji font's `NOTICE` and the CC BY 4.0 text of the
+Twemoji graphics with Wassup's own `LICENSE`.
+
+The Legal page comes from `ui/src/window/third_party.rs`, which
+`packaging/third-party.py` generates from the dependencies that end up in
+each binary (`cargo tree` and `go list -deps`) and from their license files
+in the Cargo registry and the Go module cache, and adds SQLite and the font
+(its texts are in `data/licenses/`). When dependencies change, run
+`cargo fetch --manifest-path ui/Cargo.toml && (cd daemon && go mod download)`
+and then the script, and commit the result. A crate with two licenses to
+choose from is listed under the first of MIT, Apache-2.0, Zlib and the BSD
+licenses; a package whose crate carries no license file appears without a
+copyright notice of its own.
 
 ## Releases
 
