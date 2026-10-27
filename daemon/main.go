@@ -269,6 +269,11 @@ func (d *daemon) serve(ln net.Listener) {
 			}
 			return
 		}
+		if err := checkPeer(conn); err != nil {
+			slog.Warn("refused connection", "err", err)
+			conn.Close()
+			continue
+		}
 		d.mu.Lock()
 		d.conns[conn] = struct{}{}
 		d.mu.Unlock()

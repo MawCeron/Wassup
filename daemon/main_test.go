@@ -200,3 +200,33 @@ func TestViewOnceNoticeBecomesMessage(t *testing.T) {
 		t.Fatalf("messages %v, %v", msgs, err)
 	}
 }
+
+func TestCheckPeer(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	ln, err := listen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	path, _ := socketPath()
+	go func() {
+		if c, err := net.Dial("unix", path); err == nil {
+			defer c.Close()
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+	conn, err := ln.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := checkPeer(conn); err != nil {
+		t.Fatalf("own process refused: %v", err)
+	}
+	a, b := net.Pipe()
+	defer a.Close()
+	defer b.Close()
+	if checkPeer(a) == nil {
+		t.Fatal("accepted a connection that is not a Unix socket")
+	}
+}
