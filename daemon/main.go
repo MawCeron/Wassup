@@ -178,13 +178,15 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 			case *events.Connected, *events.Disconnected, *events.LoggedOut, *events.StreamReplaced:
 				if _, ok := e.(*events.Connected); ok {
 					a.connectedAt.Store(time.Now().UnixMilli())
-					go a.resyncFavorites(context.Background())
+					go a.resyncAppState(context.Background())
 				} else {
 					a.connectedAt.Store(0)
 				}
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
 			case *events.AppState:
-				a.onAppState(context.Background(), e.Index, e.SyncActionValue)
+				if chat := a.onAppState(context.Background(), e.Index, e.SyncActionValue); chat != nil {
+					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+				}
 			case *events.GroupInfo:
 				if g := e.Ephemeral; g != nil {
 					timer := g.DisappearingTimer
@@ -443,6 +445,18 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		} else {
 			ev.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}
 			d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+		}
+	case *ipc.Request_UnlockChats:
+		if a := d.find(k.UnlockChats.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else if err := a.unlockChats(context.Background(), k.UnlockChats.GetSecretCode()); err != nil {
+			// Slows guessing; the code is short and the hash is local.
+			if errors.Is(err, errWrongSecretCode) {
+				time.Sleep(time.Second)
+			}
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
 		}
 	case *ipc.Request_FetchAvatar:
 		if a := d.find(k.FetchAvatar.GetAccountId()); a == nil {

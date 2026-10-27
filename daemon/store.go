@@ -72,6 +72,9 @@ ALTER TABLE wassup_messages ADD COLUMN quote BLOB;
 ALTER TABLE wassup_chats ADD COLUMN disappearing_seconds INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE wassup_messages ADD COLUMN expires_at_ms INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX wassup_messages_by_expiry ON wassup_messages (expires_at_ms) WHERE expires_at_ms > 0;
+`, `
+-- Chats locked on the phone, by any of their ids.
+CREATE TABLE wassup_locked_chats (jid TEXT PRIMARY KEY);
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -328,12 +331,13 @@ func (a *account) named(ctx context.Context, chat *ipc.Chat) *ipc.Chat {
 	return chat
 }
 
-const chatQuery = `SELECT jid, name, is_group, unread_count, last_message_at_ms, avatar_id FROM wassup_chats`
+const chatQuery = `SELECT jid, name, is_group, unread_count, last_message_at_ms, avatar_id,
+	EXISTS (SELECT 1 FROM wassup_locked_chats l WHERE l.jid = wassup_chats.jid) FROM wassup_chats`
 
 func (a *account) scanChat(row interface{ Scan(...any) error }) (*ipc.Chat, error) {
 	c := &ipc.Chat{AccountId: a.id}
 	var avatarID string
-	if err := row.Scan(&c.Jid, &c.Name, &c.IsGroup, &c.UnreadCount, &c.LastMessageAtMs, &avatarID); err != nil {
+	if err := row.Scan(&c.Jid, &c.Name, &c.IsGroup, &c.UnreadCount, &c.LastMessageAtMs, &avatarID, &c.Locked); err != nil {
 		return nil, err
 	}
 	if path := a.avatarPath(c.Jid, avatarID); path != "" {

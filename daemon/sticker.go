@@ -89,12 +89,34 @@ func (a *account) sendSticker(ctx context.Context, chat, sourceChat, sourceID, f
 	return a.send(ctx, chat, &waE2E.Message{StickerMessage: sticker})
 }
 
-// onAppState keeps the favorite stickers in step with the phone.
-func (a *account) onAppState(ctx context.Context, index []string, value *waSyncAction.SyncActionValue) {
-	if len(index) < 2 || index[0] != appstate.IndexFavoriteSticker {
-		return
+// onAppState keeps favorite stickers and chat locks in step with the
+// phone. It returns a chat whose lock changed, for the UIs.
+func (a *account) onAppState(ctx context.Context, index []string, value *waSyncAction.SyncActionValue) *ipc.Chat {
+	if len(index) == 0 {
+		return nil
 	}
-	id, action := index[1], value.GetStickerAction()
+	switch index[0] {
+	case appstate.IndexFavoriteSticker:
+		if len(index) > 1 {
+			a.onFavorite(ctx, index[1], value)
+		}
+	case appstate.IndexLock:
+		if len(index) > 1 {
+			if err := a.setLocked(ctx, index[1], value.GetLockChatAction().GetLocked()); err != nil {
+				a.log.Warn("chat lock", "err", err)
+			}
+			return a.lockedChat(ctx, index[1])
+		}
+	case appstate.IndexSettingChatLock:
+		if err := a.saveLockSettings(ctx, value.GetChatLockSettings()); err != nil {
+			a.log.Warn("chat lock settings", "err", err)
+		}
+	}
+	return nil
+}
+
+func (a *account) onFavorite(ctx context.Context, id string, value *waSyncAction.SyncActionValue) {
+	action := value.GetStickerAction()
 	if action == nil || !action.GetIsFavorite() || action.GetIsLottie() {
 		if _, err := a.db.ExecContext(ctx, `DELETE FROM wassup_favorite_stickers WHERE id = ?`, id); err != nil {
 			a.log.Warn("remove favorite sticker", "err", err)
@@ -119,12 +141,16 @@ func (a *account) onAppState(ctx context.Context, index []string, value *waSyncA
 	a.fetchFavorite(id, action)
 }
 
-// resyncFavorites replays the whole app state once, to learn the
-// favorites the phone already had when this version first connected.
-func (a *account) resyncFavorites(ctx context.Context) {
+// appStateVersion is bumped whenever a new kind of app state entry is
+// handled, so the next connection replays the whole app state once to
+// learn what the phone already had.
+const appStateVersion = "2" // 1: favorite stickers. 2: chat locks.
+
+// resyncAppState replays the whole app state if this version has not yet.
+func (a *account) resyncAppState(ctx context.Context) {
 	var done string
-	a.db.QueryRowContext(ctx, `SELECT value FROM wassup_meta WHERE key = 'favorites_synced'`).Scan(&done)
-	if done != "" {
+	a.db.QueryRowContext(ctx, `SELECT value FROM wassup_meta WHERE key = 'app_state_version'`).Scan(&done)
+	if done == appStateVersion {
 		return
 	}
 	for _, name := range appstate.AllPatchNames {
@@ -133,10 +159,11 @@ func (a *account) resyncFavorites(ctx context.Context) {
 			return // Retried on the next connection.
 		}
 	}
-	var n int
-	a.db.QueryRowContext(ctx, `SELECT count(*) FROM wassup_favorite_stickers`).Scan(&n)
-	a.log.Info("favorite stickers synced", "count", n)
-	a.db.ExecContext(ctx, `INSERT OR REPLACE INTO wassup_meta (key, value) VALUES ('favorites_synced', '1')`)
+	var favorites, locked int
+	a.db.QueryRowContext(ctx, `SELECT count(*) FROM wassup_favorite_stickers`).Scan(&favorites)
+	a.db.QueryRowContext(ctx, `SELECT count(*) FROM wassup_locked_chats`).Scan(&locked)
+	a.log.Info("app state synced", "favorite_stickers", favorites, "locked_chat_ids", locked)
+	a.db.ExecContext(ctx, `INSERT OR REPLACE INTO wassup_meta (key, value) VALUES ('app_state_version', ?)`, appStateVersion)
 }
 
 // favoriteHash recovers the decrypted file's hash, which the sync carries

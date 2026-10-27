@@ -137,6 +137,10 @@ func (n *notifier) openChat(account, chat, token string) {
 
 // notificationText builds the title and body for a received message.
 func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title, body string) {
+	if chat.Locked {
+		// Locking a chat on the phone hides who wrote and what.
+		return "Wassup", "New message"
+	}
 	title = chat.Name
 	if title == "" {
 		title = "New message"

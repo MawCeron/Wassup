@@ -23,6 +23,7 @@ message Request {
     FetchAvatar fetch_avatar = 11;
     ListStickers list_stickers = 12;
     SendSticker send_sticker = 13;
+    UnlockChats unlock_chats = 14;
   }
 }
 
@@ -146,6 +147,9 @@ message Chat {
   // Profile or group picture in the daemon's cache; empty when there is
   // none or it has not been fetched yet.
   string avatar_path = 7;
+  // Locked on the phone: the UI keeps it out of sight until unlocked, and
+  // its notifications carry no sender or preview.
+  bool locked = 8;
 }
 
 message Message {
@@ -252,6 +256,14 @@ message SendSticker {
   string source_message_id = 4;
   // Sends a favorite instead of a sticker from a message.
   string favorite_id = 5;
+}
+
+// Checks the secret code set on the phone for locked chats. Answered with
+// ack if it matches, error otherwise. The code is verified against the
+// phone's salted hash; neither leaves the daemon.
+message UnlockChats {
+  string account_id = 1;
+  string secret_code = 2;
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with
