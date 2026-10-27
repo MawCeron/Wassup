@@ -49,6 +49,8 @@ func withExpiration(content *waE2E.Message, secs uint32) *waE2E.Message {
 		set(&m.DocumentMessage.ContextInfo)
 	case m.AudioMessage != nil:
 		set(&m.AudioMessage.ContextInfo)
+	case m.VideoMessage != nil:
+		set(&m.VideoMessage.ContextInfo)
 	case m.StickerMessage != nil:
 		set(&m.StickerMessage.ContextInfo)
 	}
@@ -115,6 +117,12 @@ func (a *account) expire(ctx context.Context, now time.Time) (map[string][]strin
 		return nil, nil
 	}
 	_, err = a.db.ExecContext(ctx, `DELETE FROM wassup_messages WHERE expires_at_ms > 0 AND expires_at_ms <= ?`, now.UnixMilli())
+	if err != nil {
+		return nil, err
+	}
+	// Their reactions go with them.
+	_, err = a.db.ExecContext(ctx, `DELETE FROM wassup_reactions WHERE NOT EXISTS (SELECT 1 FROM wassup_messages m
+		WHERE m.chat_jid = wassup_reactions.chat_jid AND m.id = wassup_reactions.message_id)`)
 	if err != nil {
 		return nil, err
 	}

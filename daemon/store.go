@@ -82,6 +82,15 @@ CREATE TABLE wassup_locked_chats (jid TEXT PRIMARY KEY);
 `, `
 -- Link previews, as the waE2E.ExtendedTextMessage fields that make them.
 ALTER TABLE wassup_messages ADD COLUMN link BLOB;
+`, `
+-- Emoji reactions: one per person and message.
+CREATE TABLE wassup_reactions (
+	chat_jid TEXT NOT NULL,
+	message_id TEXT NOT NULL,
+	sender_jid TEXT NOT NULL,
+	emoji TEXT NOT NULL,
+	PRIMARY KEY (chat_jid, message_id, sender_jid)
+);
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -479,7 +488,18 @@ func (a *account) queryMessages(ctx context.Context, chatJID, query string, args
 		}
 		msgs = append(msgs, m)
 	}
-	return msgs, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	ids := make([]string, len(msgs))
+	for i, m := range msgs {
+		ids[i] = m.Id
+	}
+	reactions, err := a.reactions(ctx, chatJID, ids)
+	for _, m := range msgs {
+		m.Reactions = reactions[m.Id]
+	}
+	return msgs, err
 }
 
 // sendText sends a text message and stores it like a received one.

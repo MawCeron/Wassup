@@ -311,6 +311,20 @@ func (d *daemon) handle(conn net.Conn) {
 	}
 }
 
+// broadcastExcept sends an event to every UI but one, which gets it as
+// the reply to its request.
+func (d *daemon) broadcastExcept(skip net.Conn, ev *ipc.Event) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for conn := range d.conns {
+		if conn != skip {
+			if err := write(conn, ev); err != nil {
+				conn.Close()
+			}
+		}
+	}
+}
+
 // broadcast sends an unsolicited event to every connected UI.
 func (d *daemon) broadcast(ev *ipc.Event) {
 	if ev.GetChatChanged() != nil {
@@ -342,6 +356,10 @@ func (d *daemon) onMessage(a *account, e *events.Message) {
 	ctx := context.Background()
 	if isEphemeralSetting(e.Message) {
 		a.setDisappearing(ctx, e.Info.Chat.String(), e.Message.GetProtocolMessage().GetEphemeralExpiration())
+		return
+	}
+	if changed := a.onReaction(ctx, e); changed != nil {
+		d.broadcast(&ipc.Event{Kind: &ipc.Event_ReactionsChanged{ReactionsChanged: changed}})
 		return
 	}
 	msg, chat, err := a.saveMessage(ctx, e)
@@ -487,6 +505,16 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 			}
 		}()
 		return nil
+	case *ipc.Request_React:
+		r := k.React
+		if a := d.find(r.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else if changed, err := a.react(context.Background(), r.GetChatJid(), r.GetMessageId(), r.GetEmoji()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_ReactionsChanged{ReactionsChanged: changed}
+			d.broadcastExcept(conn, &ipc.Event{Kind: ev.Kind})
+		}
 	case *ipc.Request_Quit:
 		ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
 	case *ipc.Request_GetSettings:

@@ -28,6 +28,7 @@ message Request {
     SetSettings set_settings = 16;
     Quit quit = 17;
     SearchMessages search_messages = 18;
+    React react = 19;
   }
 }
 
@@ -51,6 +52,7 @@ message Event {
     StickerList stickers = 14;
     MessagesExpired messages_expired = 15;
     Settings settings = 16;
+    ReactionsChanged reactions_changed = 17;
   }
 }
 
@@ -191,6 +193,33 @@ message Message {
   Quote quote = 11;
   // Preview of the first link in the text, if the sender attached one.
   LinkPreview link = 12;
+  // Emoji reactions, grouped, most used first.
+  repeated Reaction reactions = 13;
+}
+
+message Reaction {
+  string emoji = 1;
+  // How many people reacted with it.
+  uint32 count = 2;
+  // The user is one of them.
+  bool mine = 3;
+}
+
+// Sends the user's reaction to a message; an empty emoji takes it back.
+// Answered with reactions_changed, which also goes to every other UI.
+message React {
+  string account_id = 1;
+  string chat_jid = 2;
+  string message_id = 3;
+  string emoji = 4;
+}
+
+// A message's reactions after someone reacted or took a reaction back.
+message ReactionsChanged {
+  string account_id = 1;
+  string chat_jid = 2;
+  string message_id = 3;
+  repeated Reaction reactions = 4;
 }
 
 // What a link looks like, as the sender's phone or Wassup fetched it.
