@@ -34,7 +34,7 @@ impl VoiceBar {
             .css_classes(["circular", "suggested-action"])
             .build();
         let cancel = gtk::Button::builder()
-            .icon_name("user-trash-symbolic")
+            .icon_name("wassup-discard-symbolic")
             .tooltip_text(gettext("Discard Recording"))
             .css_classes(["circular", "flat"])
             .build();
