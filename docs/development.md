@@ -228,6 +228,7 @@ is unlinked and linked again.
 | Tab | Conversation | Reach photos, documents and audio controls, which open with Enter or Space |
 | Ctrl+F | Anywhere | Search chats by name, ignoring case and accents |
 | Ctrl+Shift+F | Open chat | Search its messages, ignoring case and accents; choosing a result jumps to it |
+| Right click or long press | Message | Menu to react or reply; Escape cancels a reply |
 | Ctrl+, | Anywhere | Preferences |
 | Ctrl+? | Anywhere | Keyboard shortcuts |
 | Ctrl+W | Anywhere | Close the window; the daemon keeps notifying |

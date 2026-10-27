@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Wassup\n"
 "Report-Msgid-Bugs-To: https://github.com/MawCeron/Wassup/issues\n"
-"POT-Creation-Date: 2026-10-26 21:56-0600\n"
+"POT-Creation-Date: 2026-10-26 22:17-0600\n"
 "PO-Revision-Date: 2026-10-26 18:37-0600\n"
 "Last-Translator: Mauricio Cerón Medina\n"
 "Language-Team: Spanish\n"
@@ -17,15 +17,15 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: daemon/main.go:338
+#: daemon/main.go:352
 msgid "[View once] Open it on your phone"
 msgstr "[Ver una vez] Ábrelo en tu teléfono"
 
-#: daemon/main.go:526
+#: daemon/main.go:554
 msgid "Wrong secret code"
 msgstr "Código secreto incorrecto"
 
-#: daemon/main.go:528
+#: daemon/main.go:556
 msgid "Set a secret code for locked chats on your phone first"
 msgstr ""
 "Primero configura un código secreto para los chats bloqueados en tu teléfono"
@@ -34,54 +34,55 @@ msgstr ""
 msgid "New message"
 msgstr "Mensaje nuevo"
 
-#: daemon/notify.go:197 daemon/quote.go:65 ui/src/window.rs:1515
-#: ui/src/window/preview.rs:23 ui/src/window/rows.rs:498
+#: daemon/notify.go:197 daemon/quote.go:91 ui/src/window/preview.rs:23
+#: ui/src/window/reply.rs:249 ui/src/window/rows.rs:576
 #: ui/src/window/viewer.rs:30
 msgid "Photo"
 msgstr "Foto"
 
-#: daemon/notify.go:198 daemon/quote.go:69 ui/src/window.rs:1516
-#: ui/src/window/rows.rs:496
+#: daemon/notify.go:198 daemon/quote.go:95 ui/src/window/reply.rs:251
+#: ui/src/window/rows.rs:574
 msgid "Sticker"
 msgstr "Sticker"
 
-#: daemon/notify.go:199 daemon/quote.go:77 ui/src/window.rs:1517
+#: daemon/notify.go:199 daemon/quote.go:103 ui/src/window/reply.rs:252
 msgid "Document"
 msgstr "Documento"
 
-#: daemon/notify.go:200 daemon/quote.go:74 ui/src/window.rs:1519
+#: daemon/notify.go:200 daemon/quote.go:100 ui/src/window/reply.rs:254
 msgid "Audio"
 msgstr "Audio"
 
-#: daemon/notify.go:201 daemon/quote.go:67 ui/src/window/rows.rs:497
+#: daemon/notify.go:201 daemon/quote.go:93 ui/src/window/reply.rs:250
+#: ui/src/window/rows.rs:575
 msgid "Video"
 msgstr "Video"
 
-#: daemon/notify.go:204 daemon/quote.go:72 ui/src/window.rs:1518
+#: daemon/notify.go:204 daemon/quote.go:98 ui/src/window/reply.rs:253
 msgid "Voice message"
 msgstr "Mensaje de voz"
 
-#: daemon/quote.go:79
+#: daemon/quote.go:105
 msgid "Contact"
 msgstr "Contacto"
 
-#: daemon/quote.go:81
+#: daemon/quote.go:107
 msgid "Location"
 msgstr "Ubicación"
 
-#: daemon/quote.go:83 ui/src/window.rs:405
+#: daemon/quote.go:109 ui/src/window.rs:412
 msgid "Message"
 msgstr "Mensaje"
 
-#: daemon/store.go:151
+#: daemon/store.go:160
 msgid "[Contact]"
 msgstr "[Contacto]"
 
-#: daemon/store.go:153
+#: daemon/store.go:162
 msgid "[Location]"
 msgstr "[Ubicación]"
 
-#: daemon/store.go:155 daemon/store.go:157
+#: daemon/store.go:164 daemon/store.go:166
 msgid "[Poll]"
 msgstr "[Encuesta]"
 
@@ -113,183 +114,183 @@ msgstr "Muestra la ventana, o la cierra si tiene el foco"
 msgid "The image is too detailed to fit in a sticker"
 msgstr "La imagen tiene demasiado detalle para caber en un sticker"
 
-#: ui/src/window.rs:189 ui/src/window.rs:536
+#: ui/src/window.rs:196 ui/src/window.rs:545
 msgid "Retry"
 msgstr "Reintentar"
 
-#: ui/src/window.rs:197
+#: ui/src/window.rs:204
 msgid "Link Wassup to Your Phone"
 msgstr "Vincula Wassup con tu teléfono"
 
-#: ui/src/window.rs:204
+#: ui/src/window.rs:211
 msgid "Open WhatsApp on your phone."
 msgstr "Abre WhatsApp en tu teléfono."
 
-#: ui/src/window.rs:205
+#: ui/src/window.rs:212
 msgid "Open Settings, or the ⋮ menu on Android, and choose Linked devices."
 msgstr ""
 "Abre Configuración, o el menú ⋮ en Android, y elige Dispositivos vinculados."
 
-#: ui/src/window.rs:206
+#: ui/src/window.rs:213
 msgid "Tap Link a device."
 msgstr "Toca Vincular un dispositivo."
 
-#: ui/src/window.rs:207
+#: ui/src/window.rs:214
 msgid "Point your phone at this screen to scan the code."
 msgstr "Apunta tu teléfono a esta pantalla para escanear el código."
 
-#: ui/src/window.rs:227
+#: ui/src/window.rs:234
 msgid "Try Again"
 msgstr "Intentar de nuevo"
 
-#: ui/src/window.rs:246
+#: ui/src/window.rs:253
 msgid "QR code to link this device"
 msgstr "Código QR para vincular este dispositivo"
 
-#: ui/src/window.rs:314 ui/src/window.rs:516 ui/src/window.rs:1236
-#: ui/src/window.rs:1464 ui/src/window.rs:1606
+#: ui/src/window.rs:321 ui/src/window.rs:525 ui/src/window.rs:1251
+#: ui/src/window.rs:1479 ui/src/window.rs:1616
 msgid "Chats"
 msgstr "Chats"
 
-#: ui/src/window.rs:319
+#: ui/src/window.rs:326
 msgid "Lock Restricted Chats"
 msgstr "Bloquear chats restringidos"
 
-#: ui/src/window.rs:324
+#: ui/src/window.rs:331
 msgid "_Preferences"
 msgstr "_Preferencias"
 
-#: ui/src/window.rs:325
+#: ui/src/window.rs:332
 msgid "_Keyboard Shortcuts"
 msgstr "_Atajos del teclado"
 
-#: ui/src/window.rs:326
+#: ui/src/window.rs:333
 msgid "_About Wassup"
 msgstr "_Acerca de Wassup"
 
-#: ui/src/window.rs:330
+#: ui/src/window.rs:337
 msgid "Main Menu"
 msgstr "Menú principal"
 
-#: ui/src/window.rs:339 ui/src/window.rs:1588
+#: ui/src/window.rs:346 ui/src/window.rs:1598
 msgid "Restricted Chats"
 msgstr "Chats restringidos"
 
-#: ui/src/window.rs:352 ui/src/window.rs:1466
+#: ui/src/window.rs:359 ui/src/window.rs:1481
 msgid "Search chats"
 msgstr "Buscar chats"
 
-#: ui/src/window.rs:359
+#: ui/src/window.rs:366
 msgid "No Chats Found"
 msgstr "No se encontraron chats"
 
-#: ui/src/window.rs:360
+#: ui/src/window.rs:367
 msgid "No chat or group has that name"
 msgstr "Ningún chat ni grupo tiene ese nombre"
 
-#: ui/src/window.rs:378
+#: ui/src/window.rs:385
 msgid "No Chat Selected"
 msgstr "Ningún chat seleccionado"
 
-#: ui/src/window.rs:419 ui/src/window/preview.rs:45
+#: ui/src/window.rs:426 ui/src/window/preview.rs:45
 msgid "Send"
 msgstr "Enviar"
 
-#: ui/src/window.rs:432 ui/src/window.rs:1724
+#: ui/src/window.rs:439 ui/src/window.rs:1736
 msgid "Send a File"
 msgstr "Enviar un archivo"
 
-#: ui/src/window.rs:437
+#: ui/src/window.rs:444
 msgid "Favorites"
 msgstr "Favoritos"
 
-#: ui/src/window.rs:437
+#: ui/src/window.rs:444
 msgid "Recent"
 msgstr "Recientes"
 
-#: ui/src/window.rs:458
+#: ui/src/window.rs:465
 msgid "Your favorite stickers and the ones you send show up here."
 msgstr "Aquí aparecen tus stickers favoritos y los que envías."
 
-#: ui/src/window.rs:464
+#: ui/src/window.rs:471
 msgid "Create from Image…"
 msgstr "Crear desde una imagen…"
 
-#: ui/src/window.rs:482
+#: ui/src/window.rs:489
 msgid "Stickers"
 msgstr "Stickers"
 
-#: ui/src/window.rs:535
+#: ui/src/window.rs:544
 msgid "Reconnecting to the Wassup service…"
 msgstr "Reconectando con el servicio de Wassup…"
 
-#: ui/src/window.rs:1016
+#: ui/src/window.rs:1030
 msgid "Can't Reach the Wassup Service"
 msgstr "No se puede contactar al servicio de Wassup"
 
-#: ui/src/window.rs:1035 ui/src/window.rs:1231
+#: ui/src/window.rs:1049 ui/src/window.rs:1246
 msgid "Connecting…"
 msgstr "Conectando…"
 
-#: ui/src/window.rs:1048
+#: ui/src/window.rs:1062
 msgid "Lost Connection to the Wassup Service"
 msgstr "Se perdió la conexión con el servicio de Wassup"
 
-#: ui/src/window.rs:1089
+#: ui/src/window.rs:1103
 #, rust-format
 msgid "Couldn't reach the Wassup service: {}"
 msgstr "No se pudo contactar al servicio de Wassup: {}"
 
-#: ui/src/window.rs:1138
+#: ui/src/window.rs:1152
 msgid "No Account"
 msgstr "Sin cuenta"
 
-#: ui/src/window.rs:1139
+#: ui/src/window.rs:1153
 msgid "The Wassup service has no account yet."
 msgstr "El servicio de Wassup todavía no tiene una cuenta."
 
-#: ui/src/window.rs:1194
+#: ui/src/window.rs:1209
 msgid "The code changes every minute or so."
 msgstr "El código cambia más o menos cada minuto."
 
 #. TRANSLATORS: {} is the reason, from WhatsApp.
-#: ui/src/window.rs:1202
+#: ui/src/window.rs:1217
 #, rust-format
 msgid "Linking failed: {}"
 msgstr "No se pudo vincular: {}"
 
-#: ui/src/window.rs:1232
+#: ui/src/window.rs:1247
 msgid "Offline"
 msgstr "Sin conexión"
 
-#: ui/src/window.rs:1299
+#: ui/src/window.rs:1314
 msgid "Hide Message Content"
 msgstr "Ocultar el contenido de los mensajes"
 
-#: ui/src/window.rs:1300
+#: ui/src/window.rs:1315
 msgid "Notifications say who wrote, but not what"
 msgstr "Las notificaciones dicen quién escribió, pero no qué"
 
-#: ui/src/window.rs:1304
+#: ui/src/window.rs:1319
 msgid "Notifications"
 msgstr "Notificaciones"
 
-#: ui/src/window.rs:1308
+#: ui/src/window.rs:1323
 msgid "Status Icon"
 msgstr "Icono de estado"
 
-#: ui/src/window.rs:1310
+#: ui/src/window.rs:1325
 msgid ""
 "Shows the unread count in the top bar, on desktops that support status icons"
 msgstr ""
 "Muestra los mensajes sin leer en la barra superior, en escritorios que "
 "admiten iconos de estado"
 
-#: ui/src/window.rs:1316
+#: ui/src/window.rs:1331
 msgid "Link Previews"
 msgstr "Vista previa de enlaces"
 
-#: ui/src/window.rs:1318
+#: ui/src/window.rs:1333
 msgid ""
 "Links you send show the page's title and image. Wassup visits the page to "
 "get them, as your phone does."
@@ -297,15 +298,15 @@ msgstr ""
 "Los enlaces que envías muestran el título y la imagen de la página. Wassup "
 "visita la página para obtenerlos, como lo hace tu teléfono."
 
-#: ui/src/window.rs:1323
+#: ui/src/window.rs:1338
 msgid "Messages"
 msgstr "Mensajes"
 
-#: ui/src/window.rs:1327
+#: ui/src/window.rs:1342
 msgid "Media Cache Size"
 msgstr "Tamaño de la caché de archivos"
 
-#: ui/src/window.rs:1328
+#: ui/src/window.rs:1343
 msgid ""
 "Downloaded photos, stickers, documents and audio, in MB. The oldest are "
 "deleted first."
@@ -313,15 +314,15 @@ msgstr ""
 "Fotos, stickers, documentos y audios descargados, en MB. Los más antiguos se "
 "borran primero."
 
-#: ui/src/window.rs:1339
+#: ui/src/window.rs:1354
 msgid "Storage"
 msgstr "Almacenamiento"
 
-#: ui/src/window.rs:1343
+#: ui/src/window.rs:1358
 msgid "GPU Rendering"
 msgstr "Renderizado con GPU"
 
-#: ui/src/window.rs:1344
+#: ui/src/window.rs:1359
 msgid ""
 "Smoother animations, but uses about 50 MB more memory. Applies after "
 "restarting Wassup."
@@ -329,27 +330,27 @@ msgstr ""
 "Animaciones más fluidas, pero usa unos 50 MB más de memoria. Se aplica al "
 "reiniciar Wassup."
 
-#: ui/src/window.rs:1348
+#: ui/src/window.rs:1363
 msgid "Performance"
 msgstr "Rendimiento"
 
-#: ui/src/window.rs:1353
+#: ui/src/window.rs:1368
 msgid "System Language"
 msgstr "Idioma del sistema"
 
-#: ui/src/window.rs:1358
+#: ui/src/window.rs:1373
 msgid "Language"
 msgstr "Idioma"
 
-#: ui/src/window.rs:1359
+#: ui/src/window.rs:1374
 msgid "Applies after restarting Wassup"
 msgstr "Se aplica al reiniciar Wassup"
 
-#: ui/src/window.rs:1429
+#: ui/src/window.rs:1444
 msgid "Quit Wassup?"
 msgstr "¿Salir de Wassup?"
 
-#: ui/src/window.rs:1431
+#: ui/src/window.rs:1446
 msgid ""
 "You won't get notifications of new messages until you open Wassup again. To "
 "keep getting them, close the window instead."
@@ -357,63 +358,63 @@ msgstr ""
 "No recibirás notificaciones de mensajes nuevos hasta que vuelvas a abrir "
 "Wassup. Para seguir recibiéndolas, mejor cierra la ventana."
 
-#: ui/src/window.rs:1436 ui/src/window.rs:1549
+#: ui/src/window.rs:1451 ui/src/window.rs:1559
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: ui/src/window.rs:1436
+#: ui/src/window.rs:1451
 msgid "Quit"
 msgstr "Salir"
 
-#: ui/src/window.rs:1467 ui/src/window/search.rs:23
+#: ui/src/window.rs:1482 ui/src/window/search.rs:23
 msgid "Search messages"
 msgstr "Buscar mensajes"
 
-#: ui/src/window.rs:1468
+#: ui/src/window.rs:1483
 msgid "Open the next or previous chat"
 msgstr "Abrir el chat siguiente o anterior"
 
-#: ui/src/window.rs:1469
+#: ui/src/window.rs:1484
 msgid "Write in the open chat"
 msgstr "Escribir en el chat abierto"
 
-#: ui/src/window.rs:1470
+#: ui/src/window.rs:1485
 msgid "Back to the chat list"
 msgstr "Volver a la lista de chats"
 
-#: ui/src/window.rs:1474
+#: ui/src/window.rs:1489
 msgid "Writing"
 msgstr "Escritura"
 
-#: ui/src/window.rs:1476
+#: ui/src/window.rs:1491
 msgid "Send the message"
 msgstr "Enviar el mensaje"
 
-#: ui/src/window.rs:1477
+#: ui/src/window.rs:1492
 msgid "New line"
 msgstr "Nueva línea"
 
-#: ui/src/window.rs:1481
+#: ui/src/window.rs:1496
 msgid "General"
 msgstr "General"
 
-#: ui/src/window.rs:1483
+#: ui/src/window.rs:1498
 msgid "Preferences"
 msgstr "Preferencias"
 
-#: ui/src/window.rs:1484
+#: ui/src/window.rs:1499
 msgid "Keyboard shortcuts"
 msgstr "Atajos del teclado"
 
-#: ui/src/window.rs:1485
+#: ui/src/window.rs:1500
 msgid "Close the window"
 msgstr "Cerrar la ventana"
 
-#: ui/src/window.rs:1486
+#: ui/src/window.rs:1501
 msgid "Quit and stop notifications"
 msgstr "Salir y dejar de recibir notificaciones"
 
-#: ui/src/window.rs:1503
+#: ui/src/window.rs:1518
 msgid ""
 "An unofficial WhatsApp client for GNOME. Wassup is not affiliated with "
 "WhatsApp or Meta."
@@ -422,52 +423,52 @@ msgstr ""
 "WhatsApp ni a Meta."
 
 #. TRANSLATORS: Put your name here, as it should be credited.
-#: ui/src/window.rs:1506
+#: ui/src/window.rs:1521
 msgid "translator-credits"
 msgstr "Mauricio Cerón Medina"
 
-#: ui/src/window.rs:1536
+#: ui/src/window.rs:1546
 msgid "Secret code"
 msgstr "Código secreto"
 
-#: ui/src/window.rs:1540
+#: ui/src/window.rs:1550
 msgid "Enter Secret Code"
 msgstr "Escribe el código secreto"
 
-#: ui/src/window.rs:1542
+#: ui/src/window.rs:1552
 msgid ""
 "Enter the secret code you set on your phone to see your restricted chats."
 msgstr ""
 "Escribe el código secreto que configuraste en tu teléfono para ver tus chats "
 "restringidos."
 
-#: ui/src/window.rs:1550
+#: ui/src/window.rs:1560
 msgid "Unlock"
 msgstr "Desbloquear"
 
-#: ui/src/window.rs:1590
+#: ui/src/window.rs:1600
 msgid "Restricted chats unlocked"
 msgstr "Chats restringidos desbloqueados"
 
-#: ui/src/window.rs:1614
+#: ui/src/window.rs:1624
 msgid "Restricted chats locked"
 msgstr "Chats restringidos bloqueados"
 
 #. TRANSLATORS: {} is a file name.
-#: ui/src/window.rs:1765
+#: ui/src/window.rs:1777
 #, rust-format
 msgid "Sending {}…"
 msgstr "Enviando {}…"
 
-#: ui/src/window.rs:1929 ui/src/window/viewer.rs:254
+#: ui/src/window.rs:1943 ui/src/window/viewer.rs:254
 msgid "Couldn't download the file"
 msgstr "No se pudo descargar el archivo"
 
-#: ui/src/window.rs:2055
+#: ui/src/window.rs:2069
 msgid "Preparing a code…"
 msgstr "Preparando un código…"
 
-#: ui/src/window.rs:2107
+#: ui/src/window.rs:2121
 msgid "Unknown contact"
 msgstr "Contacto desconocido"
 
@@ -481,7 +482,7 @@ msgstr "No se pudo reproducir el audio: {}"
 msgid "Pause"
 msgstr "Pausar"
 
-#: ui/src/window/audio.rs:138 ui/src/window/rows.rs:299
+#: ui/src/window/audio.rs:138 ui/src/window/rows.rs:314
 msgid "Play"
 msgstr "Reproducir"
 
@@ -501,18 +502,32 @@ msgstr "Enviar video"
 msgid "Send Document"
 msgstr "Enviar documento"
 
-#: ui/src/window/rows.rs:295
+#: ui/src/window/reply.rs:41
+msgid "Cancel Reply"
+msgstr "Cancelar respuesta"
+
+#. TRANSLATORS: {} is an emoji.
+#: ui/src/window/reply.rs:115
+#, rust-format
+msgid "React with {}"
+msgstr "Reaccionar con {}"
+
+#: ui/src/window/reply.rs:135
+msgid "Reply"
+msgstr "Responder"
+
+#: ui/src/window/reply.rs:237 ui/src/window/rows.rs:527
+#: ui/src/window/search.rs:136 ui/src/window/viewer.rs:181
+msgid "You"
+msgstr "Tú"
+
+#: ui/src/window/rows.rs:310
 msgid "Voice Message"
 msgstr "Mensaje de voz"
 
-#: ui/src/window/rows.rs:308
+#: ui/src/window/rows.rs:323
 msgid "Playback position"
 msgstr "Posición de reproducción"
-
-#: ui/src/window/rows.rs:467 ui/src/window/search.rs:136
-#: ui/src/window/viewer.rs:181
-msgid "You"
-msgstr "Tú"
 
 #: ui/src/window/search.rs:37
 msgid "Search Messages"

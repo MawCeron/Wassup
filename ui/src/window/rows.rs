@@ -358,6 +358,44 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         bubble.append(&audio);
         bubble.append(&text);
         bubble.append(&footer);
+        let reactions = gtk::Label::builder()
+            .halign(gtk::Align::Start)
+            .css_classes(["reactions"])
+            .visible(false)
+            .build();
+        bubble.append(&reactions);
+        // Right click or a long press opens the message's menu.
+        let open_menu = {
+            let (list_item, owner, bubble) = (item.downgrade(), opener.clone(), bubble.downgrade());
+            move |x: f64, y: f64| {
+                let msg = list_item
+                    .upgrade()
+                    .and_then(|i| i.item())
+                    .and_downcast::<glib::BoxedAnyObject>();
+                if let (Some(msg), Some(ui), Some(bubble)) = (
+                    msg,
+                    owner.get().and_then(std::rc::Weak::upgrade),
+                    bubble.upgrade(),
+                ) {
+                    let msg = msg.borrow::<ipc::Message>().clone();
+                    ui.message_menu(bubble.upcast_ref(), &msg, (x, y));
+                }
+            }
+        };
+        let right_click = gtk::GestureClick::builder()
+            .button(gdk::BUTTON_SECONDARY)
+            .build();
+        right_click.connect_pressed({
+            let open_menu = open_menu.clone();
+            move |gesture, _, x, y| {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                open_menu(x, y);
+            }
+        });
+        bubble.add_controller(right_click);
+        let long_press = gtk::GestureLongPress::new();
+        long_press.connect_pressed(move |_, x, y| open_menu(x, y));
+        bubble.add_controller(long_press);
         let row = gtk::Box::builder()
             .margin_start(12)
             .margin_end(12)
@@ -447,6 +485,8 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let footer = text.next_sibling().unwrap();
         let time = footer.first_child().and_downcast::<gtk::Label>().unwrap();
         let status = time.next_sibling().and_downcast::<gtk::Image>().unwrap();
+        let reactions = footer.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        show_reactions(&reactions, &msg.reactions);
 
         let in_group = msg.chat_jid.ends_with("@g.us");
         sender.set_visible(in_group && !msg.from_me);
@@ -519,6 +559,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
                 status: status.downgrade(),
                 picture: picture.downgrade(),
                 audio: audio.downgrade(),
+                reactions: reactions.downgrade(),
             },
         );
         let kind = msg.media.as_ref().map(|m| m.kind());

@@ -13,6 +13,7 @@ use crate::ipc::{self, event, request};
 mod audio;
 mod preview;
 mod qr;
+mod reply;
 mod rows;
 mod search;
 mod state;
@@ -21,6 +22,7 @@ mod viewer;
 
 use audio::*;
 use qr::*;
+use reply::*;
 use rows::*;
 use search::*;
 use state::*;
@@ -43,6 +45,9 @@ const CSS: &str = "
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .media-button { padding: 0; }
+.reactions { font-size: 0.85em; padding: 1px 8px; border-radius: 999px; background: alpha(currentColor, 0.08); }
+.reactions.mine { background: color-mix(in srgb, var(--accent-bg-color) 30%, transparent); }
+.reaction-mine { background: color-mix(in srgb, var(--accent-bg-color) 30%, transparent); }
 .link-card { padding: 6px; border-radius: 8px; background: alpha(currentColor, 0.06); }
 .link-thumb { border-radius: 6px; }
 .video-badge { border-radius: 999px; padding: 10px; }
@@ -80,6 +85,7 @@ struct RowWidgets {
     status: glib::WeakRef<gtk::Image>,
     picture: glib::WeakRef<gtk::Picture>,
     audio: glib::WeakRef<gtk::Box>,
+    reactions: glib::WeakRef<gtk::Label>,
 }
 
 /// The audio being played. Only one plays at a time, and the stream exists
@@ -150,6 +156,7 @@ pub struct Window {
     page: gtk::Box,
     viewer: Rc<Viewer>,
     search: MessageSearch,
+    reply: ReplyBar,
     message_list: gtk::ListView,
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
@@ -509,6 +516,8 @@ impl Window {
         content_view.add_top_bar(&content_header);
         content_view.add_top_bar(&search.bar);
         content_view.set_content(Some(&content_stack));
+        let reply = ReplyBar::new();
+        content_view.add_bottom_bar(&reply.revealer);
         content_view.add_bottom_bar(&composer_bar);
         content_view.set_reveal_bottom_bars(false);
         let content = adw::NavigationPage::new(&content_view, "Wassup");
@@ -617,6 +626,7 @@ impl Window {
             page,
             viewer,
             search,
+            reply,
             message_list,
             message_scroll,
             loading: Cell::new(false),
@@ -707,6 +717,7 @@ impl Window {
         app.set_accels_for_action("app.quit", &["<Control>q"]);
         ui.connect_viewer();
         ui.connect_message_search();
+        ui.connect_reply_bar();
         let search_messages = gio::SimpleAction::new("search-messages", None);
         search_messages.connect_activate(glib::clone!(
             #[weak]
@@ -862,6 +873,9 @@ impl Window {
             glib::Propagation::Proceed,
             move |_, key, _, modifiers| {
                 if key == gdk::Key::Escape {
+                    if ui.cancel_reply() {
+                        return glib::Propagation::Stop;
+                    }
                     ui.split.set_show_content(false);
                     ui.chat_list.grab_focus();
                     return glib::Propagation::Stop;
@@ -1181,6 +1195,7 @@ impl Window {
             Some(event::Kind::MediaReady(ready)) => self.media_ready(ready),
             Some(event::Kind::MessagesExpired(gone)) => self.remove_expired(gone),
             Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
+            Some(event::Kind::ReactionsChanged(changed)) => self.reactions_changed(changed),
             Some(event::Kind::Settings(settings))
                 if event.request_id != 0 && event.request_id == self.settings_request.get() =>
             {
@@ -1510,15 +1525,10 @@ impl Window {
 
     /// Reads a message that arrived in the open chat to screen reader users.
     fn announce(&self, msg: &ipc::Message) {
-        let what = match msg.media.as_ref() {
-            _ if !msg.text.is_empty() => msg.text.clone(),
-            Some(m) if m.kind() == ipc::MediaKind::Image => gettext("Photo"),
-            Some(m) if m.kind() == ipc::MediaKind::Sticker => gettext("Sticker"),
-            Some(m) if m.kind() == ipc::MediaKind::Document => gettext("Document"),
-            Some(m) if m.voice_note => gettext("Voice message"),
-            Some(m) if m.kind() == ipc::MediaKind::Audio => gettext("Audio"),
-            _ => return,
-        };
+        let what = summary(msg);
+        if what.is_empty() {
+            return;
+        }
         let text = if msg.sender_name.is_empty() {
             what
         } else {
@@ -1625,6 +1635,7 @@ impl Window {
     /// Leaves the conversation pane empty, as when no chat is selected.
     fn close_chat(&self) {
         self.close_viewer();
+        self.cancel_reply();
         self.search.bar.set_search_mode(false);
         self.stop_audio();
         self.current_chat.replace(None);
@@ -1697,6 +1708,7 @@ impl Window {
 
     fn open_chat(&self, chat: &ipc::Chat) {
         self.close_viewer();
+        self.cancel_reply();
         self.search.bar.set_search_mode(false);
         if chat.locked && !self.restricted.get() {
             return; // Only reachable through the restricted view.
@@ -1826,9 +1838,11 @@ impl Window {
             account_id,
             chat_jid,
             text: text.clone(),
+            reply_to_id: self.reply.target.borrow().clone().unwrap_or_default(),
         });
         if let Some(id) = self.send(request) {
             buffer.set_text("");
+            self.cancel_reply();
             self.sending.borrow_mut().insert(id, text);
         }
     }
