@@ -731,6 +731,9 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
                 }
             } else {
                 show_media(&picture, &media.path, width, height, &msg.id, &bound);
+                if sticker {
+                    animation::play(&picture, &media.path, &msg.id, &bound);
+                }
             }
         }
         clamp.set_halign(if msg.from_me {

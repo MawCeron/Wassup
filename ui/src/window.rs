@@ -10,6 +10,7 @@ use gtk::{gdk, gio, glib};
 
 use crate::ipc::{self, event, request};
 
+mod animation;
 mod audio;
 mod background;
 mod preview;
