@@ -159,6 +159,16 @@ outlines. The popover was mapped in the Twemoji runs. The monochrome and Twemoji
 figures repeated within a megabyte across runs; the Noto Color Emoji ones
 did not, since they depend on how many glyphs cairo had drawn.
 
+The picker drops the emoji whose ink is more than 1.5 times as wide as
+that of 🙂, which Pango may draw with another font than the rest. With
+Symbola, a monochrome symbol font, installed, it draws 🙂 narrower than
+Twemoji draws flags and sequences, and the picker keeps fewer emoji:
+
+| Emoji font | Emoji kept of 1910, Symbola installed | Symbola hidden |
+|---|---|---|
+| Noto Color Emoji | 1910 | |
+| Twemoji 14.0.2 | 1373 | 1854 |
+
 Twemoji covers 1466 code points and Noto Color Emoji 1508, because the
 Fedora package is Twemoji 14.0.2 and lacks the emoji added to Unicode
 after version 14.
@@ -166,9 +176,9 @@ after version 14.
 ### What Wassup does
 
 - The picker is created when its button is first pressed.
-- With Twemoji installed, the UI takes both Noto emoji fonts out of its
-  fontconfig, so the picker and the messages draw every emoji with
-  Twemoji. Taking out only Noto Color Emoji makes Pango fall back to the
+- With Twemoji installed, the UI takes both Noto emoji fonts and Symbola
+  out of its fontconfig, so the picker and the messages draw every emoji
+  with Twemoji. Taking out only Noto Color Emoji makes Pango fall back to the
   monochrome Noto Emoji. Preferring Twemoji through fontconfig rules or
   through CSS `font-family` had no effect, because Pango chooses the font
   for emoji by itself.
