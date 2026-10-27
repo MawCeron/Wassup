@@ -151,6 +151,7 @@ fonts:
 | Noto Emoji (monochrome) | ngl | 77 MB | 81 MB |
 | OpenMoji Color 16 (COLRv1) | cairo | 110 MB | 112–238 MB, varies by run |
 | Twemoji 14.0.2 (bitmap, CBDT) | cairo | 48 MB | 53.5–54.4 MB |
+| twemoji-cbdt 17.0.3 (bitmap, CBDT) | cairo | 52 MB | 58 MB |
 
 The fonts that grow, Noto Color Emoji and OpenMoji Color, are COLRv1
 fonts whose glyphs are vectors; Fedora's Twemoji is a bitmap font
@@ -168,6 +169,7 @@ Twemoji draws flags and sequences, and the picker keeps fewer emoji:
 |---|---|---|
 | Noto Color Emoji | 1910 | |
 | Twemoji 14.0.2 | 1373 | 1854 |
+| twemoji-cbdt 17.0.3 | 1400 | 1910 |
 
 Twemoji covers 1466 code points and Noto Color Emoji 1508, because the
 Fedora package is Twemoji 14.0.2 and lacks the emoji added to Unicode
