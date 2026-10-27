@@ -21,6 +21,7 @@ mod rows;
 mod search;
 mod state;
 mod stickers;
+mod third_party;
 mod viewer;
 mod voice;
 
@@ -1785,12 +1786,25 @@ impl Window {
             .issue_url("https://github.com/MawCeron/Wassup/issues")
             .license_type(gtk::License::Gpl30)
             .copyright("© 2026 Mauricio Cerón Medina")
+            .developers(["Mauricio Cerón Medina"])
+            .designers(["Mauricio Cerón Medina"])
+            .artists(["Mauricio Cerón Medina"])
+            .documenters(["Mauricio Cerón Medina"])
             .comments(gettext(
                 "An unofficial WhatsApp client for GNOME. Wassup is not affiliated with WhatsApp or Meta.",
             ))
             // TRANSLATORS: Put your name here, as it should be credited.
             .translator_credits(gettext("translator-credits"))
             .build();
+        for section in third_party::SECTIONS {
+            about.add_legal_section(
+                // TRANSLATORS: {} is the name of a license.
+                &gettext("Third party code: {}").replace("{}", section.title),
+                None,
+                gtk::License::Custom,
+                Some(&legal_text(section)),
+            );
+        }
         about.present(Some(&self.window));
     }
 
@@ -2444,6 +2458,19 @@ impl Window {
     }
 }
 
+/// What the About dialog shows for the code under one license: who uses it,
+/// their copyright notices and the license. It is markup, so it is escaped.
+fn legal_text(section: &third_party::Section) -> String {
+    let mut text = gettext("Used by: {}").replace("{}", section.packages);
+    for part in [section.notices, section.text] {
+        if !part.is_empty() {
+            text.push_str("\n\n");
+            text.push_str(part);
+        }
+    }
+    glib::markup_escape_text(&text).into()
+}
+
 /// Wraps a page in a toolbar view with a plain header bar.
 /// Sets how many emoji the picker shows per row, in each of its sections.
 fn set_emoji_columns(widget: &gtk::Widget, columns: u32) {
@@ -2518,6 +2545,28 @@ fn time_of_day(ms: i64) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_dialog_lists_the_licenses_of_what_wassup_bundles() {
+        use super::third_party::SECTIONS;
+        for section in SECTIONS {
+            assert!(!section.title.is_empty() && !section.packages.is_empty());
+            assert!(!section.text.is_empty(), "{} has no text", section.title);
+        }
+        for license in ["MIT", "Apache-2.0", "MPL-2.0", "GPL-3.0-only", "CC-BY-4.0"] {
+            assert!(
+                SECTIONS.iter().any(|s| s.title == license),
+                "{license} is missing"
+            );
+        }
+        let escaped = super::legal_text(&super::third_party::Section {
+            title: "T",
+            packages: "a <1.0>",
+            notices: "",
+            text: "x & y",
+        });
+        assert!(escaped.contains("a &lt;1.0&gt;") && escaped.contains("x &amp; y"));
+    }
+
     use super::*;
 
     #[test]
