@@ -16,12 +16,14 @@ mod qr;
 mod rows;
 mod state;
 mod stickers;
+mod viewer;
 
 use audio::*;
 use qr::*;
 use rows::*;
 use state::*;
 use stickers::*;
+use viewer::*;
 
 /// Side of the QR code on the link screen, in pixels: easy to scan without
 /// crowding the instructions.
@@ -39,6 +41,9 @@ const CSS: &str = "
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .media-button { padding: 0; }
+.viewer { background: rgba(0, 0, 0, 0.92); }
+.viewer-text { color: white; }
+.viewer-caption { background: rgba(0, 0, 0, 0.5); border-radius: 8px; padding: 6px 10px; }
 .qr-card { background: white; border-radius: 12px; padding: 12px; }
 .link-step { font-size: 1.15em; }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
@@ -127,6 +132,9 @@ pub struct Window {
     current_chat: Rc<RefCell<Option<String>>>,
     content_stack: gtk::Stack,
     messages: gio::ListStore,
+    /// Everything under the photo viewer.
+    page: gtk::Box,
+    viewer: Rc<Viewer>,
     message_list: gtk::ListView,
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
@@ -482,7 +490,11 @@ impl Window {
         page.append(&banner);
         page.append(&stack);
         stack.set_vexpand(true);
-        toasts.set_child(Some(&page));
+        // The photo viewer covers the whole window; toasts stay above it.
+        let viewer = Rc::new(Viewer::new());
+        let root = gtk::Overlay::builder().child(&page).build();
+        root.add_overlay(&viewer.root);
+        toasts.set_child(Some(&root));
         let saved = SavedState::load(&state_path());
         let window = adw::ApplicationWindow::builder()
             .application(app)
@@ -550,6 +562,8 @@ impl Window {
             current_chat: Rc::default(),
             content_stack,
             messages,
+            page,
+            viewer,
             message_list,
             message_scroll,
             loading: Cell::new(false),
@@ -619,6 +633,7 @@ impl Window {
         ));
         app.add_action(&quit);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
+        ui.connect_viewer();
         ui.restricted_entry.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -1479,6 +1494,7 @@ impl Window {
 
     /// Leaves the conversation pane empty, as when no chat is selected.
     fn close_chat(&self) {
+        self.close_viewer();
         self.stop_audio();
         self.current_chat.replace(None);
         self.messages.remove_all();
@@ -1549,6 +1565,7 @@ impl Window {
     }
 
     fn open_chat(&self, chat: &ipc::Chat) {
+        self.close_viewer();
         if chat.locked && !self.restricted.get() {
             return; // Only reachable through the restricted view.
         }
@@ -1625,6 +1642,9 @@ impl Window {
     /// downloading it first if needed.
     fn open_media(&self, msg: &ipc::Message) {
         let Some(media) = &msg.media else { return };
+        if media.kind() == ipc::MediaKind::Image {
+            return self.show_photo(msg);
+        }
         if media.path.is_empty() {
             self.open_when_ready.borrow_mut().insert(msg.id.clone());
             self.request_media(msg);
@@ -1755,6 +1775,7 @@ impl Window {
         {
             show_thumb(&picture, &ready.path);
         }
+        self.photo_ready(&ready);
         let open = self.open_when_ready.borrow_mut().remove(&ready.message_id);
         if !ready.error.is_empty() {
             eprintln!("wassup: couldn't download media: {}", ready.error);

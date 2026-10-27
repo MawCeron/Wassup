@@ -459,36 +459,9 @@ pub(super) fn load_texture(
     }
     let path = path.to_owned();
     glib::spawn_future_local(async move {
-        let file = gio::File::for_path(&path);
-        let decoded = match file.read_future(glib::Priority::DEFAULT).await {
-            Ok(stream) => {
-                gtk::gdk_pixbuf::Pixbuf::from_stream_at_scale_future(
-                    &stream,
-                    width * scale,
-                    height * scale,
-                    true,
-                )
-                .await
-            }
-            Err(e) => Err(e),
+        let Some(texture) = decode_texture(&path, width * scale, height * scale).await else {
+            return;
         };
-        let pixbuf = match decoded {
-            Ok(pixbuf) => pixbuf,
-            Err(e) => return eprintln!("wassup: couldn't load {path}: {e}"),
-        };
-        let format = if pixbuf.has_alpha() {
-            gdk::MemoryFormat::R8g8b8a8
-        } else {
-            gdk::MemoryFormat::R8g8b8
-        };
-        let texture: gdk::Texture = gdk::MemoryTexture::new(
-            pixbuf.width(),
-            pixbuf.height(),
-            format,
-            &pixbuf.read_pixel_bytes(),
-            pixbuf.rowstride() as usize,
-        )
-        .upcast();
         TEXTURES.with(|c| {
             let mut c = c.borrow_mut();
             c.push_front((path, texture.clone()));
@@ -496,6 +469,40 @@ pub(super) fn load_texture(
         });
         done(texture);
     });
+}
+
+/// Decodes an image file scaled to fit width x height device pixels,
+/// without the cache: for one-off large images such as the photo viewer.
+pub(super) async fn decode_texture(path: &str, width: i32, height: i32) -> Option<gdk::Texture> {
+    let file = gio::File::for_path(path);
+    let decoded = match file.read_future(glib::Priority::DEFAULT).await {
+        Ok(stream) => {
+            gtk::gdk_pixbuf::Pixbuf::from_stream_at_scale_future(&stream, width, height, true).await
+        }
+        Err(e) => Err(e),
+    };
+    let pixbuf = match decoded {
+        Ok(pixbuf) => pixbuf,
+        Err(e) => {
+            eprintln!("wassup: couldn't load {path}: {e}");
+            return None;
+        }
+    };
+    let format = if pixbuf.has_alpha() {
+        gdk::MemoryFormat::R8g8b8a8
+    } else {
+        gdk::MemoryFormat::R8g8b8
+    };
+    Some(
+        gdk::MemoryTexture::new(
+            pixbuf.width(),
+            pixbuf.height(),
+            format,
+            &pixbuf.read_pixel_bytes(),
+            pixbuf.rowstride() as usize,
+        )
+        .upcast(),
+    )
 }
 
 /// Shows a cached file in a message row's picture.
