@@ -178,17 +178,21 @@ after version 14.
 ### What Wassup does
 
 - The picker is created when its button is first pressed.
-- With Twemoji installed, the UI takes both Noto emoji fonts and Symbola
-  out of its fontconfig, so the picker and the messages draw every emoji
-  with Twemoji. Taking out only Noto Color Emoji makes Pango fall back to the
-  monochrome Noto Emoji. Preferring Twemoji through fontconfig rules or
+- Wassup carries a bitmap emoji font, Twemoji CBDT, and loads it in its own
+  process. The UI then takes both Noto emoji fonts, other Twemoji fonts and
+  Symbola out of its fontconfig, so the picker and the messages draw every
+  emoji with it. Taking out only Noto Color Emoji makes Pango fall back to
+  the monochrome Noto Emoji. Preferring Twemoji through fontconfig rules or
   through CSS `font-family` had no effect, because Pango chooses the font
   for emoji by itself.
-- Without Twemoji, nothing changes.
+- Without the font file, nothing changes.
 
-With Twemoji, a release build used 34.1 MB for the UI at rest and 66.3 MB
-after a chat was open and the picker had been used, against 293 MB at
-rest and over 600 MB after using the picker with Noto Color Emoji.
+With Fedora's Twemoji 14.0.2, a release build used 34.1 MB for the UI at
+rest and 66.3 MB after a chat was open and the picker had been used. With
+Twemoji CBDT, the font Wassup carries, the UI used 37.6 MB 20 seconds after
+it started and 81.6 MB, peaking at 128 MB, after the picker had been opened
+and closed, with 1910 emoji in the picker instead of 1373. With Noto Color
+Emoji it was 293 MB at rest and over 600 MB after using the picker.
 
 ## Other clients
 
