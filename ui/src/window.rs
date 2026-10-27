@@ -21,6 +21,10 @@ use rows::*;
 use state::*;
 use stickers::*;
 
+/// Side of the QR code on the link screen, in pixels: easy to scan without
+/// crowding the instructions.
+const QR_SIZE: i32 = 240;
+
 /// Widest a message bubble gets, in pixels, however wide the window.
 const BUBBLE_MAX_WIDTH: i32 = 520;
 
@@ -32,6 +36,8 @@ const CSS: &str = "
 .media { border-radius: 8px; background: alpha(currentColor, 0.08); }
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
+.qr-card { background: white; border-radius: 12px; padding: 12px; }
+.link-step { font-size: 1.15em; }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
 /* After .mine, which has the same weight: own stickers have no bubble either. */
 .bubble.sticker { background: none; padding: 0; }
@@ -96,8 +102,11 @@ pub struct Window {
     status: adw::StatusPage,
     retry: gtk::Button,
     toasts: adw::ToastOverlay,
-    link: adw::StatusPage,
-    qr: gtk::Picture,
+    /// What the link screen says is going on: waiting, or why it failed.
+    link_status: gtk::Label,
+    /// The QR code, a spinner while it comes, or an error icon.
+    qr_stack: gtk::Stack,
+    qr: gtk::Image,
     link_retry: gtk::Button,
     linking: Cell<bool>,
     split: adw::NavigationSplitView,
@@ -144,23 +153,98 @@ impl Window {
             .css_classes(["pill", "suggested-action"])
             .build();
         let status = adw::StatusPage::builder().child(&retry).build();
-        let qr = gtk::Picture::builder()
-            .width_request(264)
-            .height_request(264)
-            .halign(gtk::Align::Center)
-            .alternative_text("QR code to link this device")
+        // Link screen: steps on one side, the QR code on the other; stacked
+        // on narrow windows.
+        let link_title = gtk::Label::builder()
+            .label("Link Wassup to your phone")
+            .wrap(true)
+            .xalign(0.0)
+            .css_classes(["title-1"])
+            .build();
+        let steps = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        for (n, step) in [
+            "Open WhatsApp on your phone.",
+            "Open Settings, or the ⋮ menu on Android, and choose Linked devices.",
+            "Tap Link a device.",
+            "Point your phone at this screen to scan the code.",
+        ]
+        .iter()
+        .enumerate()
+        {
+            steps.append(
+                &gtk::Label::builder()
+                    .label(format!("{}.  {step}", n + 1))
+                    .wrap(true)
+                    .xalign(0.0)
+                    .css_classes(["link-step"])
+                    .build(),
+            );
+        }
+        let link_status = gtk::Label::builder()
+            .wrap(true)
+            .xalign(0.0)
+            .css_classes(["dim-label"])
             .build();
         let link_retry = gtk::Button::builder()
             .label("Try Again")
-            .halign(gtk::Align::Center)
+            .halign(gtk::Align::Start)
             .css_classes(["pill", "suggested-action"])
             .build();
-        let link_box = gtk::Box::new(gtk::Orientation::Vertical, 24);
-        link_box.append(&qr);
-        link_box.append(&link_retry);
-        let link = adw::StatusPage::builder()
-            .title("Link This Device")
-            .child(&link_box)
+        let link_text = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(18)
+            .hexpand(true)
+            .valign(gtk::Align::Center)
+            .build();
+        link_text.append(&link_title);
+        link_text.append(&steps);
+        link_text.append(&link_status);
+        link_text.append(&link_retry);
+        let qr = gtk::Image::builder()
+            .pixel_size(QR_SIZE)
+            .accessible_role(gtk::AccessibleRole::Img)
+            .build();
+        qr.update_property(&[gtk::accessible::Property::Label(
+            "QR code to link this device",
+        )]);
+        let qr_stack = gtk::Stack::builder()
+            .width_request(QR_SIZE)
+            .height_request(QR_SIZE)
+            .build();
+        qr_stack.add_named(&adw::Spinner::new(), Some("waiting"));
+        qr_stack.add_named(&qr, Some("code"));
+        qr_stack.add_named(
+            &gtk::Image::builder()
+                .icon_name("dialog-error-symbolic")
+                .pixel_size(64)
+                .css_classes(["dim-label"])
+                .build(),
+            Some("failed"),
+        );
+        let qr_card = gtk::Box::builder()
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::Center)
+            .css_classes(["qr-card"])
+            .build();
+        qr_card.append(&qr_stack);
+        let link_columns = gtk::Box::builder()
+            .spacing(48)
+            .margin_top(36)
+            .margin_bottom(36)
+            .margin_start(24)
+            .margin_end(24)
+            .valign(gtk::Align::Center)
+            .build();
+        link_columns.append(&link_text);
+        link_columns.append(&qr_card);
+        let link = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .child(
+                &adw::Clamp::builder()
+                    .maximum_size(820)
+                    .child(&link_columns)
+                    .build(),
+            )
             .build();
 
         let owner = Owner::default();
@@ -387,6 +471,11 @@ impl Window {
             adw::BreakpointCondition::parse("max-width: 600sp").expect("valid condition"),
         );
         narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
+        narrow.add_setter(
+            &link_columns,
+            "orientation",
+            Some(&gtk::Orientation::Vertical.to_value()),
+        );
         window.add_breakpoint(narrow);
 
         let ui = Rc::new(Self {
@@ -414,7 +503,8 @@ impl Window {
             status,
             retry,
             toasts,
-            link,
+            link_status,
+            qr_stack,
             qr,
             link_retry,
             linking: Cell::new(false),
@@ -850,15 +940,16 @@ impl Window {
             Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
-                self.link.set_description(Some(
-                    "Open WhatsApp on your phone, go to Linked Devices and scan this code.",
-                ));
+                self.qr_stack.set_visible_child_name("code");
+                self.link_status
+                    .set_label("The code changes every minute or so.");
             }
             Some(event::Kind::LinkFailed(failed)) if self.is_current(&failed.account_id) => {
                 self.linking.set(false);
                 self.qr.set_paintable(None::<&gdk::Paintable>);
-                self.link
-                    .set_description(Some(&format!("Linking failed: {}", failed.reason)));
+                self.qr_stack.set_visible_child_name("failed");
+                self.link_status
+                    .set_label(&format!("Linking failed: {}", failed.reason));
                 self.link_retry.set_visible(true);
             }
             _ => {}
@@ -1426,7 +1517,8 @@ impl Window {
         self.linking.set(true);
         self.link_retry.set_visible(false);
         self.qr.set_paintable(None::<&gdk::Paintable>);
-        self.link.set_description(Some("Preparing a code…"));
+        self.qr_stack.set_visible_child_name("waiting");
+        self.link_status.set_label("Preparing a code…");
         self.send(request::Kind::LinkAccount(ipc::LinkAccount {
             account_id: id,
         }));
