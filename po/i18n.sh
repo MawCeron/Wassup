@@ -9,7 +9,7 @@ case "${1:-}" in
 update)
 	common="--package-name=Wassup --msgid-bugs-address=https://github.com/MawCeron/Wassup/issues --from-code=UTF-8 --add-comments=TRANSLATORS: --sort-by-file"
 	xgettext $common -L Rust -k -kgettext -kngettext:1,2 -o po/wassup.pot ui/src/*.rs ui/src/window/*.rs
-	xgettext $common -L Go -k -ktr -j -o po/wassup.pot $(ls daemon/*.go | grep -v _test.go)
+	xgettext $common -L Go -k -ktr -ktrn:1,2 -j -o po/wassup.pot $(ls daemon/*.go | grep -v _test.go)
 	xgettext $common -L Desktop -j -o po/wassup.pot packaging/io.github.MawCeron.Wassup.desktop
 	for lang in $(cat po/LINGUAS); do
 		msgmerge -q --no-fuzzy-matching --update --backup=none "po/$lang.po" po/wassup.pot

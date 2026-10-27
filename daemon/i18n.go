@@ -12,9 +12,17 @@ import (
 // to it into po/wassup.pot.
 func tr(s string) string { return get(s) }
 
-// get is gotext.Get, which only formats when given arguments. Calling it
-// through a variable keeps vet from taking every message for a format.
-var get = gotext.Get
+// trn is tr for a message that depends on a count, picking the plural form
+// the language needs. The count goes in with the message's {}.
+func trn(one, many string, n int) string { return getN(one, many, n) }
+
+// get and getN are gotext.Get and GetN, which only format when given
+// arguments. Calling them through variables keeps vet from taking every
+// message for a format.
+var (
+	get  = gotext.Get
+	getN = gotext.GetN
+)
 
 // initLocale loads the translations for language, or for the system's
 // language if it is empty, from the same .mo files as the UI.

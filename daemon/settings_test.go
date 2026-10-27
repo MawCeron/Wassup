@@ -16,7 +16,7 @@ func TestSettingsSaved(t *testing.T) {
 	if _, err := d.setSettings(&ipc.Settings{Language: "../../etc"}); err == nil {
 		t.Fatal("accepted a path as the language")
 	}
-	want := &ipc.Settings{HideNotificationContent: true, MediaCacheMb: 200, GpuRendering: true, Language: "pt_BR"}
+	want := &ipc.Settings{HideNotificationContent: true, MediaCacheMb: 200, GpuRendering: true, Language: "pt_BR", TrayIcon: false}
 	if _, err := d.setSettings(want); err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestSettingsSaved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c != (config{HideNotificationContent: true, MediaCacheMB: 200, GPURendering: true, Language: "pt_BR"}) {
+	if c != (config{HideNotificationContent: true, MediaCacheMB: 200, GPURendering: true, Language: "pt_BR", HideTrayIcon: true}) {
 		t.Fatalf("saved %+v", c)
 	}
 }

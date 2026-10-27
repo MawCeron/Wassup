@@ -93,6 +93,8 @@ func run() error {
 	}
 	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
 	d.configDir, d.config = configDir, cfg
+	d.tray.setEnabled(!cfg.HideTrayIcon)
+	d.refreshTray()
 	go d.sweepExpired(context.Background())
 	for _, a := range accounts {
 		if a.client.Store.ID != nil {
@@ -184,6 +186,7 @@ type daemon struct {
 	active map[net.Conn]string
 	// Stops serve; set by run.
 	stop func()
+	tray tray
 	// Preferences, saved to configDir/config.json when changed.
 	configMu  sync.Mutex
 	configDir string
@@ -290,6 +293,9 @@ func (d *daemon) handle(conn net.Conn) {
 		if ev == nil {
 			continue // Answered later, from the goroutine doing the work.
 		}
+		if ev.GetChatChanged() != nil { // Marking a chat read answers with it.
+			go d.refreshTray()
+		}
 		d.mu.Lock()
 		err := write(conn, ev)
 		d.mu.Unlock()
@@ -306,6 +312,9 @@ func (d *daemon) handle(conn net.Conn) {
 
 // broadcast sends an unsolicited event to every connected UI.
 func (d *daemon) broadcast(ev *ipc.Event) {
+	if ev.GetChatChanged() != nil {
+		go d.refreshTray()
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for conn := range d.conns {

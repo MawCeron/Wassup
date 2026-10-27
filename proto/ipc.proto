@@ -293,6 +293,8 @@ message Settings {
   // Language code such as "es" or "pt_BR"; empty follows the system. The
   // daemon switches at once, the UI at its next start.
   string language = 4;
+  // Show the unread count as a status icon, where the desktop has a tray.
+  bool tray_icon = 5;
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with

@@ -1175,6 +1175,14 @@ impl Window {
             .title(gettext("Notifications"))
             .build();
         notifications.add(&hide_content);
+        let tray_icon = adw::SwitchRow::builder()
+            .title(gettext("Status Icon"))
+            .subtitle(gettext(
+                "Shows the unread count in the top bar, on desktops that support status icons",
+            ))
+            .active(settings.tray_icon)
+            .build();
+        notifications.add(&tray_icon);
         let cache = adw::SpinRow::builder()
             .title(gettext("Media Cache Size"))
             .subtitle(gettext("Downloaded photos, stickers, documents and audio, in MB. The oldest are deleted first."))
@@ -1244,6 +1252,8 @@ impl Window {
             gpu,
             #[weak]
             language,
+            #[weak]
+            tray_icon,
             move || {
                 ui.send(request::Kind::SetSettings(ipc::SetSettings {
                     settings: Some(ipc::Settings {
@@ -1251,11 +1261,12 @@ impl Window {
                         media_cache_mb: cache.value() as u32,
                         gpu_rendering: gpu.is_active(),
                         language: languages[language.selected() as usize].0.to_owned(),
+                        tray_icon: tray_icon.is_active(),
                     }),
                 }));
             }
         ));
-        for row in [&hide_content, &gpu] {
+        for row in [&hide_content, &gpu, &tray_icon] {
             let save = save.clone();
             row.connect_active_notify(move |_| save());
         }

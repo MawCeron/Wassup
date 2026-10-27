@@ -28,6 +28,9 @@ type config struct {
 	GPURendering bool `json:"gpu_rendering"`
 	// Language code such as "es"; empty follows the system.
 	Language string `json:"language"`
+	// The tray icon is on unless turned off, as it only shows where the
+	// desktop has a tray.
+	HideTrayIcon bool `json:"hide_tray_icon"`
 }
 
 // languageCode is what a language setting may look like. It becomes part

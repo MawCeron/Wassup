@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math"
 	"path/filepath"
 
@@ -20,7 +21,17 @@ func (d *daemon) settings() *ipc.Settings {
 		MediaCacheMb:            uint32(mb),
 		GpuRendering:            d.config.GPURendering,
 		Language:                d.config.Language,
+		TrayIcon:                !d.config.HideTrayIcon,
 	}
+}
+
+// refreshTray shows the current unread count on the tray icon.
+func (d *daemon) refreshTray() {
+	total := 0
+	for _, a := range d.accounts {
+		total += a.unreadCount(context.Background())
+	}
+	d.tray.setUnread(total)
 }
 
 // setSettings saves the preferences and applies those the daemon uses.
@@ -30,6 +41,7 @@ func (d *daemon) setSettings(s *ipc.Settings) (*ipc.Settings, error) {
 		MediaCacheMB:            int(min(s.GetMediaCacheMb(), math.MaxInt32)),
 		GPURendering:            s.GetGpuRendering(),
 		Language:                s.GetLanguage(),
+		HideTrayIcon:            !s.GetTrayIcon(),
 	}
 	if err := c.validate(); err != nil {
 		return nil, err
@@ -47,6 +59,8 @@ func (d *daemon) setSettings(s *ipc.Settings) (*ipc.Settings, error) {
 	if languageChanged {
 		initLocale(c.Language)
 	}
+	d.tray.setEnabled(!c.HideTrayIcon)
+	d.refreshTray()
 	if d.notify != nil {
 		d.notify.hideContent.Store(c.HideNotificationContent)
 	}

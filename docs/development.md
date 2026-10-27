@@ -105,6 +105,7 @@ optional; every option defaults to off.
 | `hide_notification_content` | Notifications show the chat but not the message text. |
 | `media_cache_mb` | Size of the media cache; the least recently used files go first. Default 500. |
 | `gpu_rendering` | The UI draws with the GPU instead of in software. Off by default; see below. |
+| `hide_tray_icon` | Turns off the status icon with the unread count. |
 | `language` | Language code such as `es` or `pt_BR`; empty or missing follows the system. The daemon switches at once, the UI at its next start. |
 
 An unknown option or a syntax error stops the daemon instead of being
@@ -183,6 +184,19 @@ image opens the cached file in the default image viewer.
 Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
+
+## Status icon
+
+The daemon shows the unread count as a StatusNotifierItem, the tray
+protocol most desktops support. GNOME needs the AppIndicator extension
+(`gnome-shell-extension-appindicator` in Fedora). Without a tray the
+icon simply does not show; it appears once the extension is enabled.
+Clicking it opens Wassup. The count leaves out muted chats and locked
+ones, so the icon does not give locked chats away.
+
+To test it without a tray, run the daemon on a private bus with a small
+`org.kde.StatusNotifierWatcher` stand-in, and point every XDG directory of
+the daemon at temporary ones so it does not open the real account.
 
 ## Linked device name
 
