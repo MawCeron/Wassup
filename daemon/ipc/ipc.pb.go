@@ -1705,9 +1705,16 @@ type Chat struct {
 	AvatarPath string `protobuf:"bytes,7,opt,name=avatar_path,json=avatarPath,proto3" json:"avatar_path,omitempty"`
 	// Locked on the phone: the UI keeps it out of sight until unlocked, and
 	// its notifications carry no sender or preview.
-	Locked        bool `protobuf:"varint,8,opt,name=locked,proto3" json:"locked,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Locked bool `protobuf:"varint,8,opt,name=locked,proto3" json:"locked,omitempty"`
+	// The newest message, as the chat list previews it: its text, or what
+	// kind of media it is. Empty when the chat has no messages.
+	LastMessage string        `protobuf:"bytes,9,opt,name=last_message,json=lastMessage,proto3" json:"last_message,omitempty"`
+	LastFromMe  bool          `protobuf:"varint,10,opt,name=last_from_me,json=lastFromMe,proto3" json:"last_from_me,omitempty"`
+	LastStatus  MessageStatus `protobuf:"varint,11,opt,name=last_status,json=lastStatus,proto3,enum=wassup.ipc.v1.MessageStatus" json:"last_status,omitempty"`
+	// Who wrote it, in groups; empty for own messages or when unknown.
+	LastSenderName string `protobuf:"bytes,12,opt,name=last_sender_name,json=lastSenderName,proto3" json:"last_sender_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Chat) Reset() {
@@ -1794,6 +1801,34 @@ func (x *Chat) GetLocked() bool {
 		return x.Locked
 	}
 	return false
+}
+
+func (x *Chat) GetLastMessage() string {
+	if x != nil {
+		return x.LastMessage
+	}
+	return ""
+}
+
+func (x *Chat) GetLastFromMe() bool {
+	if x != nil {
+		return x.LastFromMe
+	}
+	return false
+}
+
+func (x *Chat) GetLastStatus() MessageStatus {
+	if x != nil {
+		return x.LastStatus
+	}
+	return MessageStatus_MESSAGE_STATUS_UNSPECIFIED
+}
+
+func (x *Chat) GetLastSenderName() string {
+	if x != nil {
+		return x.LastSenderName
+	}
+	return ""
 }
 
 type Message struct {
@@ -3457,7 +3492,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
 	"\x03jid\x18\x02 \x01(\tR\x03jid\x12\x1b\n" +
 	"\tpush_name\x18\x03 \x01(\tR\bpushName\x124\n" +
-	"\x05state\x18\x04 \x01(\x0e2\x1e.wassup.ipc.v1.ConnectionStateR\x05state\"\xef\x01\n" +
+	"\x05state\x18\x04 \x01(\x0e2\x1e.wassup.ipc.v1.ConnectionStateR\x05state\"\x9d\x03\n" +
 	"\x04Chat\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x10\n" +
@@ -3468,7 +3503,14 @@ const file_ipc_proto_rawDesc = "" +
 	"\x12last_message_at_ms\x18\x06 \x01(\x03R\x0flastMessageAtMs\x12\x1f\n" +
 	"\vavatar_path\x18\a \x01(\tR\n" +
 	"avatarPath\x12\x16\n" +
-	"\x06locked\x18\b \x01(\bR\x06locked\"\xd8\x03\n" +
+	"\x06locked\x18\b \x01(\bR\x06locked\x12!\n" +
+	"\flast_message\x18\t \x01(\tR\vlastMessage\x12 \n" +
+	"\flast_from_me\x18\n" +
+	" \x01(\bR\n" +
+	"lastFromMe\x12=\n" +
+	"\vlast_status\x18\v \x01(\x0e2\x1c.wassup.ipc.v1.MessageStatusR\n" +
+	"lastStatus\x12(\n" +
+	"\x10last_sender_name\x18\f \x01(\tR\x0elastSenderName\"\xd8\x03\n" +
 	"\aMessage\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -3726,21 +3768,22 @@ var file_ipc_proto_depIdxs = []int32{
 	21, // 35: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
 	22, // 36: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
 	0,  // 37: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
-	2,  // 38: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
-	28, // 39: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
-	27, // 40: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
-	26, // 41: wassup.ipc.v1.Message.link:type_name -> wassup.ipc.v1.LinkPreview
-	23, // 42: wassup.ipc.v1.Message.reactions:type_name -> wassup.ipc.v1.Reaction
-	23, // 43: wassup.ipc.v1.ReactionsChanged.reactions:type_name -> wassup.ipc.v1.Reaction
-	1,  // 44: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
-	32, // 45: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
-	38, // 46: wassup.ipc.v1.SetSettings.settings:type_name -> wassup.ipc.v1.Settings
-	2,  // 47: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
-	48, // [48:48] is the sub-list for method output_type
-	48, // [48:48] is the sub-list for method input_type
-	48, // [48:48] is the sub-list for extension type_name
-	48, // [48:48] is the sub-list for extension extendee
-	0,  // [0:48] is the sub-list for field type_name
+	2,  // 38: wassup.ipc.v1.Chat.last_status:type_name -> wassup.ipc.v1.MessageStatus
+	2,  // 39: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
+	28, // 40: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
+	27, // 41: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
+	26, // 42: wassup.ipc.v1.Message.link:type_name -> wassup.ipc.v1.LinkPreview
+	23, // 43: wassup.ipc.v1.Message.reactions:type_name -> wassup.ipc.v1.Reaction
+	23, // 44: wassup.ipc.v1.ReactionsChanged.reactions:type_name -> wassup.ipc.v1.Reaction
+	1,  // 45: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
+	32, // 46: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
+	38, // 47: wassup.ipc.v1.SetSettings.settings:type_name -> wassup.ipc.v1.Settings
+	2,  // 48: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
+	49, // [49:49] is the sub-list for method output_type
+	49, // [49:49] is the sub-list for method input_type
+	49, // [49:49] is the sub-list for extension type_name
+	49, // [49:49] is the sub-list for extension extendee
+	0,  // [0:49] is the sub-list for field type_name
 }
 
 func init() { file_ipc_proto_init() }

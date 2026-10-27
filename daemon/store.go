@@ -279,7 +279,7 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	if err != nil {
 		return nil, nil, err
 	}
-	chat, err := a.scanChat(tx.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, msg.ChatJid))
+	chat, err := a.scanChat(ctx, tx.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, msg.ChatJid))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -362,14 +362,45 @@ func (a *account) named(ctx context.Context, chat *ipc.Chat) *ipc.Chat {
 	return chat
 }
 
-const chatQuery = `SELECT jid, name, is_group, unread_count, last_message_at_ms, avatar_id,
-	EXISTS (SELECT 1 FROM wassup_locked_chats l WHERE l.jid = wassup_chats.jid) FROM wassup_chats`
+// lastMessageText previews a message on one line: its text, or for media
+// without a caption what kind it is, as a quote shows it.
+func lastMessageText(text string, media []byte) string {
+	if text == "" && media != nil {
+		var m waE2E.Message
+		if proto.Unmarshal(media, &m) == nil {
+			text = quotedText(&m)
+		}
+	}
+	return strings.Join(strings.Fields(text), " ")
+}
 
-func (a *account) scanChat(row interface{ Scan(...any) error }) (*ipc.Chat, error) {
+// chatQuery reads chats with their newest message, found through the
+// (chat_jid, timestamp_ms, id) index.
+const chatQuery = `SELECT jid, name, is_group, unread_count, last_message_at_ms, avatar_id,
+	EXISTS (SELECT 1 FROM wassup_locked_chats l WHERE l.jid = wassup_chats.jid),
+	m.text, m.from_me, m.sender_jid, m.status, m.media
+	FROM wassup_chats LEFT JOIN wassup_messages m ON m.chat_jid = wassup_chats.jid AND m.id =
+		(SELECT id FROM wassup_messages WHERE chat_jid = wassup_chats.jid ORDER BY timestamp_ms DESC, id DESC LIMIT 1)`
+
+func (a *account) scanChat(ctx context.Context, row interface{ Scan(...any) error }) (*ipc.Chat, error) {
 	c := &ipc.Chat{AccountId: a.id}
 	var avatarID string
-	if err := row.Scan(&c.Jid, &c.Name, &c.IsGroup, &c.UnreadCount, &c.LastMessageAtMs, &avatarID, &c.Locked); err != nil {
+	var text, sender sql.NullString
+	var fromMe sql.NullBool
+	var status sql.NullInt32
+	var media []byte
+	if err := row.Scan(&c.Jid, &c.Name, &c.IsGroup, &c.UnreadCount, &c.LastMessageAtMs, &avatarID, &c.Locked,
+		&text, &fromMe, &sender, &status, &media); err != nil {
 		return nil, err
+	}
+	if text.Valid {
+		c.LastMessage = lastMessageText(text.String, media)
+		c.LastFromMe, c.LastStatus = fromMe.Bool, ipc.MessageStatus(status.Int32)
+		if c.IsGroup && !c.LastFromMe {
+			if jid, err := types.ParseJID(sender.String); err == nil {
+				c.LastSenderName = a.contactName(ctx, jid)
+			}
+		}
 	}
 	if path := a.avatarPath(c.Jid, avatarID); path != "" {
 		if _, err := os.Stat(path); err == nil {
@@ -387,7 +418,7 @@ func (a *account) listChats(ctx context.Context) ([]*ipc.Chat, error) {
 	defer rows.Close()
 	var chats []*ipc.Chat
 	for rows.Next() {
-		c, err := a.scanChat(rows)
+		c, err := a.scanChat(ctx, rows)
 		if err != nil {
 			return nil, err
 		}
@@ -631,7 +662,7 @@ func (a *account) markRead(ctx context.Context, chatJID string) (*ipc.Chat, erro
 	if _, err := a.db.ExecContext(ctx, `UPDATE wassup_chats SET unread_count = 0 WHERE jid = ?`, chatJID); err != nil {
 		return nil, err
 	}
-	c, err := a.scanChat(a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
+	c, err := a.scanChat(ctx, a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
 	if err != nil {
 		return nil, err
 	}

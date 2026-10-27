@@ -105,7 +105,7 @@ func (a *account) onAppState(ctx context.Context, index []string, value *waSyncA
 			if err := a.setLocked(ctx, index[1], value.GetLockChatAction().GetLocked()); err != nil {
 				a.log.Warn("chat lock", "err", err)
 			}
-			return a.lockedChat(ctx, index[1])
+			return a.chatInfo(ctx, index[1])
 		}
 	case appstate.IndexSettingChatLock:
 		if err := a.saveLockSettings(ctx, value.GetChatLockSettings()); err != nil {

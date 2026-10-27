@@ -51,7 +51,7 @@ func (d *daemon) fetchAvatar(a *account, chatJID string) {
 		if !changed {
 			return
 		}
-		chat, err := a.scanChat(a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
+		chat, err := a.scanChat(ctx, a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
 		if err != nil {
 			a.log.Warn("fetch avatar", "chat", chatJID, "err", err)
 			return

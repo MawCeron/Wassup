@@ -172,6 +172,13 @@ message Chat {
   // Locked on the phone: the UI keeps it out of sight until unlocked, and
   // its notifications carry no sender or preview.
   bool locked = 8;
+  // The newest message, as the chat list previews it: its text, or what
+  // kind of media it is. Empty when the chat has no messages.
+  string last_message = 9;
+  bool last_from_me = 10;
+  MessageStatus last_status = 11;
+  // Who wrote it, in groups; empty for own messages or when unknown.
+  string last_sender_name = 12;
 }
 
 message Message {

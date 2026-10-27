@@ -210,3 +210,38 @@ func mustMarshal(t *testing.T, m proto.Message) []byte {
 	}
 	return b
 }
+
+func TestChatPreview(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := openAccounts(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeAccounts(accounts)
+	a := accounts[0]
+	group := types.NewJID("120363000000000009", types.GroupServer)
+	ana := types.NewJID("5215522222222", types.DefaultUserServer)
+	save := func(id string, sec int, m *waE2E.Message) {
+		t.Helper()
+		if _, _, err := a.saveMessage(ctx, &events.Message{
+			Info: types.MessageInfo{
+				MessageSource: types.MessageSource{Chat: group, Sender: ana, IsGroup: true},
+				ID:            types.MessageID(id), Timestamp: time.Unix(1_700_000_000+int64(sec), 0),
+			},
+			Message: m,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	save("1", 1, &waE2E.Message{Conversation: proto.String("primero")})
+	save("2", 2, &waE2E.Message{Conversation: proto.String("dos\nlíneas")})
+	c := a.chatInfo(ctx, group.String())
+	if c.LastMessage != "dos líneas" || c.LastFromMe {
+		t.Fatalf("preview of text: %q", c.LastMessage)
+	}
+	save("3", 3, &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Mimetype: proto.String("image/jpeg")}})
+	chats, _ := a.listChats(ctx)
+	if chats[0].LastMessage != "Photo" {
+		t.Fatalf("preview of a photo: %q", chats[0].LastMessage)
+	}
+}

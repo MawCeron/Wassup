@@ -148,6 +148,10 @@ func (d *daemon) sweepExpired(ctx context.Context) {
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_MessagesExpired{MessagesExpired: &ipc.MessagesExpired{
 					AccountId: a.id, ChatJid: chat, MessageIds: ids,
 				}}})
+				// The chat list must not keep previewing what just went away.
+				if c := a.chatInfo(ctx, chat); c != nil {
+					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: c}})
+				}
 			}
 		}
 		select {

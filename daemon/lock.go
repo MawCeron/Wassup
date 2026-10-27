@@ -122,9 +122,9 @@ func secretMatches(secret *waUserPassword.UserPassword, code string) (bool, erro
 	return subtle.ConstantTimeCompare(got, want) == 1, nil
 }
 
-// lockedChat returns the chat to show for a lock change, if it is known.
-func (a *account) lockedChat(ctx context.Context, chatJID string) *ipc.Chat {
-	chat, err := a.scanChat(a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
+// chatInfo returns a chat as the UIs show it, if it is known.
+func (a *account) chatInfo(ctx context.Context, chatJID string) *ipc.Chat {
+	chat, err := a.scanChat(ctx, a.db.QueryRowContext(ctx, chatQuery+` WHERE jid = ?`, chatJID))
 	if err != nil {
 		return nil
 	}
