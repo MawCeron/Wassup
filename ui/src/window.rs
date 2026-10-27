@@ -1312,6 +1312,17 @@ impl Window {
             .active(settings.tray_icon)
             .build();
         notifications.add(&tray_icon);
+        let link_previews = adw::SwitchRow::builder()
+            .title(gettext("Link Previews"))
+            .subtitle(gettext(
+                "Links you send show the page's title and image. Wassup visits the page to get them, as your phone does.",
+            ))
+            .active(settings.link_previews)
+            .build();
+        let messages_group = adw::PreferencesGroup::builder()
+            .title(gettext("Messages"))
+            .build();
+        messages_group.add(&link_previews);
         let cache = adw::SpinRow::builder()
             .title(gettext("Media Cache Size"))
             .subtitle(gettext("Downloaded photos, stickers, documents and audio, in MB. The oldest are deleted first."))
@@ -1364,6 +1375,7 @@ impl Window {
         let page = adw::PreferencesPage::new();
         page.add(&general);
         page.add(&notifications);
+        page.add(&messages_group);
         page.add(&storage);
         page.add(&performance);
         let dialog = adw::PreferencesDialog::new();
@@ -1383,6 +1395,8 @@ impl Window {
             language,
             #[weak]
             tray_icon,
+            #[weak]
+            link_previews,
             move || {
                 ui.send(request::Kind::SetSettings(ipc::SetSettings {
                     settings: Some(ipc::Settings {
@@ -1391,11 +1405,12 @@ impl Window {
                         gpu_rendering: gpu.is_active(),
                         language: languages[language.selected() as usize].0.to_owned(),
                         tray_icon: tray_icon.is_active(),
+                        link_previews: link_previews.is_active(),
                     }),
                 }));
             }
         ));
-        for row in [&hide_content, &gpu, &tray_icon] {
+        for row in [&hide_content, &gpu, &tray_icon, &link_previews] {
             let save = save.clone();
             row.connect_active_notify(move |_| save());
         }

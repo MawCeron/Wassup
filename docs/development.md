@@ -106,6 +106,7 @@ optional; every option defaults to off.
 | `media_cache_mb` | Size of the media cache; the least recently used files go first. Default 500. |
 | `gpu_rendering` | The UI draws with the GPU instead of in software. Off by default; see below. |
 | `hide_tray_icon` | Turns off the status icon with the unread count. |
+| `no_link_previews` | Sends links without a preview, so the daemon never visits them. |
 | `language` | Language code such as `es` or `pt_BR`; empty or missing follows the system. The daemon switches at once, the UI at its next start. |
 
 An unknown option or a syntax error stops the daemon instead of being
@@ -184,6 +185,17 @@ image opens the cached file in the default image viewer.
 Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
+
+## Link previews
+
+Received links show the preview the sender's phone attached to the
+message, so showing them needs no network. For links the user sends, the
+daemon fetches the page before sending, as the phone does: its Open Graph
+title, description and image, or its `<title>` and description. The fetch
+is capped at 5 seconds, 512 KB of page and a 5 MB image of at most 8
+megapixels, shrunk to a 200 px JPEG. Texts go out in the order they were
+written even while a preview is fetched. If anything fails the text goes
+without a preview. Preferences can turn this off.
 
 ## Status icon
 
