@@ -1,0 +1,17 @@
+The font this project builds is an adaptation of the Twemoji graphics.
+
+Graphics: Twemoji, from https://github.com/jdecked/twemoji, version 17.0.3.
+  Copyright (c) 2014-2021 Twitter
+  Copyright (c) 2022-present Jason Sofonia & Justine De Caires
+  Licensed under CC BY 4.0, https://creativecommons.org/licenses/by/4.0/
+  (the full text is in LICENSE-GRAPHICS).
+
+Changes: each graphic is converted to an indexed-color PNG, centered on a
+76x72 canvas and packed into a font with color bitmap tables (CBDT and CBLC),
+with ligature rules for the emoji sequences. The graphics are otherwise
+unchanged.
+
+Code: build_cbdt.py, build.sh and check.py are under the MIT License (LICENSE).
+
+This project is independent. It is not affiliated with, endorsed by or
+connected to Twitter, X Corp. or the Twemoji project.
