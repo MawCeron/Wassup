@@ -1,3 +1,4 @@
+mod emoji_font;
 mod ipc;
 mod sticker;
 mod window;
@@ -104,6 +105,7 @@ fn main() -> glib::ExitCode {
     let config = std::fs::read_to_string(glib::user_config_dir().join("wassup/config.json"))
         .unwrap_or_default();
     choose_renderer(&config);
+    emoji_font::prefer_twemoji();
     init_locale(&config);
     gio::resources_register_include!("wassup.gresource").expect("bundled resources");
     // Every launch is forwarded to the running instance, if there is one.
