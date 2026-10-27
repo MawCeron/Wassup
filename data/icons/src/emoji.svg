@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <title>Emoji</title>
+  <path d="M2 8 A6 6 0 1 0 14 8 A6 6 0 1 0 2 8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M5 6 A1 1 0 1 0 7 6 A1 1 0 1 0 5 6Z" fill="currentColor"/>
+  <path d="M9 6 A1 1 0 1 0 11 6 A1 1 0 1 0 9 6Z" fill="currentColor"/>
+  <path d="M5.5 9.75 Q8 12 10.5 9.75" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

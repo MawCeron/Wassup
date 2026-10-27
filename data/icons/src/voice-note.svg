@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
-  <title>Notas de voz</title>
-  <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="5.5" y="1.75" width="5" height="7.5" rx="2.5"/>
-    <path d="M3.25 7.5 A4.75 4.75 0 0 0 12.75 7.5"/>
-    <path d="M8 12.25 V14.25 M5.5 14.25 H10.5"/>
-  </g>
+  <title>Voice note</title>
+  <path d="M8 2 A2 2 0 0 1 10 4 V7 A2 2 0 0 1 6 7 V4 A2 2 0 0 1 8 2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3 7 A5 5 0 0 0 13 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 12 V14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 14 H10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
