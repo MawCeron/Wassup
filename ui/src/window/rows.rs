@@ -205,7 +205,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         bubble.append(&document);
         let voice_icon = gtk::Image::builder()
             .icon_name("wassup-voice-note-symbolic")
-            .tooltip_text(gettext("Voice message"))
+            .tooltip_text(gettext("Voice Message"))
             .build();
         let play = gtk::Button::builder()
             .icon_name("media-playback-start-symbolic")

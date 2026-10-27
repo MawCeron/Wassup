@@ -31,7 +31,7 @@ impl Window {
                 .child(&picture)
                 .css_classes(["flat"])
                 .build();
-            button.update_property(&[gtk::accessible::Property::Label(&gettext("Send sticker"))]);
+            button.update_property(&[gtk::accessible::Property::Label(&gettext("Send Sticker"))]);
             if sticker.path.is_empty() {
                 self.sticker_pictures
                     .borrow_mut()

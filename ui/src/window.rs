@@ -166,7 +166,7 @@ impl Window {
         // Link screen: steps on one side, the QR code on the other; stacked
         // on narrow windows.
         let link_title = gtk::Label::builder()
-            .label(gettext("Link Wassup to your phone"))
+            .label(gettext("Link Wassup to Your Phone"))
             .wrap(true)
             .xalign(0.0)
             .css_classes(["title-1"])
@@ -290,6 +290,8 @@ impl Window {
         sidebar_header.pack_start(&restricted_back);
         let menu = gio::Menu::new();
         menu.append(Some(&gettext("_Preferences")), Some("win.preferences"));
+        menu.append(Some(&gettext("_Keyboard Shortcuts")), Some("win.shortcuts"));
+        menu.append(Some(&gettext("_About Wassup")), Some("win.about"));
         sidebar_header.pack_end(
             &gtk::MenuButton::builder()
                 .icon_name("open-menu-symbolic")
@@ -302,7 +304,7 @@ impl Window {
             .child(
                 &adw::ButtonContent::builder()
                     .icon_name("wassup-lock-symbolic")
-                    .label(gettext("Restricted chats"))
+                    .label(gettext("Restricted Chats"))
                     .halign(gtk::Align::Start)
                     .build(),
             )
@@ -472,7 +474,7 @@ impl Window {
 
         let toasts = adw::ToastOverlay::new();
         let banner = adw::Banner::builder()
-            .title(gettext("Reconnecting to the Wassup daemon…"))
+            .title(gettext("Reconnecting to the Wassup service…"))
             .button_label(gettext("Retry"))
             .build();
         let page = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -588,6 +590,32 @@ impl Window {
         ));
         ui.window.add_action(&preferences);
         app.set_accels_for_action("win.preferences", &["<Control>comma"]);
+        let shortcuts = gio::SimpleAction::new("shortcuts", None);
+        shortcuts.connect_activate(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _| ui.show_shortcuts()
+        ));
+        ui.window.add_action(&shortcuts);
+        app.set_accels_for_action("win.shortcuts", &["<Control>question"]);
+        let about = gio::SimpleAction::new("about", None);
+        about.connect_activate(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _| ui.show_about()
+        ));
+        ui.window.add_action(&about);
+        // GtkWindow already has window.close; Ctrl+Q quits the UI only,
+        // the daemon keeps notifying.
+        app.set_accels_for_action("window.close", &["<Control>w"]);
+        let quit = gio::SimpleAction::new("quit", None);
+        quit.connect_activate(glib::clone!(
+            #[weak]
+            app,
+            move |_, _| app.quit()
+        ));
+        app.add_action(&quit);
+        app.set_accels_for_action("app.quit", &["<Control>q"]);
         ui.restricted_entry.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -881,7 +909,7 @@ impl Window {
             Ok(pair) => pair,
             Err(e) => {
                 return self
-                    .disconnected(&gettext("Can't reach the Wassup daemon"), &e.to_string());
+                    .disconnected(&gettext("Can't Reach the Wassup Service"), &e.to_string());
             }
         };
         self.conn.replace(Some(conn));
@@ -913,7 +941,7 @@ impl Window {
                     Err(e) => {
                         ui.conn.take();
                         ui.disconnected(
-                            &gettext("Lost the connection to the daemon"),
+                            &gettext("Lost Connection to the Wassup Service"),
                             &e.to_string(),
                         );
                         break;
@@ -953,7 +981,9 @@ impl Window {
         let sent = self.conn.borrow().as_ref()?.send(kind);
         sent.inspect_err(|e| {
             // TRANSLATORS: {} is the error from the system.
-            self.toast(&gettext("Couldn't reach the daemon: {}").replace("{}", &e.to_string()))
+            self.toast(
+                &gettext("Couldn't reach the Wassup service: {}").replace("{}", &e.to_string()),
+            )
         })
         .ok()
     }
@@ -1001,8 +1031,8 @@ impl Window {
                 match list.accounts.into_iter().next() {
                     Some(account) => self.set_account(account),
                     None => self.show_status(
-                        &gettext("No account"),
-                        &gettext("The daemon has no account yet."),
+                        &gettext("No Account"),
+                        &gettext("The Wassup service has no account yet."),
                         false,
                     ),
                 }
@@ -1235,6 +1265,61 @@ impl Window {
         dialog.present(Some(&self.window));
     }
 
+    fn show_shortcuts(&self) {
+        let section = |title: Option<String>, items: &[(String, &str)]| {
+            let section = adw::ShortcutsSection::new(title.as_deref());
+            for (title, accel) in items {
+                section.add(adw::ShortcutsItem::new(title, accel));
+            }
+            section
+        };
+        let dialog = adw::ShortcutsDialog::new();
+        dialog.add(section(
+            Some(gettext("Chats")),
+            &[
+                (gettext("Open the next or previous chat"), "Up Down"),
+                (gettext("Write in the open chat"), "Return"),
+                (gettext("Back to the chat list"), "Escape"),
+            ],
+        ));
+        dialog.add(section(
+            Some(gettext("Writing")),
+            &[
+                (gettext("Send the message"), "Return"),
+                (gettext("New line"), "<Shift>Return"),
+            ],
+        ));
+        dialog.add(section(
+            Some(gettext("General")),
+            &[
+                (gettext("Preferences"), "<Control>comma"),
+                (gettext("Keyboard shortcuts"), "<Control>question"),
+                (gettext("Close the window"), "<Control>w"),
+                (gettext("Quit"), "<Control>q"),
+            ],
+        ));
+        dialog.present(Some(&self.window));
+    }
+
+    fn show_about(&self) {
+        let about = adw::AboutDialog::builder()
+            .application_name("Wassup")
+            .application_icon("io.github.MawCeron.Wassup")
+            .developer_name("Mauricio Cerón Medina")
+            .version(env!("CARGO_PKG_VERSION"))
+            .website("https://github.com/MawCeron/Wassup")
+            .issue_url("https://github.com/MawCeron/Wassup/issues")
+            .license_type(gtk::License::Gpl30)
+            .copyright("© 2026 Mauricio Cerón Medina")
+            .comments(gettext(
+                "An unofficial WhatsApp client for GNOME. Wassup is not affiliated with WhatsApp or Meta.",
+            ))
+            // TRANSLATORS: Put your name here, as it should be credited.
+            .translator_credits(gettext("translator-credits"))
+            .build();
+        about.present(Some(&self.window));
+    }
+
     /// Reads a message that arrived in the open chat to screen reader users.
     fn announce(&self, msg: &ipc::Message) {
         let what = match msg.media.as_ref() {
@@ -1274,7 +1359,7 @@ impl Window {
             .build();
         dialog.add_responses(&[
             ("cancel", &gettext("Cancel")),
-            ("continue", &gettext("Continue")),
+            ("continue", &gettext("Unlock")),
         ]);
         dialog.set_response_appearance("continue", adw::ResponseAppearance::Suggested);
         dialog.set_response_enabled("continue", false);
@@ -1312,7 +1397,7 @@ impl Window {
         self.chat_filter.changed(gtk::FilterChange::Different);
         self.restricted_back.set_visible(true);
         self.show_restricted_entry();
-        self.sidebar_title.set_title(&gettext("Restricted chats"));
+        self.sidebar_title.set_title(&gettext("Restricted Chats"));
         self.reselect_current();
         self.toast(&gettext("Restricted chats unlocked"));
     }

@@ -197,6 +197,8 @@ is unlinked and linked again.
 | Escape | Message box | Back to the chat list |
 | Tab | Conversation | Reach photos, documents and audio controls, which open with Enter or Space |
 | Ctrl+, | Anywhere | Preferences |
+| Ctrl+? | Anywhere | Keyboard shortcuts |
+| Ctrl+W / Ctrl+Q | Anywhere | Close the window / quit the UI; the daemon keeps running |
 
 Every control has a name for screen readers, and a chat row reads its
 unread count. Messages that arrive in the open chat are announced. To
