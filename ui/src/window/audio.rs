@@ -1,6 +1,7 @@
 //! Playing audio and voice notes.
 
 use super::*;
+use gettextrs::gettext;
 
 impl Window {
     /// Plays or pauses a message's audio, downloading it first if needed.
@@ -51,16 +52,15 @@ impl Window {
                 ui.stop_audio();
             }
         });
-        media.connect_error_notify(glib::clone!(
-            #[weak(rename_to = ui)]
-            self,
-            move |stream| {
-                if let Some(e) = stream.error() {
-                    ui.toast(&format!("Couldn't play the audio: {e}"));
-                    ui.stop_audio();
-                }
+        // A plain closure, not glib::clone!, so xgettext finds the message.
+        let weak = Rc::downgrade(self);
+        media.connect_error_notify(move |stream| {
+            if let (Some(ui), Some(e)) = (weak.upgrade(), stream.error()) {
+                // TRANSLATORS: {} is the reason, from GStreamer.
+                ui.toast(&gettext("Couldn't play the audio: {}").replace("{}", &e.to_string()));
+                ui.stop_audio();
             }
-        ));
+        });
         media.play();
         self.player.replace(Some(Player {
             msg_id: msg_id.to_owned(),
@@ -132,7 +132,11 @@ pub(super) fn show_audio(row: &gtk::Box, duration: u32, playing: Option<&gtk::Me
     } else {
         "media-playback-start-symbolic"
     });
-    play.set_tooltip_text(Some(if running { "Pause" } else { "Play" }));
+    play.set_tooltip_text(Some(&if running {
+        gettext("Pause")
+    } else {
+        gettext("Play")
+    }));
     progress.set_range(0.0, total);
     progress.set_value(at);
     length.set_label(&clock(if playing.is_some() {

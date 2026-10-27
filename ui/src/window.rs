@@ -5,6 +5,7 @@ use std::os::unix::fs::DirBuilderExt;
 use std::rc::Rc;
 
 use adw::prelude::*;
+use gettextrs::gettext;
 use gtk::{gdk, gio, glib};
 
 use crate::ipc::{self, event, request};
@@ -155,7 +156,7 @@ pub struct Window {
 impl Window {
     pub fn build(app: &adw::Application) -> Rc<Self> {
         let retry = gtk::Button::builder()
-            .label("Retry")
+            .label(gettext("Retry"))
             .halign(gtk::Align::Center)
             .css_classes(["pill", "suggested-action"])
             .build();
@@ -163,17 +164,17 @@ impl Window {
         // Link screen: steps on one side, the QR code on the other; stacked
         // on narrow windows.
         let link_title = gtk::Label::builder()
-            .label("Link Wassup to your phone")
+            .label(gettext("Link Wassup to your phone"))
             .wrap(true)
             .xalign(0.0)
             .css_classes(["title-1"])
             .build();
         let steps = gtk::Box::new(gtk::Orientation::Vertical, 10);
         for (n, step) in [
-            "Open WhatsApp on your phone.",
-            "Open Settings, or the ⋮ menu on Android, and choose Linked devices.",
-            "Tap Link a device.",
-            "Point your phone at this screen to scan the code.",
+            gettext("Open WhatsApp on your phone."),
+            gettext("Open Settings, or the ⋮ menu on Android, and choose Linked devices."),
+            gettext("Tap Link a device."),
+            gettext("Point your phone at this screen to scan the code."),
         ]
         .iter()
         .enumerate()
@@ -193,7 +194,7 @@ impl Window {
             .css_classes(["dim-label"])
             .build();
         let link_retry = gtk::Button::builder()
-            .label("Try Again")
+            .label(gettext("Try Again"))
             .halign(gtk::Align::Start)
             .css_classes(["pill", "suggested-action"])
             .build();
@@ -211,9 +212,9 @@ impl Window {
             .pixel_size(QR_SIZE)
             .accessible_role(gtk::AccessibleRole::Img)
             .build();
-        qr.update_property(&[gtk::accessible::Property::Label(
+        qr.update_property(&[gtk::accessible::Property::Label(&gettext(
             "QR code to link this device",
-        )]);
+        ))]);
         let qr_stack = gtk::Stack::builder()
             .width_request(QR_SIZE)
             .height_request(QR_SIZE)
@@ -276,21 +277,21 @@ impl Window {
             .factory(&chat_row_factory(owner.clone()))
             .css_classes(["navigation-sidebar"])
             .build();
-        let sidebar_title = adw::WindowTitle::new("Chats", "");
+        let sidebar_title = adw::WindowTitle::new(&gettext("Chats"), "");
         let sidebar_header = adw::HeaderBar::new();
         sidebar_header.set_title_widget(Some(&sidebar_title));
         let restricted_back = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
-            .tooltip_text("Lock Restricted Chats")
+            .tooltip_text(gettext("Lock Restricted Chats"))
             .visible(false)
             .build();
         sidebar_header.pack_start(&restricted_back);
         let menu = gio::Menu::new();
-        menu.append(Some("_Preferences"), Some("win.preferences"));
+        menu.append(Some(&gettext("_Preferences")), Some("win.preferences"));
         sidebar_header.pack_end(
             &gtk::MenuButton::builder()
                 .icon_name("open-menu-symbolic")
-                .tooltip_text("Main Menu")
+                .tooltip_text(gettext("Main Menu"))
                 .primary(true)
                 .menu_model(&menu)
                 .build(),
@@ -299,7 +300,7 @@ impl Window {
             .child(
                 &adw::ButtonContent::builder()
                     .icon_name("changes-prevent-symbolic")
-                    .label("Restricted chats")
+                    .label(gettext("Restricted chats"))
                     .halign(gtk::Align::Start)
                     .build(),
             )
@@ -321,7 +322,7 @@ impl Window {
         ));
         let placeholder = adw::StatusPage::builder()
             .icon_name("chat-message-new-symbolic")
-            .title("No Chat Selected")
+            .title(gettext("No Chat Selected"))
             .build();
         let rows = BoundRows::default();
         let messages = gio::ListStore::new::<glib::BoxedAnyObject>();
@@ -346,7 +347,7 @@ impl Window {
             .right_margin(10)
             .css_classes(["composer"])
             .build();
-        composer.update_property(&[gtk::accessible::Property::Label("Message")]);
+        composer.update_property(&[gtk::accessible::Property::Label(&gettext("Message"))]);
         // Grows with the text up to a few lines, then scrolls. No scrollbar:
         // reserving room for one would make the empty field two lines tall,
         // and the text view keeps the cursor in sight on its own.
@@ -360,7 +361,7 @@ impl Window {
             .build();
         let send_button = gtk::Button::builder()
             .icon_name("wassup-send-symbolic")
-            .tooltip_text("Send")
+            .tooltip_text(gettext("Send"))
             .valign(gtk::Align::End)
             .css_classes(["circular", "suggested-action"])
             .build();
@@ -373,14 +374,14 @@ impl Window {
             .build();
         let attach = gtk::Button::builder()
             .icon_name("mail-attachment-symbolic")
-            .tooltip_text("Send a File")
+            .tooltip_text(gettext("Send a File"))
             .valign(gtk::Align::End)
             .css_classes(["circular", "flat"])
             .build();
         // Sticker picker: stickers recently sent or received.
-        let sticker_sections = ["Favorites", "Recent"].map(|title| {
+        let sticker_sections = [gettext("Favorites"), gettext("Recent")].map(|title| {
             let heading = gtk::Label::builder()
-                .label(title)
+                .label(&title)
                 .xalign(0.0)
                 .css_classes(["heading"])
                 .build();
@@ -398,12 +399,14 @@ impl Window {
             sticker_lists.append(grid);
         }
         let sticker_empty = gtk::Label::builder()
-            .label("Your favorite stickers and the ones you send show up here.")
+            .label(gettext(
+                "Your favorite stickers and the ones you send show up here.",
+            ))
             .wrap(true)
             .css_classes(["dim-label"])
             .build();
         let create_sticker = gtk::Button::builder()
-            .label("Create from Image…")
+            .label(gettext("Create from Image…"))
             .css_classes(["flat"])
             .build();
         let sticker_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
@@ -421,7 +424,7 @@ impl Window {
         let sticker_popover = gtk::Popover::builder().child(&sticker_box).build();
         let stickers_button = gtk::MenuButton::builder()
             .icon_name("wassup-stickers-symbolic")
-            .tooltip_text("Stickers")
+            .tooltip_text(gettext("Stickers"))
             .valign(gtk::Align::End)
             .popover(&sticker_popover)
             .css_classes(["circular", "flat"])
@@ -448,7 +451,7 @@ impl Window {
         content_view.set_reveal_bottom_bars(false);
         let content = adw::NavigationPage::new(&content_view, "Wassup");
         let split = adw::NavigationSplitView::builder()
-            .sidebar(&adw::NavigationPage::new(&sidebar, "Chats"))
+            .sidebar(&adw::NavigationPage::new(&sidebar, &gettext("Chats")))
             .content(&content)
             .build();
 
@@ -467,8 +470,8 @@ impl Window {
 
         let toasts = adw::ToastOverlay::new();
         let banner = adw::Banner::builder()
-            .title("Reconnecting to the Wassup daemon…")
-            .button_label("Retry")
+            .title(gettext("Reconnecting to the Wassup daemon…"))
+            .button_label(gettext("Retry"))
             .build();
         let page = gtk::Box::new(gtk::Orientation::Vertical, 0);
         page.append(&banner);
@@ -846,7 +849,10 @@ impl Window {
         }
         let (conn, events) = match ipc::Connection::open() {
             Ok(pair) => pair,
-            Err(e) => return self.disconnected("Can't reach the Wassup daemon", &e.to_string()),
+            Err(e) => {
+                return self
+                    .disconnected(&gettext("Can't reach the Wassup daemon"), &e.to_string());
+            }
         };
         self.conn.replace(Some(conn));
         self.reconnect_attempts.set(0);
@@ -864,7 +870,7 @@ impl Window {
         // The daemon forgets the active chat of a closed connection.
         self.reported_active.replace("/".to_owned());
         if !self.ever_connected.get() {
-            self.show_status("Connecting…", "", false);
+            self.show_status(&gettext("Connecting…"), "", false);
         }
         self.send(request::Kind::ListAccounts(ipc::ListAccounts {}));
 
@@ -876,7 +882,10 @@ impl Window {
                     Ok(event) => ui.handle(event),
                     Err(e) => {
                         ui.conn.take();
-                        ui.disconnected("Lost the connection to the daemon", &e.to_string());
+                        ui.disconnected(
+                            &gettext("Lost the connection to the daemon"),
+                            &e.to_string(),
+                        );
                         break;
                     }
                 }
@@ -912,8 +921,11 @@ impl Window {
     /// Sends a request; returns its id, or None if it could not be sent.
     pub fn send(&self, kind: request::Kind) -> Option<u64> {
         let sent = self.conn.borrow().as_ref()?.send(kind);
-        sent.inspect_err(|e| self.toast(&format!("Couldn't reach the daemon: {e}")))
-            .ok()
+        sent.inspect_err(|e| {
+            // TRANSLATORS: {} is the error from the system.
+            self.toast(&gettext("Couldn't reach the daemon: {}").replace("{}", &e.to_string()))
+        })
+        .ok()
     }
 
     fn handle(self: &Rc<Self>, event: ipc::Event) {
@@ -958,7 +970,11 @@ impl Window {
                 // TODO: pick the account once the UI supports several.
                 match list.accounts.into_iter().next() {
                     Some(account) => self.set_account(account),
-                    None => self.show_status("No account", "The daemon has no account yet.", false),
+                    None => self.show_status(
+                        &gettext("No account"),
+                        &gettext("The daemon has no account yet."),
+                        false,
+                    ),
                 }
             }
             Some(event::Kind::AccountChanged(account)) if self.is_current(&account.id) => {
@@ -995,14 +1011,15 @@ impl Window {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
                 self.qr_stack.set_visible_child_name("code");
                 self.link_status
-                    .set_label("The code changes every minute or so.");
+                    .set_label(&gettext("The code changes every minute or so."));
             }
             Some(event::Kind::LinkFailed(failed)) if self.is_current(&failed.account_id) => {
                 self.linking.set(false);
                 self.qr.set_paintable(None::<&gdk::Paintable>);
                 self.qr_stack.set_visible_child_name("failed");
                 self.link_status
-                    .set_label(&format!("Linking failed: {}", failed.reason));
+                    // TRANSLATORS: {} is the reason, from WhatsApp.
+                    .set_label(&gettext("Linking failed: {}").replace("{}", &failed.reason));
                 self.link_retry.set_visible(true);
             }
             _ => {}
@@ -1030,13 +1047,16 @@ impl Window {
         }
         self.linking.set(false);
         let subtitle = match state {
-            ipc::ConnectionState::Connected => "",
-            ipc::ConnectionState::Connecting => "Connecting…",
-            _ => "Offline",
+            ipc::ConnectionState::Connected => String::new(),
+            ipc::ConnectionState::Connecting => gettext("Connecting…"),
+            _ => gettext("Offline"),
         };
-        self.sidebar_title.set_subtitle(subtitle);
-        self.sidebar_title
-            .set_title(if name.is_empty() { "Chats" } else { &name });
+        self.sidebar_title.set_subtitle(&subtitle);
+        self.sidebar_title.set_title(&if name.is_empty() {
+            gettext("Chats")
+        } else {
+            name
+        });
         self.stack.set_visible_child_name("main");
         self.report_active();
         if !self.chats_loaded.replace(true) {
@@ -1080,17 +1100,17 @@ impl Window {
 
     fn show_preferences(self: &Rc<Self>, settings: ipc::Settings) {
         let hide_content = adw::SwitchRow::builder()
-            .title("Hide Message Content")
-            .subtitle("Notifications say who wrote, but not what")
+            .title(gettext("Hide Message Content"))
+            .subtitle(gettext("Notifications say who wrote, but not what"))
             .active(settings.hide_notification_content)
             .build();
         let notifications = adw::PreferencesGroup::builder()
-            .title("Notifications")
+            .title(gettext("Notifications"))
             .build();
         notifications.add(&hide_content);
         let cache = adw::SpinRow::builder()
-            .title("Media Cache Size")
-            .subtitle("Downloaded photos, stickers, documents and audio, in MB. The oldest are deleted first.")
+            .title(gettext("Media Cache Size"))
+            .subtitle(gettext("Downloaded photos, stickers, documents and audio, in MB. The oldest are deleted first."))
             .adjustment(&gtk::Adjustment::new(
                 settings.media_cache_mb as f64,
                 50.0,
@@ -1100,22 +1120,24 @@ impl Window {
                 0.0,
             ))
             .build();
-        let storage = adw::PreferencesGroup::builder().title("Storage").build();
+        let storage = adw::PreferencesGroup::builder()
+            .title(gettext("Storage"))
+            .build();
         storage.add(&cache);
         let gpu = adw::SwitchRow::builder()
-            .title("GPU Rendering")
-            .subtitle("Smoother animations, but uses about 50 MB more memory. Applies after restarting Wassup.")
+            .title(gettext("GPU Rendering"))
+            .subtitle(gettext("Smoother animations, but uses about 50 MB more memory. Applies after restarting Wassup."))
             .active(settings.gpu_rendering)
             .build();
         let performance = adw::PreferencesGroup::builder()
-            .title("Performance")
+            .title(gettext("Performance"))
             .build();
         performance.add(&gpu);
         let page = adw::PreferencesPage::new();
         page.add(&notifications);
         page.add(&storage);
         page.add(&performance);
-        let dialog = adw::PreferencesDialog::builder().title("Preferences").build();
+        let dialog = adw::PreferencesDialog::new();
         dialog.add(&page);
 
         // Every change saves all of them; the daemon writes the file.
@@ -1149,17 +1171,22 @@ impl Window {
     fn ask_secret_code(self: &Rc<Self>) {
         let code = gtk::PasswordEntry::builder()
             .show_peek_icon(true)
-            .placeholder_text("Secret code")
+            .placeholder_text(gettext("Secret code"))
             .activates_default(true)
             .build();
         let dialog = adw::AlertDialog::builder()
-            .heading("Enter Secret Code")
-            .body("Enter the secret code you set on your phone to see your restricted chats.")
+            .heading(gettext("Enter Secret Code"))
+            .body(gettext(
+                "Enter the secret code you set on your phone to see your restricted chats.",
+            ))
             .extra_child(&code)
             .default_response("continue")
             .close_response("cancel")
             .build();
-        dialog.add_responses(&[("cancel", "Cancel"), ("continue", "Continue")]);
+        dialog.add_responses(&[
+            ("cancel", &gettext("Cancel")),
+            ("continue", &gettext("Continue")),
+        ]);
         dialog.set_response_appearance("continue", adw::ResponseAppearance::Suggested);
         dialog.set_response_enabled("continue", false);
         code.connect_changed(glib::clone!(
@@ -1196,9 +1223,9 @@ impl Window {
         self.chat_filter.changed(gtk::FilterChange::Different);
         self.restricted_back.set_visible(true);
         self.show_restricted_entry();
-        self.sidebar_title.set_title("Restricted chats");
+        self.sidebar_title.set_title(&gettext("Restricted chats"));
         self.reselect_current();
-        self.toast("Restricted chats unlocked");
+        self.toast(&gettext("Restricted chats unlocked"));
     }
 
     /// Hides the locked chats again, closing one if it is open.
@@ -1213,13 +1240,16 @@ impl Window {
             .as_ref()
             .map(|a| a.push_name.clone())
             .unwrap_or_default();
-        self.sidebar_title
-            .set_title(if name.is_empty() { "Chats" } else { &name });
+        self.sidebar_title.set_title(&if name.is_empty() {
+            gettext("Chats")
+        } else {
+            name
+        });
         if self.open_chat_is_locked() {
             self.close_chat();
         }
         self.reselect_current();
-        self.toast("Restricted chats locked");
+        self.toast(&gettext("Restricted chats locked"));
     }
 
     fn open_chat_is_locked(&self) -> bool {
@@ -1326,7 +1356,7 @@ impl Window {
 
     fn choose_file(self: &Rc<Self>) {
         let dialog = gtk::FileDialog::builder()
-            .title("Send a File")
+            .title(gettext("Send a File"))
             .modal(true)
             .build();
         let ui = Rc::downgrade(self);
@@ -1367,7 +1397,8 @@ impl Window {
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
             let toast = adw::Toast::builder()
-                .title(format!("Sending {name}…"))
+                // TRANSLATORS: {} is a file name.
+                .title(gettext("Sending {}…").replace("{}", &name))
                 .timeout(0)
                 .build();
             self.toasts.add_toast(toast.clone());
@@ -1513,7 +1544,7 @@ impl Window {
         if !ready.error.is_empty() {
             eprintln!("wassup: couldn't download media: {}", ready.error);
             if open {
-                self.toast("Couldn't download the file");
+                self.toast(&gettext("Couldn't download the file"));
             }
             return;
         }
@@ -1639,7 +1670,7 @@ impl Window {
         self.link_retry.set_visible(false);
         self.qr.set_paintable(None::<&gdk::Paintable>);
         self.qr_stack.set_visible_child_name("waiting");
-        self.link_status.set_label("Preparing a code…");
+        self.link_status.set_label(&gettext("Preparing a code…"));
         self.send(request::Kind::LinkAccount(ipc::LinkAccount {
             account_id: id,
         }));
@@ -1681,7 +1712,7 @@ fn chat_title(chat: &ipc::Chat) -> String {
 fn user_label(jid: &str) -> String {
     match jid.split_once('@') {
         Some((user, "s.whatsapp.net")) => format!("+{user}"),
-        Some((_, "lid")) => "Unknown contact".to_owned(),
+        Some((_, "lid")) => gettext("Unknown contact"),
         Some((user, _)) => user.to_owned(),
         None => jid.to_owned(),
     }

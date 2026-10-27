@@ -161,10 +161,10 @@ func TestViewOnceNoticeBecomesMessage(t *testing.T) {
 			ID:            "V1",
 			Timestamp:     time.Unix(1_700_000_000, 0),
 		},
-		Message: &waE2E.Message{Conversation: proto.String(viewOncePlaceholder)},
+		Message: &waE2E.Message{Conversation: proto.String(viewOncePlaceholder())},
 	})
 	msgs, err := a.listMessages(ctx, chat.String(), "", 0)
-	if err != nil || len(msgs) != 1 || msgs[0].Text != viewOncePlaceholder {
+	if err != nil || len(msgs) != 1 || msgs[0].Text != viewOncePlaceholder() {
 		t.Fatalf("messages %v, %v", msgs, err)
 	}
 }

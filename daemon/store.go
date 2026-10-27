@@ -132,19 +132,19 @@ func messageText(evt *events.Message) string {
 	case m.GetImageMessage() != nil:
 		return m.GetImageMessage().GetCaption() // The image is carried as media.
 	case m.GetVideoMessage() != nil:
-		return label("[Video]", m.GetVideoMessage().GetCaption())
+		return label(tr("[Video]"), m.GetVideoMessage().GetCaption())
 	case m.GetAudioMessage() != nil:
 		return "" // Carried as media.
 	case m.GetDocumentMessage() != nil:
 		return m.GetDocumentMessage().GetCaption() // The file is carried as media.
 	case m.GetContactMessage() != nil:
-		return label("[Contact]", m.GetContactMessage().GetDisplayName())
+		return label(tr("[Contact]"), m.GetContactMessage().GetDisplayName())
 	case m.GetLocationMessage() != nil, m.GetLiveLocationMessage() != nil:
-		return "[Location]"
+		return tr("[Location]")
 	case m.GetPollCreationMessage() != nil:
-		return label("[Poll]", m.GetPollCreationMessage().GetName())
+		return label(tr("[Poll]"), m.GetPollCreationMessage().GetName())
 	case m.GetPollCreationMessageV3() != nil:
-		return label("[Poll]", m.GetPollCreationMessageV3().GetName())
+		return label(tr("[Poll]"), m.GetPollCreationMessageV3().GetName())
 	}
 	// Reactions, receipts and protocol messages are not chat messages.
 	return ""

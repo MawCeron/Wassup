@@ -48,6 +48,7 @@ func main() {
 }
 
 func run() error {
+	initLocale()
 	data, err := xdgDir("XDG_DATA_HOME", ".local/share")
 	if err != nil {
 		return err
@@ -228,7 +229,7 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 				// only this notice; show that the message exists.
 				if e.IsUnavailable && e.UnavailableType == events.UnavailableTypeViewOnce {
 					d.onMessage(a, &events.Message{Info: e.Info, Message: &waE2E.Message{
-						Conversation: proto.String(viewOncePlaceholder),
+						Conversation: proto.String(viewOncePlaceholder()),
 					}})
 				}
 			}
@@ -306,7 +307,7 @@ func write(conn net.Conn, ev *ipc.Event) error {
 }
 
 // viewOncePlaceholder stands for view-once media, which only the phone gets.
-const viewOncePlaceholder = "[View once] Open it on your phone"
+func viewOncePlaceholder() string { return tr("[View once] Open it on your phone") }
 
 // onMessage stores a message and tells the UIs and, if it is news, the user.
 func (d *daemon) onMessage(a *account, e *events.Message) {
@@ -464,10 +465,15 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 			fail(errors.New("unknown account"))
 		} else if err := a.unlockChats(context.Background(), k.UnlockChats.GetSecretCode()); err != nil {
 			// Slows guessing; the code is short and the hash is local.
-			if errors.Is(err, errWrongSecretCode) {
+			switch {
+			case errors.Is(err, errWrongSecretCode):
 				time.Sleep(time.Second)
+				fail(errors.New(tr("Wrong secret code")))
+			case errors.Is(err, errNoSecretCode):
+				fail(errors.New(tr("Set a secret code for locked chats on your phone first")))
+			default:
+				fail(err)
 			}
-			fail(err)
 		} else {
 			ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
 		}

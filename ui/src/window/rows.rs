@@ -1,6 +1,7 @@
 //! The list rows of chats and messages, and the pictures in them.
 
 use super::*;
+use gettextrs::gettext;
 
 pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
@@ -188,11 +189,11 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         bubble.append(&document);
         let voice_icon = gtk::Image::builder()
             .icon_name("wassup-voice-note-symbolic")
-            .tooltip_text("Voice message")
+            .tooltip_text(gettext("Voice message"))
             .build();
         let play = gtk::Button::builder()
             .icon_name("media-playback-start-symbolic")
-            .tooltip_text("Play")
+            .tooltip_text(gettext("Play"))
             .css_classes(["circular"])
             .build();
         let progress = gtk::Scale::builder()
@@ -294,7 +295,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         quote.set_visible(msg.quote.is_some());
         if let Some(q) = &msg.quote {
             quote_name.set_label(&if q.from_me {
-                "You".to_owned()
+                gettext("You")
             } else if q.sender_name.is_empty() {
                 user_label(&q.sender_jid)
             } else {

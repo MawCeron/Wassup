@@ -2,6 +2,7 @@ mod ipc;
 mod sticker;
 mod window;
 
+use gettextrs::gettext;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -41,6 +42,32 @@ fn wants_gpu(config: &str) -> bool {
         })
 }
 
+/// Loads the translations for the user's language. They live in the
+/// first XDG data directory that has Wassup's, as for the daemon:
+/// ~/.local/share/locale during development, the system one when installed.
+fn init_locale() {
+    use gettextrs::{
+        LocaleCategory, bind_textdomain_codeset, bindtextdomain, setlocale, textdomain,
+    };
+    // SAFETY: called first thing in main, before any other thread exists.
+    unsafe { setlocale(LocaleCategory::LcAll, "") };
+    let dir = std::iter::once(glib::user_data_dir())
+        .chain(glib::system_data_dirs())
+        .map(|d| d.join("locale"))
+        .find(|d| {
+            std::fs::read_dir(d).is_ok_and(|langs| {
+                langs
+                    .flatten()
+                    .any(|l| l.path().join("LC_MESSAGES/wassup.mo").exists())
+            })
+        });
+    if let Some(dir) = dir {
+        let _ = bindtextdomain("wassup", dir);
+    }
+    let _ = bind_textdomain_codeset("wassup", "UTF-8");
+    let _ = textdomain("wassup");
+}
+
 /// Draws in software unless the user enabled the GPU. GPU rendering loads
 /// the graphics drivers into the process, which on some machines costs
 /// over 50 MB, while software rendering keeps 60 fps for a chat window.
@@ -61,6 +88,7 @@ fn choose_renderer() {
 
 fn main() -> glib::ExitCode {
     choose_renderer();
+    init_locale();
     gio::resources_register_include!("wassup.gresource").expect("bundled resources");
     // Every launch is forwarded to the running instance, if there is one.
     let app = adw::Application::builder()
@@ -74,7 +102,7 @@ fn main() -> glib::ExitCode {
         glib::Char::from(b't'),
         glib::OptionFlags::NONE,
         glib::OptionArg::None,
-        "Show the window, or close it if it has focus",
+        &gettext("Show the window, or close it if it has focus"),
         None,
     );
     let slot: Slot = Rc::default();

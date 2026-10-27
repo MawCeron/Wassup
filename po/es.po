@@ -1,0 +1,358 @@
+# Spanish translations for Wassup package.
+# Copyright (C) 2026 Mauricio Cerón Medina
+# This file is distributed under the same license as the Wassup package.
+# Mauricio Cerón Medina, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Wassup\n"
+"Report-Msgid-Bugs-To: https://github.com/MawCeron/Wassup/issues\n"
+"POT-Creation-Date: 2026-10-26 18:37-0600\n"
+"PO-Revision-Date: 2026-10-26 18:37-0600\n"
+"Last-Translator: Mauricio Cerón Medina\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: daemon/main.go:310
+msgid "[View once] Open it on your phone"
+msgstr "[Ver una vez] Ábrelo en tu teléfono"
+
+#: daemon/main.go:471
+msgid "Wrong secret code"
+msgstr "Código secreto incorrecto"
+
+#: daemon/main.go:473
+msgid "Set a secret code for locked chats on your phone first"
+msgstr "Primero configura un código secreto para los chats bloqueados en tu teléfono"
+
+#: daemon/notify.go:172 daemon/notify.go:176 daemon/notify.go:199
+msgid "New message"
+msgstr "Mensaje nuevo"
+
+#: daemon/notify.go:181 daemon/quote.go:65
+msgid "Photo"
+msgstr "Foto"
+
+#: daemon/notify.go:182 daemon/quote.go:69
+msgid "Sticker"
+msgstr "Sticker"
+
+#: daemon/notify.go:183 daemon/quote.go:77
+msgid "Document"
+msgstr "Documento"
+
+#: daemon/notify.go:184 daemon/quote.go:74
+msgid "Audio"
+msgstr "Audio"
+
+#: daemon/notify.go:187 daemon/quote.go:72 ui/src/window/rows.rs:192
+msgid "Voice message"
+msgstr "Mensaje de voz"
+
+#: daemon/quote.go:67
+msgid "Video"
+msgstr "Video"
+
+#: daemon/quote.go:79
+msgid "Contact"
+msgstr "Contacto"
+
+#: daemon/quote.go:81
+msgid "Location"
+msgstr "Ubicación"
+
+#: daemon/quote.go:83 ui/src/window.rs:350
+msgid "Message"
+msgstr "Mensaje"
+
+#: daemon/store.go:135
+msgid "[Video]"
+msgstr "[Video]"
+
+#: daemon/store.go:141
+msgid "[Contact]"
+msgstr "[Contacto]"
+
+#: daemon/store.go:143
+msgid "[Location]"
+msgstr "[Ubicación]"
+
+#: daemon/store.go:145 daemon/store.go:147
+msgid "[Poll]"
+msgstr "[Encuesta]"
+
+#: packaging/io.github.MawCeron.Wassup.desktop:3
+msgid "Wassup"
+msgstr "Wassup"
+
+#: packaging/io.github.MawCeron.Wassup.desktop:4
+msgid "Unofficial WhatsApp client"
+msgstr "Cliente no oficial de WhatsApp"
+
+#: packaging/io.github.MawCeron.Wassup.desktop:9
+msgid "WhatsApp;Chat;Messages;"
+msgstr "WhatsApp;Chat;Mensajes;"
+
+#: ui/src/main.rs:105
+msgid "Show the window, or close it if it has focus"
+msgstr "Muestra la ventana, o la cierra si tiene el foco"
+
+#: ui/src/sticker.rs:46
+msgid "The image is too detailed to fit in a sticker"
+msgstr "La imagen tiene demasiado detalle para caber en un sticker"
+
+#: ui/src/window.rs:159 ui/src/window.rs:474
+msgid "Retry"
+msgstr "Reintentar"
+
+#: ui/src/window.rs:167
+msgid "Link Wassup to your phone"
+msgstr "Vincula Wassup con tu teléfono"
+
+#: ui/src/window.rs:174
+msgid "Open WhatsApp on your phone."
+msgstr "Abre WhatsApp en tu teléfono."
+
+#: ui/src/window.rs:175
+msgid "Open Settings, or the ⋮ menu on Android, and choose Linked devices."
+msgstr "Abre Configuración, o el menú ⋮ en Android, y elige Dispositivos vinculados."
+
+#: ui/src/window.rs:176
+msgid "Tap Link a device."
+msgstr "Toca Vincular un dispositivo."
+
+#: ui/src/window.rs:177
+msgid "Point your phone at this screen to scan the code."
+msgstr "Apunta tu teléfono a esta pantalla para escanear el código."
+
+#: ui/src/window.rs:197
+msgid "Try Again"
+msgstr "Intentar de nuevo"
+
+#: ui/src/window.rs:216
+msgid "QR code to link this device"
+msgstr "Código QR para vincular este dispositivo"
+
+#: ui/src/window.rs:280 ui/src/window.rs:454 ui/src/window.rs:1056
+#: ui/src/window.rs:1244
+msgid "Chats"
+msgstr "Chats"
+
+#: ui/src/window.rs:285
+msgid "Lock Restricted Chats"
+msgstr "Bloquear chats restringidos"
+
+#: ui/src/window.rs:290
+msgid "_Preferences"
+msgstr "_Preferencias"
+
+#: ui/src/window.rs:294
+msgid "Main Menu"
+msgstr "Menú principal"
+
+#: ui/src/window.rs:303 ui/src/window.rs:1226
+msgid "Restricted chats"
+msgstr "Chats restringidos"
+
+#: ui/src/window.rs:325
+msgid "No Chat Selected"
+msgstr "Ningún chat seleccionado"
+
+#: ui/src/window.rs:364
+msgid "Send"
+msgstr "Enviar"
+
+#: ui/src/window.rs:377 ui/src/window.rs:1359
+msgid "Send a File"
+msgstr "Enviar un archivo"
+
+#: ui/src/window.rs:382
+msgid "Favorites"
+msgstr "Favoritos"
+
+#: ui/src/window.rs:382
+msgid "Recent"
+msgstr "Recientes"
+
+#: ui/src/window.rs:403
+msgid "Your favorite stickers and the ones you send show up here."
+msgstr "Aquí aparecen tus stickers favoritos y los que envías."
+
+#: ui/src/window.rs:409
+msgid "Create from Image…"
+msgstr "Crear desde una imagen…"
+
+#: ui/src/window.rs:427
+msgid "Stickers"
+msgstr "Stickers"
+
+#: ui/src/window.rs:473
+msgid "Reconnecting to the Wassup daemon…"
+msgstr "Reconectando con el servicio de Wassup…"
+
+#: ui/src/window.rs:854
+msgid "Can't reach the Wassup daemon"
+msgstr "No se puede contactar al servicio de Wassup"
+
+#: ui/src/window.rs:873 ui/src/window.rs:1051
+msgid "Connecting…"
+msgstr "Conectando…"
+
+#: ui/src/window.rs:886
+msgid "Lost the connection to the daemon"
+msgstr "Se perdió la conexión con el servicio"
+
+#. TRANSLATORS: {} is the error from the system.
+#: ui/src/window.rs:926
+#, rust-format
+msgid "Couldn't reach the daemon: {}"
+msgstr "No se pudo contactar al servicio: {}"
+
+#: ui/src/window.rs:974
+msgid "No account"
+msgstr "Sin cuenta"
+
+#: ui/src/window.rs:975
+msgid "The daemon has no account yet."
+msgstr "El servicio todavía no tiene una cuenta."
+
+#: ui/src/window.rs:1014
+msgid "The code changes every minute or so."
+msgstr "El código cambia más o menos cada minuto."
+
+#. TRANSLATORS: {} is the reason, from WhatsApp.
+#: ui/src/window.rs:1022
+#, rust-format
+msgid "Linking failed: {}"
+msgstr "No se pudo vincular: {}"
+
+#: ui/src/window.rs:1052
+msgid "Offline"
+msgstr "Sin conexión"
+
+#: ui/src/window.rs:1103
+msgid "Hide Message Content"
+msgstr "Ocultar el contenido de los mensajes"
+
+#: ui/src/window.rs:1104
+msgid "Notifications say who wrote, but not what"
+msgstr "Las notificaciones dicen quién escribió, pero no qué"
+
+#: ui/src/window.rs:1108
+msgid "Notifications"
+msgstr "Notificaciones"
+
+#: ui/src/window.rs:1112
+msgid "Media Cache Size"
+msgstr "Tamaño de la caché de archivos"
+
+#: ui/src/window.rs:1113
+msgid ""
+"Downloaded photos, stickers, documents and audio, in MB. The oldest are "
+"deleted first."
+msgstr "Fotos, stickers, documentos y audios descargados, en MB. Los más antiguos se borran primero."
+
+#: ui/src/window.rs:1124
+msgid "Storage"
+msgstr "Almacenamiento"
+
+#: ui/src/window.rs:1128
+msgid "GPU Rendering"
+msgstr "Renderizado con GPU"
+
+#: ui/src/window.rs:1129
+msgid ""
+"Smoother animations, but uses about 50 MB more memory. Applies after "
+"restarting Wassup."
+msgstr "Animaciones más fluidas, pero usa unos 50 MB más de memoria. Se aplica al reiniciar Wassup."
+
+#: ui/src/window.rs:1133
+msgid "Performance"
+msgstr "Rendimiento"
+
+#: ui/src/window.rs:1174
+msgid "Secret code"
+msgstr "Código secreto"
+
+#: ui/src/window.rs:1178
+msgid "Enter Secret Code"
+msgstr "Escribe el código secreto"
+
+#: ui/src/window.rs:1180
+msgid ""
+"Enter the secret code you set on your phone to see your restricted chats."
+msgstr "Escribe el código secreto que configuraste en tu teléfono para ver tus chats restringidos."
+
+#: ui/src/window.rs:1187
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: ui/src/window.rs:1188
+msgid "Continue"
+msgstr "Continuar"
+
+#: ui/src/window.rs:1228
+msgid "Restricted chats unlocked"
+msgstr "Chats restringidos desbloqueados"
+
+#: ui/src/window.rs:1252
+msgid "Restricted chats locked"
+msgstr "Chats restringidos bloqueados"
+
+#. TRANSLATORS: {} is a file name.
+#: ui/src/window.rs:1401
+#, rust-format
+msgid "Sending {}…"
+msgstr "Enviando {}…"
+
+#: ui/src/window.rs:1547
+msgid "Couldn't download the file"
+msgstr "No se pudo descargar el archivo"
+
+#: ui/src/window.rs:1673
+msgid "Preparing a code…"
+msgstr "Preparando un código…"
+
+#: ui/src/window.rs:1715
+msgid "Unknown contact"
+msgstr "Contacto desconocido"
+
+#. TRANSLATORS: {} is the reason, from GStreamer.
+#: ui/src/window/audio.rs:60
+#, rust-format
+msgid "Couldn't play the audio: {}"
+msgstr "No se pudo reproducir el audio: {}"
+
+#: ui/src/window/audio.rs:136
+msgid "Pause"
+msgstr "Pausar"
+
+#: ui/src/window/audio.rs:138 ui/src/window/rows.rs:196
+msgid "Play"
+msgstr "Reproducir"
+
+#: ui/src/window/rows.rs:298
+msgid "You"
+msgstr "Tú"
+
+#: ui/src/window/stickers.rs:66
+msgid "Images"
+msgstr "Imágenes"
+
+#: ui/src/window/stickers.rs:71
+msgid "Create a Sticker"
+msgstr "Crear un sticker"
+
+#. TRANSLATORS: {} is the reason.
+#: ui/src/window/stickers.rs:92 ui/src/window/stickers.rs:107
+#, rust-format
+msgid "Couldn't make a sticker: {}"
+msgstr "No se pudo crear el sticker: {}"
+
+#: ui/src/window/stickers.rs:119
+msgid "Sending sticker…"
+msgstr "Enviando sticker…"

@@ -1,6 +1,7 @@
 //! The sticker picker and sending stickers.
 
 use super::*;
+use gettextrs::gettext;
 
 impl Window {
     pub(super) fn show_stickers(self: &Rc<Self>, stickers: Vec<ipc::Sticker>) {
@@ -62,12 +63,12 @@ impl Window {
     pub(super) fn choose_sticker_image(self: &Rc<Self>) {
         self.sticker_popover.popdown();
         let images = gtk::FileFilter::new();
-        images.set_name(Some("Images"));
+        images.set_name(Some(&gettext("Images")));
         images.add_mime_type("image/*");
         let filters = gio::ListStore::new::<gtk::FileFilter>();
         filters.append(&images);
         let dialog = gtk::FileDialog::builder()
-            .title("Create a Sticker")
+            .title(gettext("Create a Sticker"))
             .modal(true)
             .filters(&filters)
             .build();
@@ -87,7 +88,8 @@ impl Window {
     pub(super) async fn send_new_sticker(&self, image: &std::path::Path) {
         let webp = match crate::sticker::from_file(image).await {
             Ok(webp) => webp,
-            Err(e) => return self.toast(&format!("Couldn't make a sticker: {e}")),
+            // TRANSLATORS: {} is the reason.
+            Err(e) => return self.toast(&gettext("Couldn't make a sticker: {}").replace("{}", &e)),
         };
         let Some((account_id, chat_jid)) = self.open_ids() else {
             return;
@@ -101,7 +103,8 @@ impl Window {
             .create(&dir)
             .and_then(|_| std::fs::write(&file, webp));
         if let Err(e) = written {
-            return self.toast(&format!("Couldn't make a sticker: {e}"));
+            return self
+                .toast(&gettext("Couldn't make a sticker: {}").replace("{}", &e.to_string()));
         }
         let request = request::Kind::SendMedia(ipc::SendMedia {
             account_id,
@@ -113,7 +116,7 @@ impl Window {
         match self.send(request) {
             Some(id) => {
                 let toast = adw::Toast::builder()
-                    .title("Sending sticker…")
+                    .title(gettext("Sending sticker…"))
                     .timeout(0)
                     .build();
                 self.toasts.add_toast(toast.clone());

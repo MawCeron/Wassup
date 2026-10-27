@@ -169,22 +169,22 @@ func (n *notifier) openChat(account, chat, token string) {
 func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title, body string) {
 	if chat.Locked {
 		// Locking a chat on the phone hides who wrote and what.
-		return "Wassup", "New message"
+		return "Wassup", tr("New message")
 	}
 	title = chat.Name
 	if title == "" {
-		title = "New message"
+		title = tr("New message")
 	}
 	body = msg.Text
 	if kind := msg.GetMedia().GetKind(); kind != ipc.MediaKind_MEDIA_KIND_UNSPECIFIED {
 		label := map[ipc.MediaKind]string{
-			ipc.MediaKind_MEDIA_KIND_IMAGE:    "Photo",
-			ipc.MediaKind_MEDIA_KIND_STICKER:  "Sticker",
-			ipc.MediaKind_MEDIA_KIND_DOCUMENT: "Document",
-			ipc.MediaKind_MEDIA_KIND_AUDIO:    "Audio",
+			ipc.MediaKind_MEDIA_KIND_IMAGE:    tr("Photo"),
+			ipc.MediaKind_MEDIA_KIND_STICKER:  tr("Sticker"),
+			ipc.MediaKind_MEDIA_KIND_DOCUMENT: tr("Document"),
+			ipc.MediaKind_MEDIA_KIND_AUDIO:    tr("Audio"),
 		}[kind]
 		if msg.GetMedia().GetVoiceNote() {
-			label = "Voice message"
+			label = tr("Voice message")
 		}
 		if body == "" {
 			body = msg.GetMedia().GetFileName()
@@ -196,7 +196,7 @@ func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title
 		}
 	}
 	if hideContent {
-		body = "New message"
+		body = tr("New message")
 	} else if chat.IsGroup && msg.SenderName != "" {
 		body = msg.SenderName + ": " + body
 	}

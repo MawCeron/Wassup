@@ -1,5 +1,6 @@
 //! Turning an image into a WhatsApp sticker: 512x512 WebP under 100 KB.
 
+use gettextrs::gettext;
 use gtk::gdk_pixbuf::{Colorspace, Pixbuf};
 use gtk::{gio, glib, prelude::*};
 
@@ -42,7 +43,7 @@ pub fn from_pixbuf(image: &Pixbuf) -> Result<Vec<u8>, String> {
         .iter()
         .filter_map(|&q| encode(&pixels, SIZE, SIZE, canvas.rowstride(), q))
         .find(|webp| webp.len() <= MAX_BYTES)
-        .ok_or_else(|| "the image is too detailed to fit in a sticker".to_owned())
+        .ok_or_else(|| gettext("The image is too detailed to fit in a sticker"))
 }
 
 /// Reads an image file scaled down to fit a sticker. Decoding runs in

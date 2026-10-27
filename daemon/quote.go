@@ -62,25 +62,25 @@ func quotedText(m *waE2E.Message) string {
 	}
 	switch {
 	case m.GetImageMessage() != nil:
-		return orLabel(m.GetImageMessage().GetCaption(), "Photo")
+		return orLabel(m.GetImageMessage().GetCaption(), tr("Photo"))
 	case m.GetVideoMessage() != nil:
-		return orLabel(m.GetVideoMessage().GetCaption(), "Video")
+		return orLabel(m.GetVideoMessage().GetCaption(), tr("Video"))
 	case m.GetStickerMessage() != nil:
-		return "Sticker"
+		return tr("Sticker")
 	case m.GetAudioMessage() != nil:
 		if m.GetAudioMessage().GetPTT() {
-			return "Voice message"
+			return tr("Voice message")
 		}
-		return "Audio"
+		return tr("Audio")
 	case m.GetDocumentMessage() != nil:
 		d := m.GetDocumentMessage()
-		return orLabel(d.GetCaption(), orLabel(d.GetFileName(), "Document"))
+		return orLabel(d.GetCaption(), orLabel(d.GetFileName(), tr("Document")))
 	case m.GetContactMessage() != nil:
-		return orLabel(m.GetContactMessage().GetDisplayName(), "Contact")
+		return orLabel(m.GetContactMessage().GetDisplayName(), tr("Contact"))
 	case m.GetLocationMessage() != nil, m.GetLiveLocationMessage() != nil:
-		return "Location"
+		return tr("Location")
 	}
-	return "Message"
+	return tr("Message")
 }
 
 func orLabel(text, label string) string {
