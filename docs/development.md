@@ -89,13 +89,17 @@ Preferences (Ctrl+,) edits these options. The daemon owns
 `$XDG_CONFIG_HOME/wassup/config.json`: it reads the file at startup, and
 saves it and applies the change at once when the UI sends new settings,
 except GPU rendering, which the UI reads only when it starts. The file is
-optional; every option defaults to off.
+optional; a missing option is off, except `media_cache_mb`, which is 500, and
+`language` and `chat_background`, which are empty.
 
 ```json
 {
   "hide_notification_content": true,
   "media_cache_mb": 500,
   "gpu_rendering": false,
+  "hide_tray_icon": false,
+  "no_link_previews": false,
+  "chat_background": "",
   "language": "es"
 }
 ```
@@ -180,12 +184,45 @@ download again if shown. Temporary files left by an interrupted download
 or upload are removed when the daemon or the UI starts.
 
 The UI decodes images already scaled to their on-screen size, through
-gdk-pixbuf, which on Fedora runs glycin's sandboxed loaders. Clicking an
-image opens the cached file in the default image viewer.
+gdk-pixbuf, which on Fedora runs glycin's sandboxed loaders. Clicking a
+photo or a video opens it in a viewer over the window, which steps through
+the chat's photos and videos; videos play through GTK's media support.
 
 Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
+
+Profile and group pictures are fetched when a chat first shows up on
+screen, as small previews cached in `$XDG_CACHE_HOME/wassup/avatars/`.
+The daemon asks the server again only after a picture change event or a
+day, and remembers when a chat has no picture, since frequent picture
+requests are among the easiest ways for an unofficial client to get rate
+limited. Until a picture arrives, or when there is none, the avatar shows
+the contact's initials or an icon.
+
+To send a file, the UI passes the daemon its path, never its content.
+Choosing a file shows a preview with a caption field, and nothing is sent
+until the user presses Send. JPEG and PNG files go as photos, MP4 files as
+videos and anything else as a document, with the caption as text. The
+attach menu can send a photo or a video as a document instead. The daemon
+uploads through a temporary file, so large files are not held in memory, and
+replies when the upload ends. Photos are sent as they are, without being
+recompressed.
+
+The sticker button offers your favorite stickers and the ones you sent
+recently, which are sent again by reusing the file already on WhatsApp's servers, so
+nothing is uploaded. It can also turn an image into a sticker: the UI
+centres it on a transparent 512x512 canvas and encodes it as WebP with
+the system's libwebp, lowering the quality until it fits WhatsApp's
+100 KB limit for stickers.
+
+Favorite stickers come from the phone through WhatsApp's app state. The
+daemon replays the whole app state once to learn the existing ones, then
+follows changes. The sync carries each favorite's file hash as its id,
+which is what whatsmeow needs to verify the download. Favorites whose
+file has expired on WhatsApp's servers, or that only the phone holds,
+cannot be fetched and are left out, unless the same sticker was also
+received in a chat.
 
 ## History
 
@@ -284,32 +321,3 @@ at startup and then every minute, and open UIs drop the messages too.
 Stickers stay cached, since other chats and favorites share them. Own
 messages are sent with the chat's timer. Messages stored before Wassup
 learned about timers kept none and do not expire.
-
-Profile and group pictures are fetched when a chat first shows up on
-screen, as small previews cached in `$XDG_CACHE_HOME/wassup/avatars/`.
-The daemon asks the server again only after a picture change event or a
-day, and remembers when a chat has no picture, since frequent picture
-requests are among the easiest ways for an unofficial client to get rate
-limited. Until a picture arrives, or when there is none, the avatar shows
-the contact's initials or an icon.
-
-To send a file, the UI passes the daemon its path, never its content.
-JPEG and PNG files go as photos, anything else as a document, with the
-composer's text as caption. The daemon uploads through a temporary file,
-so large files are not held in memory, and replies when the upload ends.
-Photos are sent as they are, without being recompressed.
-
-The sticker button offers your favorite stickers and the ones you sent
-recently, which are sent again by reusing the file already on WhatsApp's servers, so
-nothing is uploaded. It can also turn an image into a sticker: the UI
-centres it on a transparent 512x512 canvas and encodes it as WebP with
-the system's libwebp, lowering the quality until it fits WhatsApp's
-100 KB limit for stickers.
-
-Favorite stickers come from the phone through WhatsApp's app state. The
-daemon replays the whole app state once to learn the existing ones, then
-follows changes. The sync carries each favorite's file hash as its id,
-which is what whatsmeow needs to verify the download. Favorites whose
-file has expired on WhatsApp's servers, or that only the phone holds,
-cannot be fetched and are left out, unless the same sticker was also
-received in a chat.
