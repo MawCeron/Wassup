@@ -150,6 +150,111 @@ impl Window {
         }
     }
 
+    /// The menu of a sticker in the conversation: add it to the favorites, or
+    /// take it out if it is one.
+    pub(super) fn sticker_menu(self: &Rc<Self>, anchor: &gtk::Widget, msg: &ipc::Message) {
+        let favorite = msg.media.as_ref().is_some_and(|m| m.favorite);
+        let toggle = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name(if favorite {
+                        "non-starred-symbolic"
+                    } else {
+                        "starred-symbolic"
+                    })
+                    .label(if favorite {
+                        gettext("Remove from Favorites")
+                    } else {
+                        gettext("Add to Favorites")
+                    })
+                    .halign(gtk::Align::Start)
+                    .build(),
+            )
+            .css_classes(["flat"])
+            .build();
+        let popover = gtk::Popover::builder().child(&toggle).build();
+        toggle.connect_clicked(glib::clone!(
+            #[weak(rename_to = ui)]
+            self,
+            #[weak]
+            popover,
+            #[strong]
+            msg,
+            move |_| {
+                popover.popdown();
+                ui.set_favorite(&msg, !favorite);
+            }
+        ));
+        popover.set_parent(anchor);
+        // A popover lives on its parent until removed.
+        popover.connect_closed(|popover| {
+            let popover = popover.clone();
+            glib::idle_add_local_once(move || popover.unparent());
+        });
+        popover.popup();
+    }
+
+    fn set_favorite(&self, msg: &ipc::Message, favorite: bool) {
+        let Some((account_id, chat_jid)) = self.open_ids() else {
+            return;
+        };
+        let id = self.send(request::Kind::SetFavoriteSticker(ipc::SetFavoriteSticker {
+            account_id,
+            chat_jid,
+            message_id: msg.id.clone(),
+            favorite,
+        }));
+        if let Some(id) = id {
+            self.favorite_requests
+                .borrow_mut()
+                .insert(id, (msg.id.clone(), favorite));
+        }
+    }
+
+    /// The daemon's answer to a request to add or remove a favorite.
+    pub(super) fn favorite_answered(
+        &self,
+        message_id: &str,
+        favorite: bool,
+        answer: Option<event::Kind>,
+    ) {
+        match answer {
+            Some(event::Kind::Ack(_)) => {
+                // The next menu of this sticker offers the opposite.
+                for pos in 0..self.messages.n_items() {
+                    let item = self
+                        .messages
+                        .item(pos)
+                        .and_downcast::<glib::BoxedAnyObject>();
+                    if let Some(item) = item {
+                        let mut msg = item.borrow_mut::<ipc::Message>();
+                        if msg.id == message_id {
+                            if let Some(media) = msg.media.as_mut() {
+                                media.favorite = favorite;
+                            }
+                            break;
+                        }
+                    }
+                }
+                self.toast(&if favorite {
+                    gettext("Added to Favorites")
+                } else {
+                    gettext("Removed from Favorites")
+                });
+            }
+            Some(event::Kind::Error(e)) => {
+                // The daemon's errors are lowercase, Go style.
+                let mut chars = e.message.chars();
+                let message = chars
+                    .next()
+                    .map(|c| c.to_uppercase().chain(chars).collect::<String>())
+                    .unwrap_or_default();
+                self.toast(&message);
+            }
+            _ => {}
+        }
+    }
+
     pub(super) fn send_sticker(&self, sticker: &ipc::Sticker) {
         self.sticker_popover.popdown();
         let Some((account_id, chat_jid)) = self.open_ids() else {

@@ -190,22 +190,22 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .css_classes(["flat", "media-button"])
             .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
             .build();
-        // Clicking opens the file with the desktop's default application.
+        // Clicking opens the file, or for a sticker offers to favorite it.
         let on_click = {
             let (list_item, owner) = (item.downgrade(), opener.clone());
-            move || {
+            move |anchor: &gtk::Widget| {
                 let msg = list_item
                     .upgrade()
                     .and_then(|i| i.item())
                     .and_downcast::<glib::BoxedAnyObject>();
                 if let (Some(msg), Some(ui)) = (msg, owner.get().and_then(std::rc::Weak::upgrade)) {
-                    ui.open_media(&msg.borrow::<ipc::Message>());
+                    ui.open_media(&msg.borrow::<ipc::Message>(), anchor);
                 }
             }
         };
         media_button.connect_clicked({
             let on_click = on_click.clone();
-            move |_| on_click()
+            move |button| on_click(button.upcast_ref())
         });
         let doc_name = gtk::Label::builder()
             .xalign(0.0)
@@ -236,7 +236,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .css_classes(["flat", "media-button"])
             .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
             .build();
-        document.connect_clicked(move |_| on_click());
+        document.connect_clicked(move |button| on_click(button.upcast_ref()));
         let text = gtk::Label::builder()
             .xalign(0.0)
             .wrap(true)

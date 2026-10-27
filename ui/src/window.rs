@@ -142,6 +142,8 @@ pub struct Window {
     open_when_ready: RefCell<std::collections::HashSet<String>>,
     /// "Sending…" notice of each upload, by request id.
     uploads: RefCell<std::collections::HashMap<u64, adw::Toast>>,
+    /// Requests to add a sticker to the favorites or take it out: the message and what was asked.
+    favorite_requests: RefCell<std::collections::HashMap<u64, (String, bool)>>,
     sticker_popover: gtk::Popover,
     /// Favorites synced from the phone, then recent stickers, each with its heading.
     sticker_sections: [(gtk::Label, gtk::FlowBox); 2],
@@ -727,6 +729,7 @@ impl Window {
             header_avatar,
             header_title,
             uploads: RefCell::default(),
+            favorite_requests: RefCell::default(),
             sticker_popover,
             sticker_sections,
             sticker_empty,
@@ -1259,6 +1262,14 @@ impl Window {
     }
 
     fn handle(self: &Rc<Self>, event: ipc::Event) {
+        if let Some((message_id, favorite)) = self
+            .favorite_requests
+            .borrow_mut()
+            .remove(&event.request_id)
+        {
+            self.favorite_answered(&message_id, favorite, event.kind);
+            return;
+        }
         if event.request_id != 0 && event.request_id == self.unlock_request.get() {
             self.unlock_request.set(0);
             match event.kind {
@@ -2039,10 +2050,15 @@ impl Window {
         true
     }
 
-    /// Opens a message's file with the desktop's default application,
-    /// downloading it first if needed.
-    fn open_media(&self, msg: &ipc::Message) {
+    /// What clicking a message's media does: photos and videos open in the
+    /// viewer, a sticker offers to add it to the favorites, and anything else
+    /// opens with the desktop's default application, downloaded first if
+    /// needed. `anchor` is the widget that was clicked.
+    fn open_media(self: &Rc<Self>, msg: &ipc::Message, anchor: &gtk::Widget) {
         let Some(media) = &msg.media else { return };
+        if media.kind() == ipc::MediaKind::Sticker {
+            return self.sticker_menu(anchor, msg);
+        }
         if matches!(media.kind(), ipc::MediaKind::Image | ipc::MediaKind::Video) {
             return self.show_in_viewer(msg);
         }
