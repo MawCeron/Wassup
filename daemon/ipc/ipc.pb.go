@@ -2529,7 +2529,9 @@ type Media struct {
 	// shows before the video is downloaded. Empty when the sender sent none.
 	ThumbnailPath string `protobuf:"bytes,9,opt,name=thumbnail_path,json=thumbnailPath,proto3" json:"thumbnail_path,omitempty"`
 	// A sticker that is one of the account's favorites.
-	Favorite      bool `protobuf:"varint,10,opt,name=favorite,proto3" json:"favorite,omitempty"`
+	Favorite bool `protobuf:"varint,10,opt,name=favorite,proto3" json:"favorite,omitempty"`
+	// A video WhatsApp shows as a GIF: short, silent and looping.
+	Gif           bool `protobuf:"varint,11,opt,name=gif,proto3" json:"gif,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2630,6 +2632,13 @@ func (x *Media) GetThumbnailPath() string {
 func (x *Media) GetFavorite() bool {
 	if x != nil {
 		return x.Favorite
+	}
+	return false
+}
+
+func (x *Media) GetGif() bool {
+	if x != nil {
+		return x.Gif
 	}
 	return false
 }
@@ -3840,7 +3849,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12\x17\n" +
 	"\afrom_me\x18\x05 \x01(\bR\x06fromMe\x12%\n" +
 	"\x0ethumbnail_path\x18\x06 \x01(\tR\rthumbnailPath\x12\x1c\n" +
-	"\tthumbnail\x18\a \x01(\fR\tthumbnail\"\xb5\x02\n" +
+	"\tthumbnail\x18\a \x01(\fR\tthumbnail\"\xc7\x02\n" +
 	"\x05Media\x12,\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x18.wassup.ipc.v1.MediaKindR\x04kind\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
@@ -3853,7 +3862,8 @@ const file_ipc_proto_rawDesc = "" +
 	"voice_note\x18\b \x01(\bR\tvoiceNote\x12%\n" +
 	"\x0ethumbnail_path\x18\t \x01(\tR\rthumbnailPath\x12\x1a\n" +
 	"\bfavorite\x18\n" +
-	" \x01(\bR\bfavorite\"\xd2\x01\n" +
+	" \x01(\bR\bfavorite\x12\x10\n" +
+	"\x03gif\x18\v \x01(\bR\x03gif\"\xd2\x01\n" +
 	"\tSendMedia\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +

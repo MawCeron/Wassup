@@ -63,6 +63,12 @@ func TestSaveAndListMessages(t *testing.T) {
 	if m := a.ipcMedia(mustMarshal(t, mediaOf(voice.Message))); m.GetKind() != ipc.MediaKind_MEDIA_KIND_AUDIO || !m.GetVoiceNote() || m.GetDurationSeconds() != 7 {
 		t.Fatalf("voice note media %v", m)
 	}
+	for _, gif := range []bool{true, false} {
+		video := &waE2E.Message{VideoMessage: &waE2E.VideoMessage{GifPlayback: proto.Bool(gif), Seconds: proto.Uint32(3)}}
+		if m := a.ipcMedia(mustMarshal(t, mediaOf(video))); m.GetKind() != ipc.MediaKind_MEDIA_KIND_VIDEO || m.GetGif() != gif {
+			t.Fatalf("video with gif playback %v: media %v", gif, m)
+		}
+	}
 	other := types.NewJID("5215551111111", types.DefaultUserServer)
 	stickerInfo := text("S", 9, false).Info
 	stickerInfo.Chat, stickerInfo.Sender = other, other

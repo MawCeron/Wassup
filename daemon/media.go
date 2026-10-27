@@ -131,6 +131,7 @@ func (a *account) ipcMedia(blob []byte) *ipc.Media {
 		v := m.GetVideoMessage()
 		media.Kind, media.Width, media.Height, media.Size = ipc.MediaKind_MEDIA_KIND_VIDEO, v.GetWidth(), v.GetHeight(), v.GetFileLength()
 		media.DurationSeconds = v.GetSeconds()
+		media.Gif = v.GetGifPlayback()
 		media.ThumbnailPath = a.videoThumbnail(&m)
 	default:
 		i := m.GetImageMessage()

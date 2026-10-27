@@ -306,6 +306,8 @@ message Media {
   string thumbnail_path = 9;
   // A sticker that is one of the account's favorites.
   bool favorite = 10;
+  // A video WhatsApp shows as a GIF: short, silent and looping.
+  bool gif = 11;
 }
 
 // Sends a local file chosen by the user: JPEG and PNG as a photo, MP4 as a
