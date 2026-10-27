@@ -220,13 +220,28 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .css_classes(["caption"])
             .build();
-        let quote = gtk::Box::builder()
+        let quote_labels = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(2)
+            .hexpand(true)
+            .build();
+        quote_labels.append(&quote_name);
+        quote_labels.append(&quote_text);
+        // A quoted photo, video or document shows its thumbnail on the right.
+        let quote_thumb = gtk::Picture::builder()
+            .content_fit(gtk::ContentFit::Cover)
+            .width_request(QUOTE_THUMB)
+            .height_request(QUOTE_THUMB)
+            .valign(gtk::Align::Center)
+            .overflow(gtk::Overflow::Hidden)
+            .css_classes(["link-thumb"])
+            .build();
+        let quote = gtk::Box::builder()
+            .spacing(8)
             .css_classes(["quote"])
             .build();
-        quote.append(&quote_name);
-        quote.append(&quote_text);
+        quote.append(&quote_labels);
+        quote.append(&quote_thumb);
         bubble.append(&quote);
         // A link's preview, above the text as in WhatsApp; opens the link.
         let link_thumb = gtk::Picture::builder()
@@ -369,7 +384,12 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let bubble = clamp.first_child().unwrap();
         let sender = bubble.first_child().and_downcast::<gtk::Label>().unwrap();
         let quote = sender.next_sibling().unwrap();
-        let quote_name = quote.first_child().and_downcast::<gtk::Label>().unwrap();
+        let quote_name = quote
+            .first_child()
+            .and_then(|b| b.first_child())
+            .and_downcast::<gtk::Label>()
+            .unwrap();
+        let quote_thumb = quote.last_child().and_downcast::<gtk::Picture>().unwrap();
         let quote_text = quote_name
             .next_sibling()
             .and_downcast::<gtk::Label>()
@@ -471,6 +491,23 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
                 q.sender_name.clone()
             });
             quote_text.set_label(&q.text);
+            quote_thumb.set_paintable(None::<&gdk::Paintable>);
+            quote_thumb.set_visible(!q.thumbnail_path.is_empty());
+            if !q.thumbnail_path.is_empty() {
+                let weak = quote_thumb.downgrade();
+                let scale = quote_thumb.scale_factor().max(1);
+                load_texture(
+                    &q.thumbnail_path,
+                    QUOTE_THUMB,
+                    QUOTE_THUMB,
+                    scale,
+                    move |t| {
+                        if let Some(thumb) = weak.upgrade() {
+                            thumb.set_paintable(Some(&t));
+                        }
+                    },
+                );
+            }
         }
         text.set_markup(&linkify(&msg.text));
         text.set_visible(!msg.text.is_empty());
@@ -599,6 +636,8 @@ fn fit_picture(picture: &gtk::Picture, width: i32, height: i32, sticker: bool) {
 
 /// Side of a link preview's image, in pixels.
 const LINK_THUMB: i32 = 64;
+/// Side of a quoted photo's thumbnail, in pixels.
+const QUOTE_THUMB: i32 = 40;
 
 /// The site a link points to, as a preview shows it: "gnome.org".
 pub(super) fn link_host(url: &str) -> String {
