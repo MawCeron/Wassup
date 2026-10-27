@@ -43,6 +43,8 @@ const CSS: &str = "
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .media-button { padding: 0; }
+.link-card { padding: 6px; border-radius: 8px; background: alpha(currentColor, 0.06); }
+.link-thumb { border-radius: 6px; }
 .video-badge { border-radius: 999px; padding: 10px; }
 .video-length { border-radius: 6px; padding: 1px 6px; }
 .viewer { background: rgba(0, 0, 0, 0.92); }
@@ -1766,6 +1768,19 @@ impl Window {
         } else {
             self.launch(&media.path);
         }
+    }
+
+    /// Opens a web address with the default browser.
+    pub(super) fn open_link(&self, url: &str) {
+        gtk::UriLauncher::new(url).launch(
+            Some(&self.window),
+            None::<&gio::Cancellable>,
+            |result| {
+                if let Err(e) = result {
+                    eprintln!("wassup: couldn't open link: {e}");
+                }
+            },
+        );
     }
 
     fn launch(&self, path: &str) {

@@ -228,6 +228,66 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         quote.append(&quote_name);
         quote.append(&quote_text);
         bubble.append(&quote);
+        // A link's preview, above the text as in WhatsApp; opens the link.
+        let link_thumb = gtk::Picture::builder()
+            .content_fit(gtk::ContentFit::Cover)
+            .width_request(LINK_THUMB)
+            .height_request(LINK_THUMB)
+            .valign(gtk::Align::Start)
+            .overflow(gtk::Overflow::Hidden)
+            .css_classes(["link-thumb"])
+            .build();
+        let link_title = gtk::Label::builder()
+            .xalign(0.0)
+            .wrap(true)
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
+            .lines(2)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["heading"])
+            .build();
+        let link_description = gtk::Label::builder()
+            .xalign(0.0)
+            .wrap(true)
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
+            .lines(2)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["caption"])
+            .build();
+        let link_site = gtk::Label::builder()
+            .xalign(0.0)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["caption", "dim-label"])
+            .build();
+        let link_labels = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .hexpand(true)
+            .build();
+        link_labels.append(&link_title);
+        link_labels.append(&link_description);
+        link_labels.append(&link_site);
+        let link_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        link_box.append(&link_thumb);
+        link_box.append(&link_labels);
+        let link_card = gtk::Button::builder()
+            .child(&link_box)
+            .css_classes(["flat", "link-card"])
+            .build();
+        link_card.connect_clicked({
+            let (list_item, owner) = (item.downgrade(), opener.clone());
+            move |_| {
+                let msg = list_item
+                    .upgrade()
+                    .and_then(|i| i.item())
+                    .and_downcast::<glib::BoxedAnyObject>();
+                if let (Some(msg), Some(ui)) = (msg, owner.get().and_then(std::rc::Weak::upgrade))
+                    && let Some(link) = &msg.borrow::<ipc::Message>().link
+                {
+                    ui.open_link(&link.url);
+                }
+            }
+        });
+        bubble.append(&link_card);
         bubble.append(&media_button);
         bubble.append(&document);
         let voice_icon = gtk::Image::builder()
@@ -314,7 +374,29 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .next_sibling()
             .and_downcast::<gtk::Label>()
             .unwrap();
-        let media_button = quote.next_sibling().and_downcast::<gtk::Button>().unwrap();
+        let link_card = quote.next_sibling().unwrap();
+        let link_box = link_card.first_child().unwrap();
+        let link_thumb = link_box
+            .first_child()
+            .and_downcast::<gtk::Picture>()
+            .unwrap();
+        let link_title = link_thumb
+            .next_sibling()
+            .and_then(|b| b.first_child())
+            .and_downcast::<gtk::Label>()
+            .unwrap();
+        let link_description = link_title
+            .next_sibling()
+            .and_downcast::<gtk::Label>()
+            .unwrap();
+        let link_site = link_description
+            .next_sibling()
+            .and_downcast::<gtk::Label>()
+            .unwrap();
+        let media_button = link_card
+            .next_sibling()
+            .and_downcast::<gtk::Button>()
+            .unwrap();
         let clamps = media_button
             .child()
             .and_downcast::<gtk::Overlay>()
@@ -354,6 +436,32 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             sender.set_label(&msg.sender_name);
         }
         quote.set_visible(msg.quote.is_some());
+        link_card.set_visible(msg.link.is_some());
+        if let Some(link) = &msg.link {
+            link_title.set_label(&link.title);
+            link_title.set_visible(!link.title.is_empty());
+            link_description.set_label(&link.description);
+            link_description.set_visible(!link.description.is_empty());
+            link_site.set_label(&link_host(&link.url));
+            link_card.update_property(&[gtk::accessible::Property::Label(&link.title)]);
+            link_thumb.set_paintable(None::<&gdk::Paintable>);
+            link_thumb.set_visible(!link.thumbnail_path.is_empty());
+            if !link.thumbnail_path.is_empty() {
+                let weak = link_thumb.downgrade();
+                let scale = link_thumb.scale_factor().max(1);
+                load_texture(
+                    &link.thumbnail_path,
+                    LINK_THUMB,
+                    LINK_THUMB,
+                    scale,
+                    move |t| {
+                        if let Some(thumb) = weak.upgrade() {
+                            thumb.set_paintable(Some(&t));
+                        }
+                    },
+                );
+            }
+        }
         if let Some(q) = &msg.quote {
             quote_name.set_label(&if q.from_me {
                 gettext("You")
@@ -487,6 +595,18 @@ fn fit_picture(picture: &gtk::Picture, width: i32, height: i32, sticker: bool) {
             clamp.set_tightening_threshold(max);
         }
     }
+}
+
+/// Side of a link preview's image, in pixels.
+const LINK_THUMB: i32 = 64;
+
+/// The site a link points to, as a preview shows it: "gnome.org".
+pub(super) fn link_host(url: &str) -> String {
+    glib::Uri::parse(url, glib::UriFlags::NONE)
+        .ok()
+        .and_then(|u| u.host())
+        .map(|h| h.trim_start_matches("www.").to_owned())
+        .unwrap_or_else(|| url.to_owned())
 }
 
 /// Message text as Pango markup, with web addresses made into links. The
