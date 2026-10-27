@@ -273,7 +273,9 @@ keep its memory in check; the measurements are in
   `ui/src/emoji_font.rs` takes both Noto emoji fonts out of the UI's
   fontconfig when Twemoji (`twitter-twemoji-fonts`) is installed, so Pango
   draws every emoji with it; the monochrome Noto Emoji has to go too, or
-  Pango falls back to it. Without Twemoji nothing changes and the emoji
+  Pango falls back to it. So does Symbola, a symbol font many systems
+  have: Pango draws the emoji GTK measures to size the others with it, and
+  the picker then drops the wide ones, such as flags. Without Twemoji nothing changes and the emoji
   use Noto Color Emoji. It runs at the start of `main`, before GTK uses
   fonts, and only changes the UI process, not the rest of the system.
 
