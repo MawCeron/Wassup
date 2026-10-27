@@ -160,7 +160,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .build();
         // Videos show their thumbnail with a play badge and their length.
         let play_badge = gtk::Image::builder()
-            .icon_name("media-playback-start-symbolic")
+            .icon_name("wassup-play-symbolic")
             .pixel_size(24)
             .halign(gtk::Align::Center)
             .valign(gtk::Align::Center)
@@ -361,7 +361,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .tooltip_text(gettext("Voice Message"))
             .build();
         let play = gtk::Button::builder()
-            .icon_name("media-playback-start-symbolic")
+            .icon_name("wassup-play-symbolic")
             .tooltip_text(gettext("Play"))
             .css_classes(["circular"])
             .build();
