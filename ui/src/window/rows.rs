@@ -358,12 +358,25 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         bubble.append(&audio);
         bubble.append(&text);
         bubble.append(&footer);
+        // Reactions sit on the bubble's bottom edge, outside it, as in
+        // WhatsApp; the spacer under the bubble makes room for them.
         let reactions = gtk::Label::builder()
-            .halign(gtk::Align::Start)
+            .valign(gtk::Align::End)
+            .margin_start(10)
+            .margin_end(10)
             .css_classes(["reactions"])
             .visible(false)
             .build();
-        bubble.append(&reactions);
+        let bubble_column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        bubble_column.append(&bubble);
+        bubble_column.append(
+            &gtk::Box::builder()
+                .height_request(12)
+                .visible(false)
+                .build(),
+        );
+        let bubble_area = gtk::Overlay::builder().child(&bubble_column).build();
+        bubble_area.add_overlay(&reactions);
         // Right click or a long press opens the message's menu.
         let open_menu = {
             let (list_item, owner, bubble) = (item.downgrade(), opener.clone(), bubble.downgrade());
@@ -396,19 +409,28 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let long_press = gtk::GestureLongPress::new();
         long_press.connect_pressed(move |_, x, y| open_menu(x, y));
         bubble.add_controller(long_press);
+        // The day, above the first message of each day.
+        let day = gtk::Label::builder()
+            .halign(gtk::Align::Center)
+            .margin_top(8)
+            .margin_bottom(6)
+            .css_classes(["day-separator"])
+            .build();
         let row = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
             .margin_start(12)
             .margin_end(12)
             .margin_top(3)
             .margin_bottom(3)
             .build();
+        row.append(&day);
         // A wrapping label asks for its whole text on one line; the clamp
         // caps the bubble so long messages wrap instead of filling the view.
         let clamp = adw::Clamp::builder()
             .maximum_size(BUBBLE_MAX_WIDTH)
             .tightening_threshold(BUBBLE_MAX_WIDTH)
             .hexpand(true)
-            .child(&bubble)
+            .child(&bubble_area)
             .build();
         row.append(&clamp);
         item.set_child(Some(&row));
@@ -418,8 +440,18 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         let msg = item.item().and_downcast::<glib::BoxedAnyObject>().unwrap();
         let msg = msg.borrow::<ipc::Message>();
-        let clamp = item.child().and_then(|row| row.first_child()).unwrap();
-        let bubble = clamp.first_child().unwrap();
+        let day = item
+            .child()
+            .and_then(|row| row.first_child())
+            .and_downcast::<gtk::Label>()
+            .unwrap();
+        let clamp = day.next_sibling().unwrap();
+        let bubble_area = clamp.first_child().and_downcast::<gtk::Overlay>().unwrap();
+        let bubble = bubble_area.child().and_then(|c| c.first_child()).unwrap();
+        let reactions = bubble_area
+            .last_child()
+            .and_downcast::<gtk::Label>()
+            .unwrap();
         let sender = bubble.first_child().and_downcast::<gtk::Label>().unwrap();
         let quote = sender.next_sibling().unwrap();
         let quote_name = quote
@@ -485,8 +517,21 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let footer = text.next_sibling().unwrap();
         let time = footer.first_child().and_downcast::<gtk::Label>().unwrap();
         let status = time.next_sibling().and_downcast::<gtk::Image>().unwrap();
-        let reactions = footer.next_sibling().and_downcast::<gtk::Label>().unwrap();
         show_reactions(&reactions, &msg.reactions);
+        // A separator when this message starts a day: the first loaded one,
+        // or one on another day than the message before it.
+        let previous = owner.get().and_then(std::rc::Weak::upgrade).and_then(|ui| {
+            item.position()
+                .checked_sub(1)
+                .and_then(|p| ui.messages.item(p))
+                .and_downcast::<glib::BoxedAnyObject>()
+                .map(|m| m.borrow::<ipc::Message>().timestamp_ms)
+        });
+        let starts_day = previous.is_none_or(|p| !same_day(p, msg.timestamp_ms));
+        day.set_visible(starts_day);
+        if starts_day {
+            day.set_label(&day_label(msg.timestamp_ms));
+        }
 
         let in_group = msg.chat_jid.ends_with("@g.us");
         sender.set_visible(in_group && !msg.from_me);
@@ -642,6 +687,11 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         } else {
             gtk::Align::Start
         });
+        reactions.set_halign(if msg.from_me {
+            gtk::Align::End
+        } else {
+            gtk::Align::Start
+        });
         if msg.from_me {
             bubble.add_css_class("mine");
         } else {
@@ -673,6 +723,48 @@ fn fit_picture(picture: &gtk::Picture, width: i32, height: i32, sticker: bool) {
             clamp.set_tightening_threshold(max);
         }
     }
+}
+
+/// Whether two moments fall on the same local day.
+fn same_day(a_ms: i64, b_ms: i64) -> bool {
+    let day = |ms: i64| {
+        glib::DateTime::from_unix_local(ms / 1000)
+            .ok()
+            .map(|d| d.ymd())
+    };
+    day(a_ms) == day(b_ms)
+}
+
+/// A day as the separator shows it: Today, Yesterday, the weekday within
+/// the last week, or the date.
+pub(super) fn day_label(ms: i64) -> String {
+    let (Ok(at), Ok(now)) = (
+        glib::DateTime::from_unix_local(ms / 1000),
+        glib::DateTime::now_local(),
+    ) else {
+        return String::new();
+    };
+    let midnight = |d: &glib::DateTime| {
+        let (y, m, day) = d.ymd();
+        glib::DateTime::from_local(y, m, day, 0, 0, 0.0).ok()
+    };
+    let days_ago = match (midnight(&now), midnight(&at)) {
+        (Some(today), Some(that)) => (today.difference(&that).as_seconds() + 3600) / 86_400,
+        _ => i64::MAX,
+    };
+    let label = match days_ago {
+        0 => return gettext("Today"),
+        1 => return gettext("Yesterday"),
+        2..=6 => at.format("%A"),
+        _ => at.format("%x"),
+    };
+    // Weekdays are lowercase in some languages, such as Spanish.
+    let label: String = label.map(Into::into).unwrap_or_default();
+    let mut chars = label.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 /// Side of a link preview's image, in pixels.
@@ -889,6 +981,18 @@ pub(super) fn show_avatar(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn days_are_named_relative_to_today() {
+        let now = glib::DateTime::now_local().unwrap();
+        let ms = |d: &glib::DateTime| d.to_unix() * 1000;
+        assert_eq!(day_label(ms(&now)), "Today");
+        assert_eq!(day_label(ms(&now.add_days(-1).unwrap())), "Yesterday");
+        let label = day_label(ms(&now.add_days(-3).unwrap()));
+        assert!(label.chars().next().unwrap().is_uppercase(), "{label}");
+        assert!(same_day(ms(&now), ms(&now)));
+        assert!(!same_day(ms(&now), ms(&now.add_days(-1).unwrap())));
+    }
 
     #[test]
     fn links_are_made_clickable_and_text_escaped() {

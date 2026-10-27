@@ -45,8 +45,10 @@ const CSS: &str = "
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .media-button { padding: 0; }
-.reactions { font-size: 0.85em; padding: 1px 8px; border-radius: 999px; background: alpha(currentColor, 0.08); }
-.reactions.mine { background: color-mix(in srgb, var(--accent-bg-color) 30%, transparent); }
+/* Opaque, with a ring of the backdrop, as they overlap the bubble's edge. */
+.reactions { font-size: 0.9em; padding: 2px 8px; border-radius: 999px; background: var(--popover-bg-color); box-shadow: 0 0 0 2px var(--view-bg-color); }
+.reactions.mine { background: color-mix(in srgb, var(--accent-bg-color) 25%, var(--popover-bg-color)); }
+.day-separator { font-size: 0.85em; font-weight: bold; padding: 4px 12px; border-radius: 8px; background: var(--popover-bg-color); box-shadow: 0 1px 2px alpha(black, 0.1); }
 .reaction-mine { background: color-mix(in srgb, var(--accent-bg-color) 30%, transparent); }
 .link-card { padding: 6px; border-radius: 8px; background: alpha(currentColor, 0.06); }
 .link-thumb { border-radius: 6px; }
@@ -1897,6 +1899,11 @@ impl Window {
             .map(glib::BoxedAnyObject::new)
             .collect();
         self.messages.splice(0, 0, &items);
+        // The message that was first may share its day with the page above
+        // it: bind it again so it drops its day separator.
+        if !first_page && !items.is_empty() {
+            self.messages.items_changed(items.len() as u32, 1, 1);
+        }
         if first_page {
             self.scroll_to_bottom();
         }

@@ -224,6 +224,15 @@ pub(super) fn show_reactions(label: &gtk::Label, reactions: &[ipc::Reaction]) {
         .join("  ");
     label.set_label(&text);
     label.set_visible(!reactions.is_empty());
+    // The space under the bubble that the reactions overlap.
+    let spacer = label
+        .parent()
+        .and_downcast::<gtk::Overlay>()
+        .and_then(|o| o.child())
+        .and_then(|c| c.last_child());
+    if let Some(spacer) = spacer {
+        spacer.set_visible(!reactions.is_empty());
+    }
     if reactions.iter().any(|r| r.mine) {
         label.add_css_class("mine");
     } else {
