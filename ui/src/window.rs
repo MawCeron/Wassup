@@ -533,21 +533,28 @@ impl Window {
             .popover(&sticker_popover)
             .css_classes(["circular", "flat"])
             .build();
-        // GTK's own emoji picker, inserting at the cursor.
-        let emoji_chooser = gtk::EmojiChooser::new();
+        // GTK's own emoji picker, inserting at the cursor. It loads every emoji
+        // when created, so it is built when the button is first pressed.
         let emoji_button = gtk::MenuButton::builder()
             .icon_name("wassup-emoji-symbolic")
             .tooltip_text(gettext("Emoji"))
             .valign(gtk::Align::End)
-            .popover(&emoji_chooser)
             .css_classes(["circular", "flat"])
             .build();
-        emoji_chooser.connect_emoji_picked(glib::clone!(
+        emoji_button.set_create_popup_func(glib::clone!(
             #[weak]
             composer,
-            move |_, emoji| {
-                composer.buffer().insert_at_cursor(emoji);
-                composer.grab_focus();
+            move |button| {
+                let chooser = gtk::EmojiChooser::new();
+                chooser.connect_emoji_picked(glib::clone!(
+                    #[weak]
+                    composer,
+                    move |_, emoji| {
+                        composer.buffer().insert_at_cursor(emoji);
+                        composer.grab_focus();
+                    }
+                ));
+                button.set_popover(Some(&chooser));
             }
         ));
         composer_bar.append(&attach);
