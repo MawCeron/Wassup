@@ -14,6 +14,7 @@ mod audio;
 mod preview;
 mod qr;
 mod rows;
+mod search;
 mod state;
 mod stickers;
 mod viewer;
@@ -21,6 +22,7 @@ mod viewer;
 use audio::*;
 use qr::*;
 use rows::*;
+use search::*;
 use state::*;
 use stickers::*;
 use viewer::*;
@@ -57,6 +59,8 @@ const CSS: &str = "
 .chat-bg-light { background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color)) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-light.svg\") repeat; }
 .chat-bg-dark { background: var(--view-bg-color) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-dark.svg\") repeat; }
 .chat-bg-light listview, .chat-bg-dark listview { background: none; }
+/* Last, to win over .mine: a search result just jumped to. */
+.bubble.found { background: color-mix(in srgb, var(--accent-bg-color) 60%, var(--card-bg-color)); transition: background 300ms; }
 ";
 
 /// Widgets of each bound message row, by message id, so receipts and
@@ -137,6 +141,7 @@ pub struct Window {
     /// Everything under the photo viewer.
     page: gtk::Box,
     viewer: Rc<Viewer>,
+    search: MessageSearch,
     message_list: gtk::ListView,
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
@@ -378,6 +383,8 @@ impl Window {
         let content_stack = gtk::Stack::new();
         content_stack.add_named(&placeholder, Some("empty"));
         content_stack.add_named(&message_scroll, Some("messages"));
+        let search = MessageSearch::new();
+        content_stack.add_named(&search.pages, Some("search"));
         let composer = gtk::TextView::builder()
             .wrap_mode(gtk::WrapMode::WordChar)
             .accepts_tab(false)
@@ -484,8 +491,15 @@ impl Window {
         header_box.append(&header_title);
         let content_header = adw::HeaderBar::new();
         content_header.set_title_widget(Some(&header_box));
+        // Searching makes sense only with a chat open, like the header.
+        header_box
+            .bind_property("visible", &search.button, "visible")
+            .sync_create()
+            .build();
+        content_header.pack_end(&search.button);
         let content_view = adw::ToolbarView::new();
         content_view.add_top_bar(&content_header);
+        content_view.add_top_bar(&search.bar);
         content_view.set_content(Some(&content_stack));
         content_view.add_bottom_bar(&composer_bar);
         content_view.set_reveal_bottom_bars(false);
@@ -594,6 +608,7 @@ impl Window {
             messages,
             page,
             viewer,
+            search,
             message_list,
             message_scroll,
             loading: Cell::new(false),
@@ -683,6 +698,20 @@ impl Window {
         app.add_action(&quit);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
         ui.connect_viewer();
+        ui.connect_message_search();
+        let search_messages = gio::SimpleAction::new("search-messages", None);
+        search_messages.connect_activate(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _| {
+                if ui.current_chat.borrow().is_some() {
+                    ui.search.bar.set_search_mode(true);
+                    ui.search.entry.grab_focus();
+                }
+            }
+        ));
+        ui.window.add_action(&search_messages);
+        app.set_accels_for_action("win.search-messages", &["<Control><Shift>f"]);
         ui.restricted_entry.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -1122,6 +1151,17 @@ impl Window {
             Some(event::Kind::ChatChanged(chat)) if self.is_current(&chat.account_id) => {
                 self.upsert_chat(chat)
             }
+            Some(event::Kind::Messages(list))
+                if event.request_id != 0 && event.request_id == self.search.request.get() =>
+            {
+                self.show_results(list.messages)
+            }
+            Some(event::Kind::Messages(list))
+                if event.request_id != 0 && event.request_id == self.search.jump_request.get() =>
+            {
+                self.search.jump_request.set(0);
+                self.show_from(list.messages)
+            }
             Some(event::Kind::Messages(list)) => self.add_page(list.messages),
             Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => {
                 if !msg.from_me {
@@ -1401,6 +1441,7 @@ impl Window {
             Some(gettext("Chats")),
             &[
                 (gettext("Search chats"), "<Control>f"),
+                (gettext("Search messages"), "<Control><Shift>f"),
                 (gettext("Open the next or previous chat"), "Up Down"),
                 (gettext("Write in the open chat"), "Return"),
                 (gettext("Back to the chat list"), "Escape"),
@@ -1561,6 +1602,7 @@ impl Window {
     /// Leaves the conversation pane empty, as when no chat is selected.
     fn close_chat(&self) {
         self.close_viewer();
+        self.search.bar.set_search_mode(false);
         self.stop_audio();
         self.current_chat.replace(None);
         self.messages.remove_all();
@@ -1632,6 +1674,7 @@ impl Window {
 
     fn open_chat(&self, chat: &ipc::Chat) {
         self.close_viewer();
+        self.search.bar.set_search_mode(false);
         if chat.locked && !self.restricted.get() {
             return; // Only reachable through the restricted view.
         }
@@ -1775,6 +1818,7 @@ impl Window {
             chat_jid,
             before_id,
             limit: PAGE_SIZE,
+            ..Default::default()
         }));
     }
 

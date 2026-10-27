@@ -215,6 +215,7 @@ is unlinked and linked again.
 | Escape | Message box | Back to the chat list |
 | Tab | Conversation | Reach photos, documents and audio controls, which open with Enter or Space |
 | Ctrl+F | Anywhere | Search chats by name, ignoring case and accents |
+| Ctrl+Shift+F | Open chat | Search its messages, ignoring case and accents; choosing a result jumps to it |
 | Ctrl+, | Anywhere | Preferences |
 | Ctrl+? | Anywhere | Keyboard shortcuts |
 | Ctrl+W | Anywhere | Close the window; the daemon keeps notifying |
