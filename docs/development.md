@@ -224,6 +224,14 @@ file has expired on WhatsApp's servers, or that only the phone holds,
 cannot be fetched and are left out, unless the same sticker was also
 received in a chat.
 
+Clicking a sticker in a conversation opens a menu to add it to the favorites,
+or to take it out if it is one. The daemon writes the same `favoriteSticker`
+action the phone does, with the file's hash in base64 as its index and what
+is needed to download the file again (`SetFavoriteSticker` in
+`daemon/sticker.go`), and then records the change itself, since the server
+does not send it back. The action's version is 2, which the phone accepted
+when it was tried; it was not read from a mutation of the phone.
+
 ## History
 
 When a device is linked, the phone sends the last three months of every
