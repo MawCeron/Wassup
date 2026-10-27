@@ -614,10 +614,7 @@ impl Window {
             app,
             #[weak]
             ui,
-            move |_, _| {
-                ui.send(request::Kind::Quit(ipc::Quit {}));
-                app.quit();
-            }
+            move |_, _| ui.confirm_quit(&app)
         ));
         app.add_action(&quit);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
@@ -1267,6 +1264,35 @@ impl Window {
             move |_| save()
         });
         language.connect_selected_notify(move |_| save());
+        dialog.present(Some(&self.window));
+    }
+
+    /// Quitting also stops notifications, unlike closing the window, so
+    /// it asks first.
+    fn confirm_quit(self: &Rc<Self>, app: &adw::Application) {
+        let dialog = adw::AlertDialog::builder()
+            .heading(gettext("Quit Wassup?"))
+            .body(gettext(
+                "You won't get notifications of new messages until you open Wassup again. To keep getting them, close the window instead.",
+            ))
+            .default_response("quit")
+            .close_response("cancel")
+            .build();
+        dialog.add_responses(&[("cancel", &gettext("Cancel")), ("quit", &gettext("Quit"))]);
+        dialog.set_response_appearance("quit", adw::ResponseAppearance::Destructive);
+        dialog.connect_response(
+            Some("quit"),
+            glib::clone!(
+                #[weak(rename_to = ui)]
+                self,
+                #[weak]
+                app,
+                move |_, _| {
+                    ui.send(request::Kind::Quit(ipc::Quit {}));
+                    app.quit();
+                }
+            ),
+        );
         dialog.present(Some(&self.window));
     }
 

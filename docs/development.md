@@ -203,7 +203,7 @@ is unlinked and linked again.
 | Ctrl+, | Anywhere | Preferences |
 | Ctrl+? | Anywhere | Keyboard shortcuts |
 | Ctrl+W | Anywhere | Close the window; the daemon keeps notifying |
-| Ctrl+Q | Anywhere | Quit, stopping the daemon and notifications until Wassup is opened again |
+| Ctrl+Q | Anywhere | Quit after confirming, stopping the daemon and notifications until Wassup is opened again |
 
 Every control has a name for screen readers, and a chat row reads its
 unread count. Messages that arrive in the open chat are announced. To
