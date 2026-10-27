@@ -1,0 +1,44 @@
+# Checks every push and pull request on Fedora, the only platform Wassup
+# targets, with the same packages it builds against.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    steps:
+      - name: Install build dependencies
+        run: >
+          dnf install -y --setopt=install_weak_deps=False
+          git golang cargo rust rustfmt clippy gtk4-devel libadwaita-devel
+          libwebp-devel glib2-devel protobuf-compiler gettext
+          desktop-file-utils appstream
+      - uses: actions/checkout@v5
+
+      - name: Daemon
+        working-directory: daemon
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test ./...
+
+      - name: UI
+        working-directory: ui
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --locked
+
+      - name: Translations and desktop metadata
+        run: |
+          for po in po/*.po; do msgfmt --check -o /dev/null "$po"; done
+          desktop-file-validate packaging/io.github.MawCeron.Wassup.desktop
+          appstreamcli validate --no-net data/io.github.MawCeron.Wassup.metainfo.xml

@@ -1,0 +1,49 @@
+# Publishes a release when a version tag is pushed: the RPM and source RPM
+# for Fedora, and the source and vendored-dependency tarballs they are
+# built from. See docs/packaging.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    steps:
+      - name: Install build dependencies
+        run: >
+          dnf install -y --setopt=install_weak_deps=False
+          git gh rpm-build rpmdevtools golang cargo rust gtk4-devel
+          libadwaita-devel libwebp-devel glib2-devel protobuf-compiler gettext
+          desktop-file-utils appstream systemd-rpm-macros
+      - uses: actions/checkout@v5
+
+      - name: Check the tag matches the version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' ui/Cargo.toml | head -1)
+          spec=$(sed -n 's/^Version:[[:space:]]*//p' packaging/wassup.spec)
+          if [ "$GITHUB_REF_NAME" != "v$version" ] || [ "$spec" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME, Cargo.toml $version and wassup.spec $spec must agree."
+            exit 1
+          fi
+
+      - name: Build the RPM
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          rpmdev-setuptree
+          packaging/tarballs.sh
+          rpmbuild -ba packaging/wassup.spec
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "Wassup ${GITHUB_REF_NAME#v}" --generate-notes \
+            ~/rpmbuild/RPMS/*/wassup-*.rpm ~/rpmbuild/SRPMS/wassup-*.src.rpm \
+            ~/rpmbuild/SOURCES/wassup-*.tar.*
