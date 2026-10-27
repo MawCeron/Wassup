@@ -61,9 +61,12 @@ fn choose_renderer() {
 
 fn main() -> glib::ExitCode {
     choose_renderer();
+    gio::resources_register_include!("icons.gresource").expect("bundled icons");
     // Every launch is forwarded to the running instance, if there is one.
     let app = adw::Application::builder()
         .application_id(APP_ID)
+        // Where GTK finds the bundled icons, whatever the app id.
+        .resource_base_path("/io/github/MawCeron/Wassup")
         .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
     app.add_main_option(

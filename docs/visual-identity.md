@@ -105,8 +105,7 @@ example with Inkscape's *Path → Stroke to Path*) before installing.
 | Delivered | `wassup-double-tick-symbolic` | `dim-label` |
 | Read | `wassup-double-tick-symbolic` | `accent` |
 
-These are the same classes `show_status` in `ui/src/window.rs` already
-applies to the text marks, so the icons can replace them without new CSS.
+`show_status` in `ui/src/window/rows.rs` applies them.
 
 ## Chat background
 
@@ -133,6 +132,10 @@ Change the opacity on the root `<g>` of each file to make it more or less
 visible.
 
 ## Trying the icons during development
+
+The interface icons are compiled into the UI binary as a GResource by
+`ui/build.rs`, so they work without installing anything; rebuild after
+changing them. The app icon needs installing:
 
 ```sh
 mkdir -p ~/.local/share/icons

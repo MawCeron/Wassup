@@ -50,7 +50,7 @@ const CSS: &str = "
 type BoundRows = Rc<RefCell<std::collections::HashMap<String, RowWidgets>>>;
 
 struct RowWidgets {
-    status: glib::WeakRef<gtk::Label>,
+    status: glib::WeakRef<gtk::Image>,
     picture: glib::WeakRef<gtk::Picture>,
     audio: glib::WeakRef<gtk::Box>,
 }
@@ -342,7 +342,7 @@ impl Window {
             .child(&composer)
             .build();
         let send_button = gtk::Button::builder()
-            .icon_name("mail-send-symbolic")
+            .icon_name("wassup-send-symbolic")
             .tooltip_text("Send")
             .valign(gtk::Align::End)
             .css_classes(["circular", "suggested-action"])
@@ -403,7 +403,7 @@ impl Window {
         );
         let sticker_popover = gtk::Popover::builder().child(&sticker_box).build();
         let stickers_button = gtk::MenuButton::builder()
-            .icon_name("face-smile-symbolic")
+            .icon_name("wassup-stickers-symbolic")
             .tooltip_text("Stickers")
             .valign(gtk::Align::End)
             .popover(&sticker_popover)
@@ -1482,13 +1482,13 @@ impl Window {
             if hit {
                 let mut msg = item.borrow_mut::<ipc::Message>();
                 msg.status = change.status;
-                let label = self
+                let icon = self
                     .rows
                     .borrow()
                     .get(&msg.id)
                     .and_then(|r| r.status.upgrade());
-                if let Some(label) = label {
-                    show_status(&label, change.status());
+                if let Some(icon) = icon {
+                    show_status(&icon, change.status());
                 }
             }
         }

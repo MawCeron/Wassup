@@ -63,21 +63,17 @@ pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
     factory
 }
 
-pub(super) fn show_status(label: &gtk::Label, status: ipc::MessageStatus) {
-    let (marks, tooltip, read) = match status {
-        ipc::MessageStatus::Sent => ("✓", "Sent", false),
-        ipc::MessageStatus::Delivered => ("✓✓", "Delivered", false),
-        ipc::MessageStatus::Read => ("✓✓", "Read", true),
-        ipc::MessageStatus::Unspecified => ("", "", false),
+pub(super) fn show_status(icon: &gtk::Image, status: ipc::MessageStatus) {
+    let (name, tooltip, read) = match status {
+        ipc::MessageStatus::Sent => (Some("wassup-tick-symbolic"), "Sent", false),
+        ipc::MessageStatus::Delivered => (Some("wassup-double-tick-symbolic"), "Delivered", false),
+        ipc::MessageStatus::Read => (Some("wassup-double-tick-symbolic"), "Read", true),
+        ipc::MessageStatus::Unspecified => (None, "", false),
     };
-    label.set_label(marks);
-    label.set_tooltip_text(Some(tooltip));
-    label.update_property(&[gtk::accessible::Property::Label(tooltip)]);
-    label.set_css_classes(if read {
-        &["caption", "accent"]
-    } else {
-        &["caption", "dim-label"]
-    });
+    icon.set_icon_name(name);
+    icon.set_tooltip_text(Some(tooltip));
+    icon.update_property(&[gtk::accessible::Property::Label(tooltip)]);
+    icon.set_css_classes(if read { &["accent"] } else { &["dim-label"] });
 }
 
 pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalListItemFactory {
@@ -138,7 +134,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .build();
         document.append(
             &gtk::Image::builder()
-                .icon_name("x-office-document-symbolic")
+                .icon_name("wassup-document-symbolic")
                 .pixel_size(32)
                 .build(),
         );
@@ -154,7 +150,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let time = gtk::Label::builder()
             .css_classes(["caption", "dim-label"])
             .build();
-        let status = gtk::Label::builder().css_classes(["caption"]).build();
+        let status = gtk::Image::new();
         let footer = gtk::Box::builder()
             .spacing(4)
             .halign(gtk::Align::End)
@@ -191,7 +187,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         bubble.append(&picture);
         bubble.append(&document);
         let voice_icon = gtk::Image::builder()
-            .icon_name("audio-input-microphone-symbolic")
+            .icon_name("wassup-voice-note-symbolic")
             .tooltip_text("Voice message")
             .build();
         let play = gtk::Button::builder()
@@ -286,7 +282,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let text = audio.next_sibling().and_downcast::<gtk::Label>().unwrap();
         let footer = text.next_sibling().unwrap();
         let time = footer.first_child().and_downcast::<gtk::Label>().unwrap();
-        let status = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let status = time.next_sibling().and_downcast::<gtk::Image>().unwrap();
 
         let in_group = msg.chat_jid.ends_with("@g.us");
         sender.set_visible(in_group && !msg.from_me);
