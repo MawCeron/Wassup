@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="data/icons/hicolor/scalable/apps/io.github.MawCeron.Wassup.svg" alt="Wassup icon" width="128">
+  <img src="data/brand/wassup-lockup.svg" alt="Wassup" height="96">
 </p>
 
-# Wassup
+<p align="center"><em>Unofficial native WhatsApp client for Linux.</em></p>
 
 An **unofficial** WhatsApp client for Linux (GNOME), with a native protocol
 implementation and low RAM usage.
