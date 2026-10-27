@@ -7,8 +7,8 @@
 An **unofficial** WhatsApp client for Linux (GNOME), with a native protocol
 implementation and low RAM usage.
 
-> Early development. Packages for Fedora are on the way; until then it is
-> built from source.
+> Early development. The first release is an RPM for Fedora 44; other
+> distributions build it from source.
 
 **Warning:** since this is an unofficial client, Meta could restrict accounts that use it. Try it with a secondary number first.
 
@@ -16,8 +16,10 @@ implementation and low RAM usage.
 
 - Links your account by QR code, as another device of your phone, and
   brings in your recent history; older messages load as you scroll up.
-- Sends and receives text, photos, videos, documents, stickers and voice
-  notes, with replies, reactions and link previews.
+- Sends and receives text, photos, videos, documents, stickers, GIFs and
+  voice notes, with replies, reactions, link previews and mentions.
+- Plays animated stickers and GIFs, and keeps your favorite stickers in
+  sync with the phone.
 - Shows delivery and read marks, unread counts, and profile and group
   pictures; keeps disappearing messages and locked chats as the phone does.
 - Searches chats, and messages inside a chat.
@@ -28,6 +30,19 @@ implementation and low RAM usage.
 
 It supports one account. What comes next is in
 [`docs/roadmap.md`](docs/roadmap.md).
+
+## Installing
+
+Download the RPM from the
+[releases page](https://github.com/MawCeron/Wassup/releases) and install it
+on Fedora 44:
+
+```sh
+sudo dnf install ./wassup-*.x86_64.rpm
+```
+
+Open Wassup from the application launcher and scan the QR code with your
+phone, as when linking any other device.
 
 ## How it works
 
@@ -49,6 +64,11 @@ it as an order of magnitude. Emoji are drawn with a bitmap font that the
 package carries, because the default emoji font makes the UI grow by
 hundreds of megabytes once emoji are shown. Method, caveats and every
 figure are in [`docs/performance.md`](docs/performance.md).
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Changes by release are in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ## Building
 
