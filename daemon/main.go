@@ -109,6 +109,7 @@ func run() error {
 	slog.Info("started", "socket", ln.Addr(), "data", data, "cache", cache, "accounts", len(accounts))
 	d.stop = func() { ln.Close() }
 	d.serve(ln)
+	d.wait() // Tray refreshes read the databases, which are closed next.
 	// A clean exit, so systemd does not restart it; the socket unit
 	// starts it again when the UI next connects.
 	slog.Info("quit")
@@ -180,6 +181,8 @@ func listen() (net.Listener, error) {
 type daemon struct {
 	accounts []*account
 	notify   *notifier
+	// Tray refreshes in flight, which read the accounts' databases.
+	background sync.WaitGroup
 	// TODO: one lock for every socket write; per-connection queues if a slow UI ever stalls the others.
 	mu    sync.Mutex
 	conns map[net.Conn]struct{}
@@ -304,7 +307,7 @@ func (d *daemon) handle(conn net.Conn) {
 			continue // Answered later, from the goroutine doing the work.
 		}
 		if ev.GetChatChanged() != nil { // Marking a chat read answers with it.
-			go d.refreshTray()
+			d.refreshTrayLater()
 		}
 		d.mu.Lock()
 		err := write(conn, ev)
@@ -337,7 +340,7 @@ func (d *daemon) broadcastExcept(skip net.Conn, ev *ipc.Event) {
 // broadcast sends an unsolicited event to every connected UI.
 func (d *daemon) broadcast(ev *ipc.Event) {
 	if ev.GetChatChanged() != nil {
-		go d.refreshTray()
+		d.refreshTrayLater()
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()

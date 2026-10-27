@@ -36,6 +36,19 @@ func (d *daemon) refreshTray() {
 	d.tray.setUnread(total)
 }
 
+// refreshTrayLater refreshes the tray without making the caller wait. wait
+// lets whoever closes the accounts wait for it first.
+func (d *daemon) refreshTrayLater() {
+	d.background.Add(1)
+	go func() {
+		defer d.background.Done()
+		d.refreshTray()
+	}()
+}
+
+// wait returns once the work started by refreshTrayLater is done.
+func (d *daemon) wait() { d.background.Wait() }
+
 // setSettings saves the preferences and applies those the daemon uses.
 func (d *daemon) setSettings(s *ipc.Settings) (*ipc.Settings, error) {
 	c := config{

@@ -33,6 +33,7 @@ func TestDisappearingMessages(t *testing.T) {
 	a := accounts[0]
 	a.mediaDir = t.TempDir()
 	d := newDaemon(accounts, nil)
+	defer d.wait() // Before the accounts close.
 	chat := types.NewJID("5215550000000", types.DefaultUserServer)
 	sent := time.Unix(1_700_000_000, 0)
 	save := func(id string, m *waE2E.Message) {

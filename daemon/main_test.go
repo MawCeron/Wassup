@@ -186,6 +186,7 @@ func TestViewOnceNoticeBecomesMessage(t *testing.T) {
 	defer closeAccounts(accounts)
 	a := accounts[0]
 	d := newDaemon(accounts, nil)
+	defer d.wait() // Before the accounts close.
 	chat := types.NewJID("120363000000000001", types.GroupServer)
 	d.onMessage(a, &events.Message{
 		Info: types.MessageInfo{
