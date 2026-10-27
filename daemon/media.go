@@ -216,7 +216,7 @@ func (a *account) fetchMedia(ctx context.Context, chatJID, msgID string) (string
 
 // cacheLimit is the media cache size in bytes.
 func (a *account) cacheLimit() int64 {
-	mb := a.mediaCacheMB
+	mb := a.mediaCacheMB.Load()
 	if mb <= 0 {
 		mb = defaultMediaCacheMB
 	}

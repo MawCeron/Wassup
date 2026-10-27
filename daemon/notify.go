@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
 	"github.com/godbus/dbus/v5"
@@ -43,10 +44,39 @@ func loadConfig(configDir string) (config, error) {
 	if err := dec.Decode(&c); err != nil {
 		return c, errors.New(f.Name() + ": " + err.Error())
 	}
-	if c.MediaCacheMB < 0 {
-		return c, errors.New(f.Name() + ": media_cache_mb cannot be negative")
+	if err := c.validate(); err != nil {
+		return c, errors.New(f.Name() + ": " + err.Error())
 	}
 	return c, nil
+}
+
+func (c config) validate() error {
+	if c.MediaCacheMB < 0 {
+		return errors.New("media_cache_mb cannot be negative")
+	}
+	return nil
+}
+
+// saveConfig replaces configDir/config.json in one step, so the daemon
+// never reads half a file.
+func saveConfig(configDir string, c config) error {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(configDir, ".config-*.json")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(append(data, '\n')); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), filepath.Join(configDir, "config.json"))
 }
 
 // notifier shows desktop notifications through org.freedesktop.Notifications.
@@ -54,7 +84,7 @@ func loadConfig(configDir string) (config, error) {
 type notifier struct {
 	conn        *dbus.Conn
 	bus         dbus.BusObject
-	hideContent bool
+	hideContent atomic.Bool
 	mu          sync.Mutex
 	ids         map[string]uint32 // Shown notification per chat, replaced by the next one.
 	tokens      map[uint32]string // Activation token sent just before a click.
@@ -67,12 +97,12 @@ func newNotifier(hideContent bool) *notifier {
 		return nil
 	}
 	n := &notifier{
-		conn:        conn,
-		bus:         conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications"),
-		hideContent: hideContent,
-		ids:         map[string]uint32{},
-		tokens:      map[uint32]string{},
+		conn:   conn,
+		bus:    conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications"),
+		ids:    map[string]uint32{},
+		tokens: map[uint32]string{},
 	}
+	n.hideContent.Store(hideContent)
 	err = conn.AddMatchSignal(
 		dbus.WithMatchObjectPath("/org/freedesktop/Notifications"),
 		dbus.WithMatchInterface("org.freedesktop.Notifications"),
@@ -178,7 +208,7 @@ func (n *notifier) message(chat *ipc.Chat, msg *ipc.Message) {
 	if n == nil {
 		return
 	}
-	title, body := notificationText(chat, msg, n.hideContent)
+	title, body := notificationText(chat, msg, n.hideContent.Load())
 	key := chatKey(msg.AccountId, chat.Jid)
 	n.mu.Lock()
 	defer n.mu.Unlock()

@@ -74,7 +74,9 @@ func TestRemoveLeftovers(t *testing.T) {
 	if got := (&account{}).cacheLimit(); got != defaultMediaCacheMB<<20 {
 		t.Fatalf("default cache limit %d", got)
 	}
-	if got := (&account{mediaCacheMB: 50}).cacheLimit(); got != 50<<20 {
+	var a account
+	a.mediaCacheMB.Store(50)
+	if got := a.cacheLimit(); got != 50<<20 {
 		t.Fatalf("configured cache limit %d", got)
 	}
 }

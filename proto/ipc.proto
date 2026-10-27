@@ -24,6 +24,8 @@ message Request {
     ListStickers list_stickers = 12;
     SendSticker send_sticker = 13;
     UnlockChats unlock_chats = 14;
+    GetSettings get_settings = 15;
+    SetSettings set_settings = 16;
   }
 }
 
@@ -46,6 +48,7 @@ message Event {
     MediaReady media_ready = 13;
     StickerList stickers = 14;
     MessagesExpired messages_expired = 15;
+    Settings settings = 16;
   }
 }
 
@@ -264,6 +267,24 @@ message SendSticker {
 message UnlockChats {
   string account_id = 1;
   string secret_code = 2;
+}
+
+// The user's preferences, stored in config.json. Answered with settings.
+message GetSettings {}
+
+// Saves and applies preferences. Answered with settings, or error if a
+// value is out of range.
+message SetSettings {
+  Settings settings = 1;
+}
+
+message Settings {
+  // Notifications say who wrote but not what.
+  bool hide_notification_content = 1;
+  // Size of the media cache.
+  uint32 media_cache_mb = 2;
+  // Read by the UI at startup: draw with the GPU instead of in software.
+  bool gpu_rendering = 3;
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with

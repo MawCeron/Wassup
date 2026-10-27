@@ -34,7 +34,7 @@ type account struct {
 	// Where this account's media is cached; empty disables downloads.
 	mediaDir     string
 	avatarDir    string
-	mediaCacheMB int
+	mediaCacheMB atomic.Int32
 	downloads    *downloads
 }
 

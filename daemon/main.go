@@ -78,7 +78,7 @@ func run() error {
 	for _, a := range accounts {
 		a.mediaDir = filepath.Join(cache, "media", a.id)
 		a.avatarDir = filepath.Join(cache, "avatars", a.id)
-		a.mediaCacheMB = cfg.MediaCacheMB
+		a.mediaCacheMB.Store(int32(cfg.MediaCacheMB))
 		for _, dir := range []string{a.mediaDir, a.avatarDir} {
 			if err := os.MkdirAll(dir, 0o700); err != nil {
 				closeAccounts(accounts)
@@ -90,6 +90,7 @@ func run() error {
 		removeLeftovers(a.mediaDir, a.avatarDir)
 	}
 	d := newDaemon(accounts, newNotifier(cfg.HideNotificationContent))
+	d.configDir, d.config = configDir, cfg
 	go d.sweepExpired(context.Background())
 	for _, a := range accounts {
 		if a.client.Store.ID != nil {
@@ -168,6 +169,10 @@ type daemon struct {
 	conns map[net.Conn]struct{}
 	// Chat each UI is showing, as "account/chat", so it is not notified.
 	active map[net.Conn]string
+	// Preferences, saved to configDir/config.json when changed.
+	configMu  sync.Mutex
+	configDir string
+	config    config
 }
 
 func newDaemon(accounts []*account, notify *notifier) *daemon {
@@ -428,6 +433,14 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 			}
 		}()
 		return nil
+	case *ipc.Request_GetSettings:
+		ev.Kind = &ipc.Event_Settings{Settings: d.settings()}
+	case *ipc.Request_SetSettings:
+		if s, err := d.setSettings(k.SetSettings.GetSettings()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Settings{Settings: s}
+		}
 	case *ipc.Request_ListStickers:
 		if a := d.find(k.ListStickers.GetAccountId()); a == nil {
 			fail(errors.New("unknown account"))
