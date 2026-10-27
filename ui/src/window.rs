@@ -45,6 +45,12 @@ const PAGE_SIZE: u32 = 50;
 /// Emoji per row in the picker; GTK shows 7.
 const EMOJI_COLUMNS: u32 = 10;
 
+/// Hides the glow and the shadow libadwaita draws at the edges of the
+/// composer's scrolled text. At the application's priority its own rules
+/// win, so these go in a provider of the user's priority.
+const COMPOSER_EDGES_CSS: &str = ".composer scrolledwindow > overshoot, \
+    .composer scrolledwindow > undershoot { background: none; box-shadow: none; }";
+
 const CSS: &str = "
 .bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
 .media { border-radius: 8px; background: alpha(currentColor, 0.08); }
@@ -656,6 +662,13 @@ impl Window {
             &gdk::Display::default().expect("a display"),
             &css,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+        let composer_css = gtk::CssProvider::new();
+        composer_css.load_from_string(COMPOSER_EDGES_CSS);
+        gtk::style_context_add_provider_for_display(
+            &gdk::Display::default().expect("a display"),
+            &composer_css,
+            gtk::STYLE_PROVIDER_PRIORITY_USER,
         );
         // The user's background picture, which CSS names by its path.
         let background_css = gtk::CssProvider::new();
