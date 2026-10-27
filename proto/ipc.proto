@@ -375,6 +375,9 @@ message Settings {
   bool tray_icon = 5;
   // Fetch a preview of the first link in messages the user sends.
   bool link_previews = 6;
+  // Read by the UI: "" for the doodles, "plain", or "picture" for the
+  // user's own, which the UI keeps in its data directory.
+  string chat_background = 7;
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with

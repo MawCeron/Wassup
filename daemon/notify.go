@@ -34,6 +34,8 @@ type config struct {
 	// Sent links go with a preview of the page unless turned off: fetching
 	// it visits the site, as the phone does.
 	NoLinkPreviews bool `json:"no_link_previews"`
+	// Read by the UI: "" for the doodles, "plain", or "picture".
+	ChatBackground string `json:"chat_background"`
 }
 
 // languageCode is what a language setting may look like. It becomes part
@@ -69,6 +71,11 @@ func (c config) validate() error {
 	}
 	if !languageCode.MatchString(c.Language) {
 		return errors.New("language must be a code such as es or pt_BR")
+	}
+	switch c.ChatBackground {
+	case "", "plain", "picture":
+	default:
+		return errors.New(`chat_background must be "", "plain" or "picture"`)
 	}
 	return nil
 }

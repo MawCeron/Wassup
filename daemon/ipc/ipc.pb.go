@@ -3001,9 +3001,12 @@ type Settings struct {
 	// Show the unread count as a status icon, where the desktop has a tray.
 	TrayIcon bool `protobuf:"varint,5,opt,name=tray_icon,json=trayIcon,proto3" json:"tray_icon,omitempty"`
 	// Fetch a preview of the first link in messages the user sends.
-	LinkPreviews  bool `protobuf:"varint,6,opt,name=link_previews,json=linkPreviews,proto3" json:"link_previews,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	LinkPreviews bool `protobuf:"varint,6,opt,name=link_previews,json=linkPreviews,proto3" json:"link_previews,omitempty"`
+	// Read by the UI: "" for the doodles, "plain", or "picture" for the
+	// user's own, which the UI keeps in its data directory.
+	ChatBackground string `protobuf:"bytes,7,opt,name=chat_background,json=chatBackground,proto3" json:"chat_background,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Settings) Reset() {
@@ -3076,6 +3079,13 @@ func (x *Settings) GetLinkPreviews() bool {
 		return x.LinkPreviews
 	}
 	return false
+}
+
+func (x *Settings) GetChatBackground() string {
+	if x != nil {
+		return x.ChatBackground
+	}
+	return ""
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with
@@ -3633,14 +3643,15 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04Quit\"\r\n" +
 	"\vGetSettings\"B\n" +
 	"\vSetSettings\x123\n" +
-	"\bsettings\x18\x01 \x01(\v2\x17.wassup.ipc.v1.SettingsR\bsettings\"\xef\x01\n" +
+	"\bsettings\x18\x01 \x01(\v2\x17.wassup.ipc.v1.SettingsR\bsettings\"\x98\x02\n" +
 	"\bSettings\x12:\n" +
 	"\x19hide_notification_content\x18\x01 \x01(\bR\x17hideNotificationContent\x12$\n" +
 	"\x0emedia_cache_mb\x18\x02 \x01(\rR\fmediaCacheMb\x12#\n" +
 	"\rgpu_rendering\x18\x03 \x01(\bR\fgpuRendering\x12\x1a\n" +
 	"\blanguage\x18\x04 \x01(\tR\blanguage\x12\x1b\n" +
 	"\ttray_icon\x18\x05 \x01(\bR\btrayIcon\x12#\n" +
-	"\rlink_previews\x18\x06 \x01(\bR\flinkPreviews\"G\n" +
+	"\rlink_previews\x18\x06 \x01(\bR\flinkPreviews\x12'\n" +
+	"\x0fchat_background\x18\a \x01(\tR\x0echatBackground\"G\n" +
 	"\vFetchAvatar\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +

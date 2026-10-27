@@ -23,6 +23,7 @@ func (d *daemon) settings() *ipc.Settings {
 		Language:                d.config.Language,
 		TrayIcon:                !d.config.HideTrayIcon,
 		LinkPreviews:            !d.config.NoLinkPreviews,
+		ChatBackground:          d.config.ChatBackground,
 	}
 }
 
@@ -44,6 +45,7 @@ func (d *daemon) setSettings(s *ipc.Settings) (*ipc.Settings, error) {
 		Language:                s.GetLanguage(),
 		HideTrayIcon:            !s.GetTrayIcon(),
 		NoLinkPreviews:          !s.GetLinkPreviews(),
+		ChatBackground:          s.GetChatBackground(),
 	}
 	if err := c.validate(); err != nil {
 		return nil, err
