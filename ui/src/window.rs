@@ -1133,7 +1133,32 @@ impl Window {
             .title(gettext("Performance"))
             .build();
         performance.add(&gpu);
+        // Names in their own language, so anyone can find theirs.
+        let languages = [
+            ("", gettext("System Language")),
+            ("en", "English".to_owned()),
+            ("es", "Español".to_owned()),
+        ];
+        let language = adw::ComboRow::builder()
+            .title(gettext("Language"))
+            .subtitle(gettext("Applies after restarting Wassup"))
+            .model(&gtk::StringList::new(
+                &languages
+                    .iter()
+                    .map(|(_, name)| name.as_str())
+                    .collect::<Vec<_>>(),
+            ))
+            .selected(
+                languages
+                    .iter()
+                    .position(|(code, _)| *code == settings.language)
+                    .unwrap_or(0) as u32,
+            )
+            .build();
+        let general = adw::PreferencesGroup::new();
+        general.add(&language);
         let page = adw::PreferencesPage::new();
+        page.add(&general);
         page.add(&notifications);
         page.add(&storage);
         page.add(&performance);
@@ -1150,12 +1175,15 @@ impl Window {
             cache,
             #[weak]
             gpu,
+            #[weak]
+            language,
             move || {
                 ui.send(request::Kind::SetSettings(ipc::SetSettings {
                     settings: Some(ipc::Settings {
                         hide_notification_content: hide_content.is_active(),
                         media_cache_mb: cache.value() as u32,
                         gpu_rendering: gpu.is_active(),
+                        language: languages[language.selected() as usize].0.to_owned(),
                     }),
                 }));
             }
@@ -1164,7 +1192,11 @@ impl Window {
             let save = save.clone();
             row.connect_active_notify(move |_| save());
         }
-        cache.connect_value_notify(move |_| save());
+        cache.connect_value_notify({
+            let save = save.clone();
+            move |_| save()
+        });
+        language.connect_selected_notify(move |_| save());
         dialog.present(Some(&self.window));
     }
 

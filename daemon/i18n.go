@@ -16,10 +16,13 @@ func tr(s string) string { return get(s) }
 // through a variable keeps vet from taking every message for a format.
 var get = gotext.Get
 
-// initLocale loads the translations for the user's language, from the same
-// .mo files as the UI.
-func initLocale() {
-	lang := os.Getenv("LANGUAGE") // A list such as "es_MX:es", as gettext reads it.
+// initLocale loads the translations for language, or for the system's
+// language if it is empty, from the same .mo files as the UI.
+func initLocale(language string) {
+	lang := language
+	if lang == "" {
+		lang = os.Getenv("LANGUAGE") // A list such as "es_MX:es", as gettext reads it.
+	}
 	for _, env := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
 		if lang == "" {
 			lang = os.Getenv(env)

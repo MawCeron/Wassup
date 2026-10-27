@@ -22,6 +22,10 @@ translation. The comment above such a message says what it stands for.
 `msgfmt --check` in `po/i18n.sh install` rejects a translation that drops
 it.
 
+Preferences lists the languages users can pick. Add the new one to the
+`languages` list in `show_preferences` in `ui/src/window.rs`, with its
+name in that language.
+
 ## Marking strings in the code
 
 - **UI (Rust):** wrap the text in `gettext("...")`. Put values in with

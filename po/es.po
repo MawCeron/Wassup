@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Wassup\n"
 "Report-Msgid-Bugs-To: https://github.com/MawCeron/Wassup/issues\n"
-"POT-Creation-Date: 2026-10-26 18:37-0600\n"
+"POT-Creation-Date: 2026-10-26 18:41-0600\n"
 "PO-Revision-Date: 2026-10-26 18:37-0600\n"
 "Last-Translator: Mauricio Cerón Medina\n"
 "Language-Team: Spanish\n"
@@ -27,29 +27,30 @@ msgstr "Código secreto incorrecto"
 
 #: daemon/main.go:473
 msgid "Set a secret code for locked chats on your phone first"
-msgstr "Primero configura un código secreto para los chats bloqueados en tu teléfono"
+msgstr ""
+"Primero configura un código secreto para los chats bloqueados en tu teléfono"
 
-#: daemon/notify.go:172 daemon/notify.go:176 daemon/notify.go:199
+#: daemon/notify.go:182 daemon/notify.go:186 daemon/notify.go:209
 msgid "New message"
 msgstr "Mensaje nuevo"
 
-#: daemon/notify.go:181 daemon/quote.go:65
+#: daemon/notify.go:191 daemon/quote.go:65
 msgid "Photo"
 msgstr "Foto"
 
-#: daemon/notify.go:182 daemon/quote.go:69
+#: daemon/notify.go:192 daemon/quote.go:69
 msgid "Sticker"
 msgstr "Sticker"
 
-#: daemon/notify.go:183 daemon/quote.go:77
+#: daemon/notify.go:193 daemon/quote.go:77
 msgid "Document"
 msgstr "Documento"
 
-#: daemon/notify.go:184 daemon/quote.go:74
+#: daemon/notify.go:194 daemon/quote.go:74
 msgid "Audio"
 msgstr "Audio"
 
-#: daemon/notify.go:187 daemon/quote.go:72 ui/src/window/rows.rs:192
+#: daemon/notify.go:197 daemon/quote.go:72 ui/src/window/rows.rs:192
 msgid "Voice message"
 msgstr "Mensaje de voz"
 
@@ -97,7 +98,7 @@ msgstr "Cliente no oficial de WhatsApp"
 msgid "WhatsApp;Chat;Messages;"
 msgstr "WhatsApp;Chat;Mensajes;"
 
-#: ui/src/main.rs:105
+#: ui/src/main.rs:121
 msgid "Show the window, or close it if it has focus"
 msgstr "Muestra la ventana, o la cierra si tiene el foco"
 
@@ -119,7 +120,8 @@ msgstr "Abre WhatsApp en tu teléfono."
 
 #: ui/src/window.rs:175
 msgid "Open Settings, or the ⋮ menu on Android, and choose Linked devices."
-msgstr "Abre Configuración, o el menú ⋮ en Android, y elige Dispositivos vinculados."
+msgstr ""
+"Abre Configuración, o el menú ⋮ en Android, y elige Dispositivos vinculados."
 
 #: ui/src/window.rs:176
 msgid "Tap Link a device."
@@ -138,7 +140,7 @@ msgid "QR code to link this device"
 msgstr "Código QR para vincular este dispositivo"
 
 #: ui/src/window.rs:280 ui/src/window.rs:454 ui/src/window.rs:1056
-#: ui/src/window.rs:1244
+#: ui/src/window.rs:1276
 msgid "Chats"
 msgstr "Chats"
 
@@ -154,7 +156,7 @@ msgstr "_Preferencias"
 msgid "Main Menu"
 msgstr "Menú principal"
 
-#: ui/src/window.rs:303 ui/src/window.rs:1226
+#: ui/src/window.rs:303 ui/src/window.rs:1258
 msgid "Restricted chats"
 msgstr "Chats restringidos"
 
@@ -166,7 +168,7 @@ msgstr "Ningún chat seleccionado"
 msgid "Send"
 msgstr "Enviar"
 
-#: ui/src/window.rs:377 ui/src/window.rs:1359
+#: ui/src/window.rs:377 ui/src/window.rs:1391
 msgid "Send a File"
 msgstr "Enviar un archivo"
 
@@ -254,7 +256,9 @@ msgstr "Tamaño de la caché de archivos"
 msgid ""
 "Downloaded photos, stickers, documents and audio, in MB. The oldest are "
 "deleted first."
-msgstr "Fotos, stickers, documentos y audios descargados, en MB. Los más antiguos se borran primero."
+msgstr ""
+"Fotos, stickers, documentos y audios descargados, en MB. Los más antiguos se "
+"borran primero."
 
 #: ui/src/window.rs:1124
 msgid "Storage"
@@ -268,56 +272,72 @@ msgstr "Renderizado con GPU"
 msgid ""
 "Smoother animations, but uses about 50 MB more memory. Applies after "
 "restarting Wassup."
-msgstr "Animaciones más fluidas, pero usa unos 50 MB más de memoria. Se aplica al reiniciar Wassup."
+msgstr ""
+"Animaciones más fluidas, pero usa unos 50 MB más de memoria. Se aplica al "
+"reiniciar Wassup."
 
 #: ui/src/window.rs:1133
 msgid "Performance"
 msgstr "Rendimiento"
 
-#: ui/src/window.rs:1174
+#: ui/src/window.rs:1138
+msgid "System Language"
+msgstr "Idioma del sistema"
+
+#: ui/src/window.rs:1143
+msgid "Language"
+msgstr "Idioma"
+
+#: ui/src/window.rs:1144
+msgid "Applies after restarting Wassup"
+msgstr "Se aplica al reiniciar Wassup"
+
+#: ui/src/window.rs:1206
 msgid "Secret code"
 msgstr "Código secreto"
 
-#: ui/src/window.rs:1178
+#: ui/src/window.rs:1210
 msgid "Enter Secret Code"
 msgstr "Escribe el código secreto"
 
-#: ui/src/window.rs:1180
+#: ui/src/window.rs:1212
 msgid ""
 "Enter the secret code you set on your phone to see your restricted chats."
-msgstr "Escribe el código secreto que configuraste en tu teléfono para ver tus chats restringidos."
+msgstr ""
+"Escribe el código secreto que configuraste en tu teléfono para ver tus chats "
+"restringidos."
 
-#: ui/src/window.rs:1187
+#: ui/src/window.rs:1219
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: ui/src/window.rs:1188
+#: ui/src/window.rs:1220
 msgid "Continue"
 msgstr "Continuar"
 
-#: ui/src/window.rs:1228
+#: ui/src/window.rs:1260
 msgid "Restricted chats unlocked"
 msgstr "Chats restringidos desbloqueados"
 
-#: ui/src/window.rs:1252
+#: ui/src/window.rs:1284
 msgid "Restricted chats locked"
 msgstr "Chats restringidos bloqueados"
 
 #. TRANSLATORS: {} is a file name.
-#: ui/src/window.rs:1401
+#: ui/src/window.rs:1433
 #, rust-format
 msgid "Sending {}…"
 msgstr "Enviando {}…"
 
-#: ui/src/window.rs:1547
+#: ui/src/window.rs:1579
 msgid "Couldn't download the file"
 msgstr "No se pudo descargar el archivo"
 
-#: ui/src/window.rs:1673
+#: ui/src/window.rs:1705
 msgid "Preparing a code…"
 msgstr "Preparando un código…"
 
-#: ui/src/window.rs:1715
+#: ui/src/window.rs:1747
 msgid "Unknown contact"
 msgstr "Contacto desconocido"
 

@@ -48,7 +48,6 @@ func main() {
 }
 
 func run() error {
-	initLocale()
 	data, err := xdgDir("XDG_DATA_HOME", ".local/share")
 	if err != nil {
 		return err
@@ -65,6 +64,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	initLocale(cfg.Language)
 	// Listen first: it refuses to start if another daemon already owns the databases.
 	ln, err := listen()
 	if err != nil {

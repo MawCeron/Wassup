@@ -13,7 +13,10 @@ func TestSettingsSaved(t *testing.T) {
 	if got := d.settings().MediaCacheMb; got != defaultMediaCacheMB {
 		t.Fatalf("default cache %d MB", got)
 	}
-	want := &ipc.Settings{HideNotificationContent: true, MediaCacheMb: 200, GpuRendering: true}
+	if _, err := d.setSettings(&ipc.Settings{Language: "../../etc"}); err == nil {
+		t.Fatal("accepted a path as the language")
+	}
+	want := &ipc.Settings{HideNotificationContent: true, MediaCacheMb: 200, GpuRendering: true, Language: "pt_BR"}
 	if _, err := d.setSettings(want); err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +24,7 @@ func TestSettingsSaved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c != (config{HideNotificationContent: true, MediaCacheMB: 200, GPURendering: true}) {
+	if c != (config{HideNotificationContent: true, MediaCacheMB: 200, GPURendering: true, Language: "pt_BR"}) {
 		t.Fatalf("saved %+v", c)
 	}
 }

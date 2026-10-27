@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -25,7 +26,13 @@ type config struct {
 	// Read by the UI: draw with the GPU instead of in software. Declared
 	// here so the daemon's strict parsing accepts it.
 	GPURendering bool `json:"gpu_rendering"`
+	// Language code such as "es"; empty follows the system.
+	Language string `json:"language"`
 }
+
+// languageCode is what a language setting may look like. It becomes part
+// of a file path, so nothing else is accepted.
+var languageCode = regexp.MustCompile(`^([a-z]{2,3}(_[A-Z]{2})?)?$`)
 
 // loadConfig reads configDir/config.json; a missing file means defaults.
 // Anything it cannot read exactly is an error rather than a silent default,
@@ -53,6 +60,9 @@ func loadConfig(configDir string) (config, error) {
 func (c config) validate() error {
 	if c.MediaCacheMB < 0 {
 		return errors.New("media_cache_mb cannot be negative")
+	}
+	if !languageCode.MatchString(c.Language) {
+		return errors.New("language must be a code such as es or pt_BR")
 	}
 	return nil
 }

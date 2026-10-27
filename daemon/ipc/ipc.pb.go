@@ -2433,7 +2433,10 @@ type Settings struct {
 	// Size of the media cache.
 	MediaCacheMb uint32 `protobuf:"varint,2,opt,name=media_cache_mb,json=mediaCacheMb,proto3" json:"media_cache_mb,omitempty"`
 	// Read by the UI at startup: draw with the GPU instead of in software.
-	GpuRendering  bool `protobuf:"varint,3,opt,name=gpu_rendering,json=gpuRendering,proto3" json:"gpu_rendering,omitempty"`
+	GpuRendering bool `protobuf:"varint,3,opt,name=gpu_rendering,json=gpuRendering,proto3" json:"gpu_rendering,omitempty"`
+	// Language code such as "es" or "pt_BR"; empty follows the system. The
+	// daemon switches at once, the UI at its next start.
+	Language      string `protobuf:"bytes,4,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2487,6 +2490,13 @@ func (x *Settings) GetGpuRendering() bool {
 		return x.GpuRendering
 	}
 	return false
+}
+
+func (x *Settings) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with
@@ -2993,11 +3003,12 @@ const file_ipc_proto_rawDesc = "" +
 	"secretCode\"\r\n" +
 	"\vGetSettings\"B\n" +
 	"\vSetSettings\x123\n" +
-	"\bsettings\x18\x01 \x01(\v2\x17.wassup.ipc.v1.SettingsR\bsettings\"\x91\x01\n" +
+	"\bsettings\x18\x01 \x01(\v2\x17.wassup.ipc.v1.SettingsR\bsettings\"\xad\x01\n" +
 	"\bSettings\x12:\n" +
 	"\x19hide_notification_content\x18\x01 \x01(\bR\x17hideNotificationContent\x12$\n" +
 	"\x0emedia_cache_mb\x18\x02 \x01(\rR\fmediaCacheMb\x12#\n" +
-	"\rgpu_rendering\x18\x03 \x01(\bR\fgpuRendering\"G\n" +
+	"\rgpu_rendering\x18\x03 \x01(\bR\fgpuRendering\x12\x1a\n" +
+	"\blanguage\x18\x04 \x01(\tR\blanguage\"G\n" +
 	"\vFetchAvatar\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +

@@ -29,28 +29,43 @@ fn window(app: &adw::Application, slot: &Slot) -> Rc<window::Window> {
     w
 }
 
-/// Whether config.json asks for GPU rendering. The daemon validates the
-/// file strictly and refuses to start on a malformed one, so a plain scan
-/// for the key is enough here.
-fn wants_gpu(config: &str) -> bool {
-    config
-        .split_once("\"gpu_rendering\"")
-        .is_some_and(|(_, rest)| {
-            rest.trim_start()
-                .strip_prefix(':')
-                .is_some_and(|v| v.trim_start().starts_with("true"))
-        })
+/// The text after a key of config.json. The daemon validates the file
+/// strictly and refuses to start on a malformed one, so a plain scan for
+/// the key is enough here.
+fn config_value<'a>(config: &'a str, key: &str) -> Option<&'a str> {
+    let (_, rest) = config.split_once(&format!("\"{key}\""))?;
+    Some(rest.trim_start().strip_prefix(':')?.trim_start())
 }
 
-/// Loads the translations for the user's language. They live in the
-/// first XDG data directory that has Wassup's, as for the daemon:
-/// ~/.local/share/locale during development, the system one when installed.
-fn init_locale() {
+/// Whether config.json asks for GPU rendering.
+fn wants_gpu(config: &str) -> bool {
+    config_value(config, "gpu_rendering").is_some_and(|v| v.starts_with("true"))
+}
+
+/// The language chosen in config.json, if not the system's.
+fn language(config: &str) -> Option<&str> {
+    let (code, _) = config_value(config, "language")?
+        .strip_prefix('"')?
+        .split_once('"')?;
+    (!code.is_empty()).then_some(code)
+}
+
+/// Loads the translations for the chosen language, or the user's. They
+/// live in the first XDG data directory that has Wassup's, as for the
+/// daemon: ~/.local/share/locale during development, the system one when
+/// installed.
+fn init_locale(config: &str) {
     use gettextrs::{
         LocaleCategory, bind_textdomain_codeset, bindtextdomain, setlocale, textdomain,
     };
     // SAFETY: called first thing in main, before any other thread exists.
-    unsafe { setlocale(LocaleCategory::LcAll, "") };
+    unsafe {
+        // gettext, GTK and libadwaita all read LANGUAGE first.
+        if let Some(code) = language(config) {
+            std::env::set_var("LANGUAGE", code);
+        }
+        setlocale(LocaleCategory::LcAll, "");
+    }
     let dir = std::iter::once(glib::user_data_dir())
         .chain(glib::system_data_dirs())
         .map(|d| d.join("locale"))
@@ -72,9 +87,8 @@ fn init_locale() {
 /// the graphics drivers into the process, which on some machines costs
 /// over 50 MB, while software rendering keeps 60 fps for a chat window.
 /// See docs/performance.md.
-fn choose_renderer() {
-    let config = glib::user_config_dir().join("wassup").join("config.json");
-    let gpu = std::fs::read_to_string(config).is_ok_and(|c| wants_gpu(&c));
+fn choose_renderer(config: &str) {
+    let gpu = wants_gpu(config);
     let user_chose =
         std::env::var_os("GSK_RENDERER").is_some() || std::env::var_os("GDK_DISABLE").is_some();
     if !gpu && !user_chose {
@@ -87,8 +101,10 @@ fn choose_renderer() {
 }
 
 fn main() -> glib::ExitCode {
-    choose_renderer();
-    init_locale();
+    let config = std::fs::read_to_string(glib::user_config_dir().join("wassup/config.json"))
+        .unwrap_or_default();
+    choose_renderer(&config);
+    init_locale(&config);
     gio::resources_register_include!("wassup.gresource").expect("bundled resources");
     // Every launch is forwarded to the running instance, if there is one.
     let app = adw::Application::builder()
@@ -141,7 +157,7 @@ fn main() -> glib::ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::wants_gpu;
+    use super::{language, wants_gpu};
 
     #[test]
     fn reads_the_gpu_option() {
@@ -152,5 +168,16 @@ mod tests {
         assert!(!wants_gpu(r#"{"gpu_rendering": false}"#));
         assert!(!wants_gpu(r#"{"media_cache_mb": 200}"#));
         assert!(!wants_gpu(""));
+    }
+
+    #[test]
+    fn reads_the_language() {
+        assert_eq!(language(r#"{"language": "pt_BR"}"#), Some("pt_BR"));
+        assert_eq!(
+            language(r#"{"language":"es", "gpu_rendering": true}"#),
+            Some("es")
+        );
+        assert_eq!(language(r#"{"language": ""}"#), None);
+        assert_eq!(language(r#"{"gpu_rendering": true}"#), None);
     }
 }

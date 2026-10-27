@@ -19,6 +19,7 @@ func (d *daemon) settings() *ipc.Settings {
 		HideNotificationContent: d.config.HideNotificationContent,
 		MediaCacheMb:            uint32(mb),
 		GpuRendering:            d.config.GPURendering,
+		Language:                d.config.Language,
 	}
 }
 
@@ -28,18 +29,23 @@ func (d *daemon) setSettings(s *ipc.Settings) (*ipc.Settings, error) {
 		HideNotificationContent: s.GetHideNotificationContent(),
 		MediaCacheMB:            int(min(s.GetMediaCacheMb(), math.MaxInt32)),
 		GPURendering:            s.GetGpuRendering(),
+		Language:                s.GetLanguage(),
 	}
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
 	d.configMu.Lock()
 	err := saveConfig(d.configDir, c)
+	languageChanged := err == nil && c.Language != d.config.Language
 	if err == nil {
 		d.config = c
 	}
 	d.configMu.Unlock()
 	if err != nil {
 		return nil, err
+	}
+	if languageChanged {
+		initLocale(c.Language)
 	}
 	if d.notify != nil {
 		d.notify.hideContent.Store(c.HideNotificationContent)

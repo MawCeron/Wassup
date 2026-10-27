@@ -95,7 +95,8 @@ optional; every option defaults to off.
 {
   "hide_notification_content": true,
   "media_cache_mb": 500,
-  "gpu_rendering": false
+  "gpu_rendering": false,
+  "language": "es"
 }
 ```
 
@@ -104,6 +105,7 @@ optional; every option defaults to off.
 | `hide_notification_content` | Notifications show the chat but not the message text. |
 | `media_cache_mb` | Size of the media cache; the least recently used files go first. Default 500. |
 | `gpu_rendering` | The UI draws with the GPU instead of in software. Off by default; see below. |
+| `language` | Language code such as `es` or `pt_BR`; empty or missing follows the system. The daemon switches at once, the UI at its next start. |
 
 An unknown option or a syntax error stops the daemon instead of being
 ignored, so a misspelled privacy option cannot silently turn itself off.

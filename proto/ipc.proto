@@ -285,6 +285,9 @@ message Settings {
   uint32 media_cache_mb = 2;
   // Read by the UI at startup: draw with the GPU instead of in software.
   bool gpu_rendering = 3;
+  // Language code such as "es" or "pt_BR"; empty follows the system. The
+  // daemon switches at once, the UI at its next start.
+  string language = 4;
 }
 
 // Fetches a chat's profile or group picture into the cache. Answered with
