@@ -76,6 +76,10 @@ All of them live in `data/icons/hicolor/symbolic/actions/`.
 | `wassup-attach-symbolic` | Attach a file (paperclip, tilted 35°) | 16×16 |
 | `wassup-lock-symbolic` | Restricted chats and end-to-end encryption (padlock) | 16×16 |
 | `wassup-voice-note-symbolic` | Voice notes (microphone) | 16×16 |
+| `wassup-discard-symbolic` | Discard a voice note (trash can) | 16×16 |
+| `wassup-reply-symbolic` | Reply to a message (curved arrow) | 16×16 |
+| `wassup-play-symbolic` | Play audio | 16×16 |
+| `wassup-pause-symbolic` | Pause audio | 16×16 |
 
 Rules for any new interface icon, from the GNOME guidelines for UI icons:
 
@@ -87,8 +91,9 @@ Rules for any new interface icon, from the GNOME guidelines for UI icons:
 - Flat and monochrome: no opacity, duotone, dithering, gradients or fixed
   colors, because the icon is recolored at runtime.
 - One idea per icon, and a simple orthogonal view.
-- Outline style, except for the send arrow, the mountains of the media icon
-  and small dots (eyes, sun), which are solid.
+- Outline style, except for the send arrow, the play triangle, the pause
+  bars, the mountains of the media icon and small dots (eyes, sun), which
+  are solid.
 
 ### Why the installed icons have no strokes
 
