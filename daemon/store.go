@@ -13,7 +13,11 @@ import (
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 	"google.golang.org/protobuf/proto"
+	"unicode"
 )
 
 // Our tables live next to whatsmeow's in the account database. Each
@@ -105,6 +109,9 @@ func migrate(ctx context.Context, db *sql.DB) error {
 const (
 	defaultPageSize = 50
 	maxPageSize     = 500
+	// Most messages loaded to reach a search result, and most results.
+	maxFromCount   = 2000
+	maxSearchCount = 50
 )
 
 // messageText returns a message's text, a bracketed placeholder for content
@@ -367,16 +374,68 @@ func (a *account) listChats(ctx context.Context) ([]*ipc.Chat, error) {
 
 // listMessages returns up to limit messages, newest first, older than
 // beforeID when it is set.
-func (a *account) listMessages(ctx context.Context, chatJID, beforeID string, limit uint32) ([]*ipc.Message, error) {
+func (a *account) listMessages(ctx context.Context, chatJID, beforeID, fromID string, limit uint32) ([]*ipc.Message, error) {
 	if limit == 0 {
 		limit = defaultPageSize
 	}
 	limit = min(limit, maxPageSize)
-	rows, err := a.db.QueryContext(ctx, `
+	if fromID != "" {
+		return a.queryMessages(ctx, chatJID, `
+			SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote FROM wassup_messages
+			WHERE chat_jid = ?1 AND (timestamp_ms, id) >=
+				(SELECT timestamp_ms, id FROM wassup_messages WHERE chat_jid = ?1 AND id = ?2)
+			ORDER BY timestamp_ms DESC, id DESC LIMIT ?3`, chatJID, fromID, maxFromCount)
+	}
+	return a.queryMessages(ctx, chatJID, `
 		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote FROM wassup_messages
 		WHERE chat_jid = ?1 AND (?2 = '' OR (timestamp_ms, id) <
 			(SELECT timestamp_ms, id FROM wassup_messages WHERE chat_jid = ?1 AND id = ?2))
 		ORDER BY timestamp_ms DESC, id DESC LIMIT ?3`, chatJID, beforeID, limit)
+}
+
+// searchMessages finds the chat's messages whose text contains query,
+// ignoring case and accents, newest first. SQLite's LIKE only ignores the
+// case of ASCII letters, so the text is folded and compared here.
+func (a *account) searchMessages(ctx context.Context, chatJID, query string) ([]*ipc.Message, error) {
+	query = searchFold(strings.TrimSpace(query))
+	if query == "" {
+		return nil, nil
+	}
+	rows, err := a.db.QueryContext(ctx, `SELECT id, text FROM wassup_messages
+		WHERE chat_jid = ? AND text != '' ORDER BY timestamp_ms DESC, id DESC`, chatJID)
+	if err != nil {
+		return nil, err
+	}
+	var ids []any
+	for rows.Next() && len(ids) < maxSearchCount {
+		var id, text string
+		if rows.Scan(&id, &text) == nil && strings.Contains(searchFold(text), query) {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(ids) == 0 {
+		return nil, err
+	}
+	return a.queryMessages(ctx, chatJID, `
+		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote FROM wassup_messages
+		WHERE chat_jid = ? AND id IN (?`+strings.Repeat(", ?", len(ids)-1)+`)
+		ORDER BY timestamp_ms DESC, id DESC`, append([]any{chatJID}, ids...)...)
+}
+
+// searchFold lowercases text and drops its accents, so "noemi" finds "Noemí".
+func searchFold(text string) string {
+	folded, _, err := transform.String(transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn))), text)
+	if err != nil {
+		folded = text
+	}
+	return strings.ToLower(folded)
+}
+
+// queryMessages reads full messages of a chat from a query that selects
+// id, sender_jid, from_me, timestamp_ms, text, status, media and quote.
+func (a *account) queryMessages(ctx context.Context, chatJID, query string, args ...any) ([]*ipc.Message, error) {
+	rows, err := a.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

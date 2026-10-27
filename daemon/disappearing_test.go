@@ -68,7 +68,7 @@ func TestDisappearingMessages(t *testing.T) {
 	if err != nil || len(got[chat.String()]) != 3 {
 		t.Fatalf("expired %v, %v; want text, photo and sticker", got, err)
 	}
-	msgs, _ := a.listMessages(ctx, chat.String(), "", 0)
+	msgs, _ := a.listMessages(ctx, chat.String(), "", "", 0)
 	if len(msgs) != 1 || msgs[0].Id != "plain" {
 		t.Fatalf("left %v; want only the message without a timer", msgs)
 	}

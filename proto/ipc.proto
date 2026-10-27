@@ -27,6 +27,7 @@ message Request {
     GetSettings get_settings = 15;
     SetSettings set_settings = 16;
     Quit quit = 17;
+    SearchMessages search_messages = 18;
   }
 }
 
@@ -65,6 +66,17 @@ message ListMessages {
   string chat_jid = 2;
   string before_id = 3;
   uint32 limit = 4;
+  // Instead of a page: every message from this one to the newest, at most
+  // 2000, to show a search result in place.
+  string from_id = 5;
+}
+
+// Messages of a chat whose text contains query, ignoring case and accents,
+// newest first, at most 50. Answered with messages.
+message SearchMessages {
+  string account_id = 1;
+  string chat_jid = 2;
+  string query = 3;
 }
 
 // Answered with message_received carrying the stored message, or error.

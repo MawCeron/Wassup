@@ -397,7 +397,16 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		a := d.find(r.GetAccountId())
 		if a == nil {
 			fail(errors.New("unknown account"))
-		} else if msgs, err := a.listMessages(context.Background(), r.GetChatJid(), r.GetBeforeId(), r.GetLimit()); err != nil {
+		} else if msgs, err := a.listMessages(context.Background(), r.GetChatJid(), r.GetBeforeId(), r.GetFromId(), r.GetLimit()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Messages{Messages: &ipc.MessageList{Messages: msgs}}
+		}
+	case *ipc.Request_SearchMessages:
+		r := k.SearchMessages
+		if a := d.find(r.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else if msgs, err := a.searchMessages(context.Background(), r.GetChatJid(), r.GetQuery()); err != nil {
 			fail(err)
 		} else {
 			ev.Kind = &ipc.Event_Messages{Messages: &ipc.MessageList{Messages: msgs}}

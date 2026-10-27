@@ -71,7 +71,7 @@ func TestSaveAndListMessages(t *testing.T) {
 	if err != nil || stickerMsg == nil || stickerMsg.Text != "" || stickerMsg.GetMedia().GetKind() != ipc.MediaKind_MEDIA_KIND_STICKER || stickerMsg.GetMedia().GetWidth() != 512 {
 		t.Fatalf("sticker saved as %v, %v", stickerMsg, err)
 	}
-	if page, _ := a.listMessages(ctx, other.String(), "", 1); page[0].GetMedia().GetKind() != ipc.MediaKind_MEDIA_KIND_STICKER {
+	if page, _ := a.listMessages(ctx, other.String(), "", "", 1); page[0].GetMedia().GetKind() != ipc.MediaKind_MEDIA_KIND_STICKER {
 		t.Fatalf("sticker media not read back: %v", page[0])
 	}
 	doc := &events.Message{Message: &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileName: proto.String("a.pdf")}}}
@@ -100,13 +100,31 @@ func TestSaveAndListMessages(t *testing.T) {
 		t.Fatalf("reply did not clear unread: %v", chats[0])
 	}
 
-	page, err := a.listMessages(ctx, chat.String(), "", 2)
+	page, err := a.listMessages(ctx, chat.String(), "", "", 2)
 	if err != nil || len(page) != 2 || page[0].Id != "E" || page[1].Id != "D" {
 		t.Fatalf("first page: %v, %v", page, err)
 	}
-	page, err = a.listMessages(ctx, chat.String(), "D", 0)
+	page, err = a.listMessages(ctx, chat.String(), "D", "", 0)
 	if err != nil || len(page) != 2 || page[0].Id != "B" || page[1].Id != "A" {
 		t.Fatalf("page before D: %v, %v", page, err)
+	}
+	page, err = a.listMessages(ctx, chat.String(), "", "B", 0)
+	if err != nil || len(page) != 3 || page[0].Id != "E" || page[2].Id != "B" {
+		t.Fatalf("from B to the newest: %v, %v", page, err)
+	}
+	song := text("S", 6, false)
+	song.Message = &waE2E.Message{Conversation: proto.String("Esa CANCIÓN me encanta")}
+	save(song)
+	found, err := a.searchMessages(ctx, chat.String(), "  cancion ")
+	if err != nil || len(found) != 1 || found[0].Id != "S" {
+		t.Fatalf("search ignoring case and accents: %v, %v", found, err)
+	}
+	found, _ = a.searchMessages(ctx, chat.String(), "MSG")
+	if len(found) != 4 || found[0].Id != "E" || found[3].Id != "A" {
+		t.Fatalf("search, newest first: %v", found)
+	}
+	if found, _ = a.searchMessages(ctx, chat.String(), "nothing like this"); len(found) != 0 {
+		t.Fatalf("search without matches: %v", found)
 	}
 
 	changed, err := a.advanceStatus(ctx, []types.MessageID{"D", "A"}, ipc.MessageStatus_MESSAGE_STATUS_READ)
@@ -117,7 +135,7 @@ func TestSaveAndListMessages(t *testing.T) {
 	if len(changed) != 0 {
 		t.Fatalf("status went back from read to delivered: %v", changed)
 	}
-	page, _ = a.listMessages(ctx, chat.String(), "", 0)
+	page, _ = a.listMessages(ctx, chat.String(), "", "", 0)
 	for _, m := range page {
 		if m.Id == "D" && m.Status != ipc.MessageStatus_MESSAGE_STATUS_READ {
 			t.Fatalf("stored status of D: %v", m.Status)

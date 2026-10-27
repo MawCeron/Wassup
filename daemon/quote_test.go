@@ -46,7 +46,7 @@ func TestQuotes(t *testing.T) {
 	reply("2", &waE2E.Message{ImageMessage: &waE2E.ImageMessage{}})
 	reply("3", &waE2E.Message{Conversation: proto.String(strings.Repeat("x", 500))})
 
-	msgs, err := a.listMessages(ctx, chat.String(), "", 0)
+	msgs, err := a.listMessages(ctx, chat.String(), "", "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
