@@ -15,8 +15,9 @@ rpmbuild -ba packaging/wassup.spec
 
 `packaging/tarballs.sh` makes two sources from a commit: the code, and a
 tarball with every Go module and Rust crate it uses (`go mod vendor`,
-`cargo vendor`). The build then needs no network, as COPR and mock
-require. `REF=<commit>` packages another commit than HEAD.
+`cargo vendor`). It also downloads the emoji font and its license, so it
+needs network, but the build does not: the sources go into the source RPM,
+as COPR and mock require. `REF=<commit>` packages another commit than HEAD.
 
 ## What the package installs
 
@@ -30,6 +31,7 @@ require. `REF=<commit>` packages another commit than HEAD.
 | `/usr/share/metainfo/io.github.MawCeron.Wassup.metainfo.xml` | The description GNOME Software shows |
 | `/usr/share/icons/hicolor/…` | The app icon and its symbolic version; interface icons are inside the UI binary |
 | `/usr/share/locale/*/LC_MESSAGES/wassup.mo` | Translations |
+| `/usr/share/wassup/fonts/TwemojiCBDT.ttf` | The emoji font, loaded only by the UI |
 
 ## Sandboxing
 
@@ -54,12 +56,20 @@ socket runs as the same user, including when systemd hands it the socket.
 At run time Wassup needs glycin's loaders for images and stickers,
 GStreamer (base and good plugins) for video, audio and voice notes, and
 util-linux for `setpriv`, which keeps a recording from outliving the
-window. H.264 video needs `gstreamer1-plugin-openh264`, and emoji are
-drawn with Twemoji (`twitter-twemoji-fonts`), which keeps the UI's memory
-low; the package recommends both. Without Twemoji the UI draws emoji with
-Noto Color Emoji and uses much more memory once emoji are shown. The
-status icon on GNOME needs the AppIndicator extension, which the package
-suggests.
+window. H.264 video needs `gstreamer1-plugin-openh264`, which the package
+recommends. The status icon on GNOME needs the AppIndicator extension,
+which the package suggests.
+
+The emoji font is not a dependency: the package installs
+[Twemoji CBDT](https://github.com/MawCeron/twemoji-cbdt) in
+`/usr/share/wassup/fonts/`, and only Wassup's UI loads it. A font in the
+system's font directories would take the memory of the emoji picker back to
+hundreds of megabytes for every application that picked it up, and would
+need a name of its own to stay clear of other Twemoji packages.
+`packaging/tarballs.sh` downloads it from the release at a pinned version
+and checks its SHA-256, together with its `NOTICE` and the CC BY 4.0 text.
+When the font changes, update the version and the three checksums there and
+`font_version` in `wassup.spec`.
 
 ## Licenses
 
@@ -67,7 +77,9 @@ The `License:` tag lists Wassup's license and those of every bundled Go
 module and Rust crate, as Fedora asks of vendored code. When dependencies
 change, list them again: for Rust, the `license` field of each crate in
 `cargo metadata`; for Go, the license file of each module that
-`go mod vendor` brings in.
+`go mod vendor` brings in. The emoji font adds CC-BY-4.0, the license of
+the Twemoji graphics; the package installs its `NOTICE` and the license text
+with Wassup's own `LICENSE`.
 
 ## Releases
 
