@@ -732,7 +732,15 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             } else {
                 show_media(&picture, &media.path, width, height, &msg.id, &bound);
                 if sticker {
-                    animation::play(&picture, &media.path, &msg.id, &bound);
+                    // Until the row shows another message or goes away.
+                    let (rows, id) = (bound.clone(), msg.id.clone());
+                    animation::play(&picture, &media.path, move |picture| {
+                        rows.borrow()
+                            .get(&id)
+                            .and_then(|r| r.picture.upgrade())
+                            .as_ref()
+                            == Some(picture)
+                    });
                 }
             }
         }

@@ -3,7 +3,8 @@
 //! The frames are decoded one at a time with libwebp's animation decoder, so
 //! a playing sticker costs about two frames of memory (a few megabytes)
 //! however long it is, where decoding them all at once would cost one per
-//! frame. A sticker plays only while its row shows it.
+//! frame. A sticker plays only while it is wanted: while its row shows it in a
+//! conversation, or while the pointer is over it in the picker.
 
 use std::collections::HashMap;
 use std::ffi::c_int;
@@ -129,13 +130,17 @@ thread_local! {
     static PLAYING: RefCell<HashMap<usize, Rc<()>>> = RefCell::default();
 }
 
-/// Plays the sticker in `path` in a message row's picture, if it is animated,
-/// until the row shows another message or goes away.
-pub(super) fn play(picture: &gtk::Picture, path: &str, msg_id: &str, rows: &BoundRows) {
+/// Plays the sticker in `path` in a picture, if it is animated, for as long
+/// as `wanted` says it should: it is asked before every frame. Playing in a
+/// picture again stops the earlier playback.
+pub(super) fn play(
+    picture: &gtk::Picture,
+    path: &str,
+    wanted: impl Fn(&gtk::Picture) -> bool + 'static,
+) {
     let Some(animation) = Animation::open(path) else {
         return;
     };
-    // A row can bind the same message again: only the newest playback runs.
     let token = Rc::new(());
     PLAYING.with(|p| {
         p.borrow_mut()
@@ -145,8 +150,7 @@ pub(super) fn play(picture: &gtk::Picture, path: &str, msg_id: &str, rows: &Boun
         animation,
         Rc::downgrade(&token),
         picture.downgrade(),
-        msg_id.to_owned(),
-        rows.clone(),
+        Rc::new(wanted),
     );
 }
 
@@ -154,14 +158,12 @@ fn tick(
     mut animation: Animation,
     token: Weak<()>,
     picture: glib::WeakRef<gtk::Picture>,
-    msg_id: String,
-    rows: BoundRows,
+    wanted: Rc<dyn Fn(&gtk::Picture) -> bool>,
 ) {
     let Some(widget) = picture.upgrade() else {
         return;
     };
-    let bound = rows.borrow().get(&msg_id).and_then(|r| r.picture.upgrade());
-    if token.upgrade().is_none() || bound.as_ref() != Some(&widget) {
+    if token.upgrade().is_none() || !wanted(&widget) {
         return;
     }
     let delay = if widget.is_mapped() {
@@ -173,7 +175,7 @@ fn tick(
     } else {
         PAUSED_CHECK
     };
-    glib::timeout_add_local_once(delay, move || tick(animation, token, picture, msg_id, rows));
+    glib::timeout_add_local_once(delay, move || tick(animation, token, picture, wanted));
 }
 
 #[cfg(test)]

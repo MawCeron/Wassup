@@ -1,5 +1,7 @@
 //! The sticker picker and sending stickers.
 
+use std::collections::HashMap;
+
 use super::*;
 use gettextrs::gettext;
 
@@ -12,6 +14,7 @@ impl Window {
             heading.set_visible(false);
         }
         self.sticker_pictures.borrow_mut().clear();
+        THUMB_PATHS.with(|p| p.borrow_mut().clear());
         self.sticker_empty.set_visible(stickers.is_empty());
         let account_id = self
             .account
@@ -52,6 +55,19 @@ impl Window {
             } else {
                 show_thumb(&picture, &sticker.path);
             }
+            // An animated sticker moves while the pointer is over it.
+            let hover = gtk::EventControllerMotion::new();
+            hover.connect_enter(glib::clone!(
+                #[weak]
+                picture,
+                move |_, _, _| play_thumb(&picture)
+            ));
+            hover.connect_leave(glib::clone!(
+                #[weak]
+                picture,
+                move |_| stop_thumb(&picture)
+            ));
+            button.add_controller(hover);
             button.connect_clicked(glib::clone!(
                 #[weak(rename_to = ui)]
                 self,
@@ -157,7 +173,47 @@ pub(super) fn outgoing_dir() -> std::path::PathBuf {
 /// Size of a sticker in the picker, in pixels.
 pub(super) const STICKER_THUMB: i32 = 64;
 
+thread_local! {
+    /// The file shown in each thumbnail of the picker, by the picture's address.
+    static THUMB_PATHS: RefCell<HashMap<usize, String>> = RefCell::default();
+    /// The thumbnail the pointer is over, and the image to put back when it leaves.
+    static HOVERED: RefCell<Option<(usize, Option<gdk::Paintable>)>> = const { RefCell::new(None) };
+}
+
+fn play_thumb(picture: &gtk::Picture) {
+    let key = picture.as_ptr() as usize;
+    let Some(path) = THUMB_PATHS.with(|p| p.borrow().get(&key).cloned()) else {
+        return;
+    };
+    HOVERED.with(|h| *h.borrow_mut() = Some((key, picture.paintable())));
+    animation::play(picture, &path, move |_| {
+        HOVERED.with(|h| {
+            h.borrow()
+                .as_ref()
+                .is_some_and(|(hovered, _)| *hovered == key)
+        })
+    });
+}
+
+fn stop_thumb(picture: &gtk::Picture) {
+    let key = picture.as_ptr() as usize;
+    let still = HOVERED.with(|h| match h.borrow_mut().take() {
+        Some((hovered, still)) if hovered == key => Some(still),
+        other => {
+            *h.borrow_mut() = other;
+            None
+        }
+    });
+    if let Some(still) = still {
+        picture.set_paintable(still.as_ref());
+    }
+}
+
 pub(super) fn show_thumb(picture: &gtk::Picture, path: &str) {
+    THUMB_PATHS.with(|p| {
+        p.borrow_mut()
+            .insert(picture.as_ptr() as usize, path.to_owned())
+    });
     let scale = picture.scale_factor().max(1);
     let picture = picture.downgrade();
     load_texture(path, STICKER_THUMB, STICKER_THUMB, scale, move |texture| {
