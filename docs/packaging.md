@@ -6,7 +6,7 @@ Wassup ships as an RPM for Fedora, built from `packaging/wassup.spec`.
 
 ```sh
 sudo dnf install rpm-build rpmdevtools golang cargo rust gtk4-devel \
-    libadwaita-devel libwebp-devel glib2-devel protobuf-compiler gettext \
+    libadwaita-devel libwebp-devel fontconfig-devel glib2-devel protobuf-compiler gettext \
     desktop-file-utils appstream systemd-rpm-macros
 rpmdev-setuptree
 packaging/tarballs.sh          # sources from HEAD into ~/rpmbuild/SOURCES
@@ -54,9 +54,12 @@ socket runs as the same user, including when systemd hands it the socket.
 At run time Wassup needs glycin's loaders for images and stickers,
 GStreamer (base and good plugins) for video, audio and voice notes, and
 util-linux for `setpriv`, which keeps a recording from outliving the
-window. H.264 video needs `gstreamer1-plugin-openh264`, which the package
-recommends; the status icon on GNOME needs the AppIndicator extension,
-which it suggests.
+window. H.264 video needs `gstreamer1-plugin-openh264`, and emoji are
+drawn with Twemoji (`twitter-twemoji-fonts`), which keeps the UI's memory
+low; the package recommends both. Without Twemoji the UI draws emoji with
+Noto Color Emoji and uses much more memory once emoji are shown. The
+status icon on GNOME needs the AppIndicator extension, which the package
+suggests.
 
 ## Licenses
 
