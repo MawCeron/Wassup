@@ -131,7 +131,7 @@ impl Window {
         let reply = gtk::Button::builder()
             .child(
                 &adw::ButtonContent::builder()
-                    .icon_name("mail-reply-sender-symbolic")
+                    .icon_name("wassup-reply-symbolic")
                     .label(gettext("Reply"))
                     .halign(gtk::Align::Start)
                     .build(),
