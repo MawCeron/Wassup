@@ -301,7 +301,7 @@ impl Window {
         let restricted_entry = gtk::Button::builder()
             .child(
                 &adw::ButtonContent::builder()
-                    .icon_name("changes-prevent-symbolic")
+                    .icon_name("wassup-lock-symbolic")
                     .label(gettext("Restricted chats"))
                     .halign(gtk::Align::Start)
                     .build(),
@@ -375,7 +375,7 @@ impl Window {
             .margin_end(12)
             .build();
         let attach = gtk::Button::builder()
-            .icon_name("mail-attachment-symbolic")
+            .icon_name("wassup-attach-symbolic")
             .tooltip_text(gettext("Send a File"))
             .valign(gtk::Align::End)
             .css_classes(["circular", "flat"])
