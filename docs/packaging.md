@@ -31,6 +31,24 @@ require. `REF=<commit>` packages another commit than HEAD.
 | `/usr/share/icons/hicolor/…` | The app icon and its symbolic version; interface icons are inside the UI binary |
 | `/usr/share/locale/*/LC_MESSAGES/wassup.mo` | Translations |
 
+## Sandboxing
+
+`wassupd.service` runs the daemon with systemd's sandboxing, as far as a
+user service allows: the file system is read-only except for Wassup's
+data, cache and config directories and the runtime directory; it gets no
+new privileges, devices, kernel tunables or namespaces of its own; system
+calls are limited to `@system-service`, sockets to Unix and Internet ones,
+and memory cannot be writable and executable at once. Files it creates are
+private to the user. `systemd-analyze --user security wassupd` rates it
+3.8 (OK), down from 9.4.
+
+The directories are the XDG defaults under the home directory. Someone who
+moves them with `XDG_DATA_HOME` and the like needs a drop-in adding the new
+paths to `ReadWritePaths=`.
+
+The daemon also checks, with `SO_PEERCRED`, that whoever connects to its
+socket runs as the same user, including when systemd hands it the socket.
+
 ## Dependencies
 
 At run time Wassup needs glycin's loaders for images and stickers,

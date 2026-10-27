@@ -8,5 +8,31 @@ ExecStart=/usr/bin/wassupd
 Restart=on-failure
 RestartSec=5
 
+# Sandboxing. The daemon only needs its own directories, the user's
+# session bus for notifications, and the network. See docs/packaging.md.
+# The directories must exist before the file system is made read-only.
+ExecStartPre=+/usr/bin/mkdir -p %h/.local/share/wassup %h/.cache/wassup %h/.config/wassup
+ProtectSystem=strict
+ReadWritePaths=%h/.local/share/wassup %h/.cache/wassup %h/.config/wassup %t
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
 [Install]
 WantedBy=default.target
