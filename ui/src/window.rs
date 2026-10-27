@@ -11,6 +11,7 @@ use gtk::{gdk, gio, glib};
 use crate::ipc::{self, event, request};
 
 mod audio;
+mod preview;
 mod qr;
 mod rows;
 mod state;
@@ -1583,20 +1584,18 @@ impl Window {
                     return; // Closed, or cancelled.
                 };
                 if let Some(path) = file.path() {
-                    ui.send_file(&path.to_string_lossy());
+                    ui.preview_file(&path.to_string_lossy());
                 }
             },
         );
     }
 
-    /// Sends a file, with whatever is in the composer as its caption.
-    fn send_file(&self, path: &str) {
+    /// Sends a file with a caption. Returns whether the request went out.
+    fn send_file(&self, path: &str, caption: &str) -> bool {
         let Some((account_id, chat_jid)) = self.open_ids() else {
-            return;
+            return false;
         };
-        let buffer = self.composer.buffer();
-        let (start, end) = buffer.bounds();
-        let caption = buffer.text(&start, &end, false).trim().to_owned();
+        let caption = caption.to_owned();
         let request = request::Kind::SendMedia(ipc::SendMedia {
             account_id,
             chat_jid,
@@ -1604,21 +1603,22 @@ impl Window {
             caption: caption.clone(),
             as_sticker: false,
         });
-        if let Some(id) = self.send(request) {
-            buffer.set_text("");
-            self.sending.borrow_mut().insert(id, caption);
-            let name = std::path::Path::new(path)
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let toast = adw::Toast::builder()
-                // TRANSLATORS: {} is a file name.
-                .title(gettext("Sending {}…").replace("{}", &name))
-                .timeout(0)
-                .build();
-            self.toasts.add_toast(toast.clone());
-            self.uploads.borrow_mut().insert(id, toast);
-        }
+        let Some(id) = self.send(request) else {
+            return false;
+        };
+        self.sending.borrow_mut().insert(id, caption);
+        let name = std::path::Path::new(path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let toast = adw::Toast::builder()
+            // TRANSLATORS: {} is a file name.
+            .title(gettext("Sending {}…").replace("{}", &name))
+            .timeout(0)
+            .build();
+        self.toasts.add_toast(toast.clone());
+        self.uploads.borrow_mut().insert(id, toast);
+        true
     }
 
     /// Opens a message's file with the desktop's default application,
