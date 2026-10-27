@@ -40,7 +40,7 @@ new privileges, devices, kernel tunables or namespaces of its own; system
 calls are limited to `@system-service`, sockets to Unix and Internet ones,
 and memory cannot be writable and executable at once. Files it creates are
 private to the user. `systemd-analyze --user security wassupd` rates it
-3.8 (OK), down from 9.4.
+3.8 (OK).
 
 The directories are the XDG defaults under the home directory. Someone who
 moves them with `XDG_DATA_HOME` and the like needs a drop-in adding the new
