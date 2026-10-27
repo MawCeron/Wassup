@@ -364,7 +364,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             });
             quote_text.set_label(&q.text);
         }
-        text.set_label(&msg.text);
+        text.set_markup(&linkify(&msg.text));
         text.set_visible(!msg.text.is_empty());
         time.set_label(&time_of_day(msg.timestamp_ms));
         show_status(&status, msg.status());
@@ -487,6 +487,51 @@ fn fit_picture(picture: &gtk::Picture, width: i32, height: i32, sticker: bool) {
             clamp.set_tightening_threshold(max);
         }
     }
+}
+
+/// Message text as Pango markup, with web addresses made into links. The
+/// rest is escaped: message text is never markup.
+pub(super) fn linkify(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while !rest.is_empty() {
+        // Up to the next word that starts a web address.
+        let start = rest
+            .match_indices(|c: char| !c.is_whitespace())
+            .map(|(i, _)| i)
+            .find(|&i| {
+                (i == 0 || rest[..i].ends_with(char::is_whitespace))
+                    && ["https://", "http://", "www."].iter().any(|p| {
+                        rest[i..]
+                            .get(..p.len())
+                            .is_some_and(|s| s.eq_ignore_ascii_case(p))
+                    })
+            });
+        let Some(start) = start else {
+            out += &glib::markup_escape_text(rest);
+            break;
+        };
+        out += &glib::markup_escape_text(&rest[..start]);
+        let word_end = rest[start..]
+            .find(char::is_whitespace)
+            .map_or(rest.len(), |e| start + e);
+        // Punctuation right after an address is the sentence's, not the link's.
+        let url = rest[start..word_end]
+            .trim_end_matches(['.', ',', ';', ':', '!', '?', ')', ']', '"', '\'']);
+        let end = start + url.len();
+        let href = if url.len() >= 4 && url[..4].eq_ignore_ascii_case("www.") {
+            format!("https://{url}")
+        } else {
+            url.to_owned()
+        };
+        out += &format!(
+            "<a href=\"{}\">{}</a>",
+            glib::markup_escape_text(&href),
+            glib::markup_escape_text(url)
+        );
+        rest = &rest[end..];
+    }
+    out
 }
 
 /// Largest an image or sticker is shown in a conversation, in pixels.
@@ -644,6 +689,28 @@ pub(super) fn show_avatar(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn links_are_made_clickable_and_text_escaped() {
+        assert_eq!(
+            linkify("see https://gnome.org/apps, ok"),
+            "see <a href=\"https://gnome.org/apps\">https://gnome.org/apps</a>, ok"
+        );
+        assert_eq!(
+            linkify("WWW.example.com."),
+            "<a href=\"https://WWW.example.com\">WWW.example.com</a>."
+        );
+        assert_eq!(linkify("a <b> & c"), "a &lt;b&gt; &amp; c");
+        assert_eq!(
+            linkify("x https://a.b/?q=1&r=<2>"),
+            "x <a href=\"https://a.b/?q=1&amp;r=&lt;2&gt;\">https://a.b/?q=1&amp;r=&lt;2&gt;</a>"
+        );
+        assert_eq!(linkify("nohttps://here"), "nohttps://here");
+        assert_eq!(
+            linkify("¿ves https://ñ.mx?"),
+            "¿ves <a href=\"https://ñ.mx\">https://ñ.mx</a>?"
+        );
+    }
 
     #[test]
     fn media_fits_its_box_keeping_proportions() {

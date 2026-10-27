@@ -63,6 +63,8 @@ const CSS: &str = "
 .chat-bg-light { background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color)) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-light.svg\") repeat; }
 .chat-bg-dark { background: var(--view-bg-color) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-dark.svg\") repeat; }
 .chat-bg-light listview, .chat-bg-dark listview { background: none; }
+/* Links in own messages take the bubble's color, the accent being too close. */
+.bubble.mine link { color: inherit; text-decoration-line: underline; }
 /* Last, to win over .mine: a search result just jumped to. */
 .bubble.found { background: color-mix(in srgb, var(--accent-bg-color) 60%, var(--card-bg-color)); transition: background 300ms; }
 ";
