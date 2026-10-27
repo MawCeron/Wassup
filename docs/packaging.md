@@ -73,13 +73,11 @@ When the font changes, update the version and the three checksums there and
 
 ## Licenses
 
-The `License:` tag lists Wassup's license and those of every bundled Go
-module and Rust crate, as Fedora asks of vendored code. When dependencies
-change, list them again: for Rust, the `license` field of each crate in
-`cargo metadata`; for Go, the license file of each module that
-`go mod vendor` brings in. The emoji font adds CC-BY-4.0, the license of
-the Twemoji graphics; the package installs its `NOTICE` and the license text
-with Wassup's own `LICENSE`.
+The `License:` tag holds Wassup's own license, GPL-3.0-or-later. The code
+Wassup bundles, the Go modules and Rust crates of the vendored
+dependencies and the emoji font, keeps its own licenses. The package
+installs the emoji font's `NOTICE` and the CC BY 4.0 text of the Twemoji
+graphics with Wassup's own `LICENSE`.
 
 ## Releases
 
