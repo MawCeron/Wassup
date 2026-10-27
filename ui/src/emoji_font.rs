@@ -5,15 +5,18 @@
 //! bitmap font, costs almost nothing. Pango picks the emoji font by itself, so
 //! the only way to switch it for the chat and the emoji picker alike is to
 //! take both Noto emoji fonts out of the process's fontconfig, since without
-//! the color one Pango falls back to the monochrome one. See
-//! docs/performance.md.
+//! the color one Pango falls back to the monochrome one. Symbola, a
+//! monochrome symbol font that many systems have, goes too: it draws the
+//! emoji GTK measures to decide how wide the others may be, which makes the
+//! picker drop the wider ones, such as flags. See docs/performance.md.
 
 use std::ffi::{CStr, c_char, c_int, c_void};
 
 const FAMILY: &CStr = c"Twemoji";
-const REJECT_NOTO: &CStr = c"<?xml version=\"1.0\"?><fontconfig><selectfont><rejectfont>\
+const REJECT_FONTS: &CStr = c"<?xml version=\"1.0\"?><fontconfig><selectfont><rejectfont>\
     <pattern><patelt name=\"family\"><string>Noto Color Emoji</string></patelt></pattern>\
     <pattern><patelt name=\"family\"><string>Noto Emoji</string></patelt></pattern>\
+    <pattern><patelt name=\"family\"><string>Symbola</string></patelt></pattern>\
     </rejectfont></selectfont></fontconfig>";
 
 #[link(name = "fontconfig")]
@@ -64,7 +67,7 @@ unsafe fn twemoji_installed(config: *mut c_void) -> bool {
     }
 }
 
-/// Hides the Noto emoji fonts from this process when Twemoji can replace it.
+/// Hides the other emoji fonts from this process when Twemoji can replace them.
 /// Call before anything uses Pango.
 pub fn prefer_twemoji() {
     // SAFETY: called from main before GTK starts, so no other thread uses fontconfig.
@@ -73,7 +76,7 @@ pub fn prefer_twemoji() {
         if config.is_null() || !twemoji_installed(config) {
             return;
         }
-        if FcConfigParseAndLoadFromMemory(config, REJECT_NOTO.as_ptr().cast(), 0) != 0 {
+        if FcConfigParseAndLoadFromMemory(config, REJECT_FONTS.as_ptr().cast(), 0) != 0 {
             FcConfigBuildFonts(config);
         }
     }
