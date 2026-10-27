@@ -175,6 +175,13 @@ Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
 
+## Linked device name
+
+The phone lists Wassup under Linked devices as "Wassup" with the desktop
+icon; WhatsApp does not allow a custom one. The name is sent only when
+linking, so a device linked by an older build keeps its old name until it
+is unlinked and linked again.
+
 ## Locked chats
 
 Chats locked on the phone stay out of the chat list, unread counts

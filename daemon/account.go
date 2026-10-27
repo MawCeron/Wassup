@@ -14,6 +14,8 @@ import (
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	waLog "go.mau.fi/whatsmeow/util/log"
@@ -34,6 +36,17 @@ type account struct {
 	avatarDir    string
 	mediaCacheMB int
 	downloads    *downloads
+}
+
+// version is the release, matching ui/Cargo.toml; the phone shows it for
+// devices linked from now on.
+var version = [3]uint32{0, 1, 0}
+
+func init() {
+	// Shown under Linked devices on the phone. WhatsApp offers no custom
+	// icon, so the desktop one it is.
+	store.SetOSInfo("Wassup", version)
+	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_DESKTOP.Enum()
 }
 
 // openAccounts opens every account under dataDir/accounts.
