@@ -292,10 +292,14 @@ point `FONTCONFIG_FILE` at a configuration that adds it:
 </fontconfig>
 ```
 
-The Fedora package is Twemoji 14.0.2, which lacks the emoji added to
+The Fedora package is Twemoji 14.0.2, a bitmap font, which lacks the emoji added to
 Unicode after version 14; the picker leaves those out. The
 [jdecked/twemoji](https://github.com/jdecked/twemoji) fork publishes the
-artwork up to Emoji 17 as images, not as a font file.
+artwork up to Emoji 17 as images, not as a font file. A font built from
+those images with [twemoji-colr](https://github.com/mozilla/twemoji-colr)
+is a COLR font whose base glyphs have no outline, and with it the picker
+shows no emoji: GTK measures the ink width of one emoji to decide which
+ones to keep, and for such a font it is 0.
 
 ## Status icon
 
