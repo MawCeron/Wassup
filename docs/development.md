@@ -282,6 +282,14 @@ keep its memory in check; the measurements are in
 Pango picks the font for emoji characters itself, so a `font-family` in
 CSS does not change it.
 
+The picker's size is adjusted in two places. libadwaita and GTK both scale
+the emoji, which makes them about twice the text size; the CSS in
+`ui/src/window.rs` sets the font size on the label inside each emoji
+(`popover.emoji-picker emoji label`), because the same property on the
+`emoji` node has no effect. GTK shows 7 emoji per row and CSS cannot
+change that, so `set_emoji_columns` sets `max-children-per-line` on each
+section's flow box to `EMOJI_COLUMNS`, 10.
+
 To try Twemoji without installing it, put its `.ttf` in a directory and
 point `FONTCONFIG_FILE` at a configuration that adds it:
 
