@@ -13,6 +13,7 @@ impl Window {
     /// Nothing is sent until the user presses Send; Escape discards it.
     pub(super) fn preview_file(self: &Rc<Self>, path: &str) {
         let photo = is_photo(path);
+        let video = !photo && is_video(path);
         let preview: gtk::Widget = if photo {
             let picture = gtk::Picture::builder()
                 .content_fit(gtk::ContentFit::Contain)
@@ -29,7 +30,7 @@ impl Window {
             });
             picture.upcast()
         } else {
-            document_card(path).upcast()
+            document_card(path, video).upcast()
         };
         // Whatever was typed before choosing the file becomes its caption.
         let buffer = self.composer.buffer();
@@ -68,6 +69,8 @@ impl Window {
         let dialog = adw::Dialog::builder()
             .title(if photo {
                 gettext("Send Photo")
+            } else if video {
+                gettext("Send Video")
             } else {
                 gettext("Send Document")
             })
@@ -101,8 +104,8 @@ impl Window {
     }
 }
 
-/// A document's icon, name and size, as in a message.
-fn document_card(path: &str) -> gtk::Box {
+/// A file's icon, name and size, as for a document in a message.
+fn document_card(path: &str, video: bool) -> gtk::Box {
     let file = std::path::Path::new(path);
     let name = gtk::Label::builder()
         .label(
@@ -131,7 +134,11 @@ fn document_card(path: &str) -> gtk::Box {
         .build();
     card.append(
         &gtk::Image::builder()
-            .icon_name("wassup-document-symbolic")
+            .icon_name(if video {
+                "wassup-media-symbolic"
+            } else {
+                "wassup-document-symbolic"
+            })
             .pixel_size(32)
             .build(),
     );
@@ -149,9 +156,28 @@ fn is_photo(path: &str) -> bool {
     })
 }
 
+/// Whether the daemon will send the file as a video: an MP4 file, by the
+/// same rule as Go's http.DetectContentType, which the daemon uses.
+fn is_video(path: &str) -> bool {
+    let mut head = Vec::with_capacity(512);
+    let read = std::fs::File::open(path).and_then(|f| f.take(512).read_to_end(&mut head));
+    if read.is_err() || head.len() < 12 || &head[4..8] != b"ftyp" {
+        return false;
+    }
+    let size = u32::from_be_bytes([head[0], head[1], head[2], head[3]]) as usize;
+    if size > head.len() || !size.is_multiple_of(4) {
+        return false;
+    }
+    // Major brand, then compatible brands; the minor version at 12 is skipped.
+    (8..size)
+        .step_by(4)
+        .filter(|&at| at != 12)
+        .any(|at| head[at..].starts_with(b"mp4"))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::is_photo;
+    use super::{is_photo, is_video};
 
     #[test]
     fn photos_are_told_by_content() {
@@ -166,6 +192,13 @@ mod tests {
         assert!(is_photo(&write("b", b"\x89PNG\r\n\x1a\nrest")));
         assert!(!is_photo(&write("c.jpg", b"%PDF-1.7")));
         assert!(!is_photo(&dir.join("missing").to_string_lossy()));
+        let mp4 = write("d.mov", b"\0\0\0\x18ftypisom\0\0\x02\0mp41isommore");
+        assert!(is_video(&mp4) && !is_photo(&mp4));
+        assert!(!is_video(&write(
+            "e.mp4",
+            b"\0\0\0\x14ftypqt  \0\0\0\0qt  "
+        )));
+        assert!(!is_video(&write("f.mp4", b"short")));
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

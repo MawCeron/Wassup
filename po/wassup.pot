@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Wassup\n"
 "Report-Msgid-Bugs-To: https://github.com/MawCeron/Wassup/issues\n"
-"POT-Creation-Date: 2026-10-26 20:11-0600\n"
+"POT-Creation-Date: 2026-10-26 21:11-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -35,7 +35,7 @@ msgid "New message"
 msgstr ""
 
 #: daemon/notify.go:194 daemon/quote.go:65 ui/src/window.rs:1387
-#: ui/src/window/preview.rs:22 ui/src/window/rows.rs:377
+#: ui/src/window/preview.rs:23 ui/src/window/rows.rs:377
 #: ui/src/window/viewer.rs:30
 msgid "Photo"
 msgstr ""
@@ -178,7 +178,7 @@ msgstr ""
 msgid "No Chat Selected"
 msgstr ""
 
-#: ui/src/window.rs:379 ui/src/window/preview.rs:44
+#: ui/src/window.rs:379 ui/src/window/preview.rs:45
 msgid "Send"
 msgstr ""
 
@@ -440,15 +440,19 @@ msgstr ""
 msgid "Play"
 msgstr ""
 
-#: ui/src/window/preview.rs:38
+#: ui/src/window/preview.rs:39
 msgid "Add a caption"
 msgstr ""
 
-#: ui/src/window/preview.rs:70
+#: ui/src/window/preview.rs:71
 msgid "Send Photo"
 msgstr ""
 
-#: ui/src/window/preview.rs:72
+#: ui/src/window/preview.rs:73
+msgid "Send Video"
+msgstr ""
+
+#: ui/src/window/preview.rs:75
 msgid "Send Document"
 msgstr ""
 
