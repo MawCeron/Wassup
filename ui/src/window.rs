@@ -128,6 +128,8 @@ pub struct Window {
     /// Whether any connection succeeded; until then failures fill the window.
     ever_connected: Cell<bool>,
     reconnect_attempts: Cell<u32>,
+    /// Whether the UI has already asked systemd to start the daemon's socket.
+    service_tried: Cell<bool>,
     reconnect_pending: Cell<bool>,
     rows: BoundRows,
     /// Messages whose media was asked for and has not arrived yet.
@@ -720,6 +722,7 @@ impl Window {
             banner,
             ever_connected: Cell::new(false),
             reconnect_attempts: Cell::new(0),
+            service_tried: Cell::new(false),
             reconnect_pending: Cell::new(false),
             rows,
             media_requested: RefCell::default(),
@@ -1173,6 +1176,23 @@ impl Window {
         }));
     }
 
+    /// The daemon starts when something connects to `wassupd.socket`, but a
+    /// package installed during the session leaves that socket stopped until
+    /// the next login. Asks systemd to start it, and then connects again.
+    fn start_service(self: &Rc<Self>) {
+        let ui = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let args = ["systemctl", "--user", "start", "wassupd.socket"].map(std::ffi::OsStr::new);
+            let flags = gio::SubprocessFlags::STDOUT_SILENCE | gio::SubprocessFlags::STDERR_SILENCE;
+            if let Ok(process) = gio::Subprocess::newv(&args, flags) {
+                process.wait_future().await.ok();
+            }
+            if let Some(ui) = ui.upgrade() {
+                ui.connect();
+            }
+        });
+    }
+
     fn connect(self: &Rc<Self>) {
         if self.conn.borrow().is_some() {
             return; // A pending retry raced with a manual one.
@@ -1180,11 +1200,15 @@ impl Window {
         let (conn, events) = match ipc::Connection::open() {
             Ok(pair) => pair,
             Err(e) => {
+                if !self.service_tried.replace(true) {
+                    return self.start_service();
+                }
                 return self
                     .disconnected(&gettext("Can't Reach the Wassup Service"), &e.to_string());
             }
         };
         self.conn.replace(Some(conn));
+        self.service_tried.set(false);
         self.reconnect_attempts.set(0);
         self.banner.set_revealed(false);
         if self.ever_connected.get() {
