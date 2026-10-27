@@ -150,9 +150,12 @@ fonts:
 | Noto Emoji (monochrome) | cairo | 51 MB | 57.5 MB |
 | Noto Emoji (monochrome) | ngl | 77 MB | 81 MB |
 | OpenMoji Color 16 (COLRv1) | cairo | 110 MB | 112–238 MB, varies by run |
-| Twemoji 14.0.2 | cairo | 48 MB | 53.5–54.4 MB |
+| Twemoji 14.0.2 (bitmap, CBDT) | cairo | 48 MB | 53.5–54.4 MB |
 
-The popover was mapped in the Twemoji runs. The monochrome and Twemoji
+The fonts that grow, Noto Color Emoji and OpenMoji Color, are COLRv1
+fonts whose glyphs are vectors; Fedora's Twemoji is a bitmap font
+(`CBDT` and `CBLC` tables) and the monochrome Noto Emoji has plain
+outlines. The popover was mapped in the Twemoji runs. The monochrome and Twemoji
 figures repeated within a megabyte across runs; the Noto Color Emoji ones
 did not, since they depend on how many glyphs cairo had drawn.
 
