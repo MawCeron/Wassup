@@ -45,6 +45,7 @@ const CSS: &str = "
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .media-button { padding: 0; }
+.unread-pill { font-size: 0.8em; font-weight: bold; min-width: 12px; padding: 1px 6px; border-radius: 999px; background: var(--accent-bg-color); color: var(--accent-fg-color); }
 /* Opaque, with a ring of the backdrop, as they overlap the bubble's edge. */
 .reactions { font-size: 0.9em; padding: 2px 8px; border-radius: 999px; background: var(--popover-bg-color); box-shadow: 0 0 0 2px var(--view-bg-color); }
 .reactions.mine { background: color-mix(in srgb, var(--accent-bg-color) 25%, var(--popover-bg-color)); }

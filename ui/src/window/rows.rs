@@ -5,8 +5,10 @@ use gettextrs::{gettext, ngettext};
 
 pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
+    // Two lines beside a tall avatar, as in WhatsApp Web: the name and the
+    // time, then the last message and the unread count.
     factory.connect_setup(|_, item| {
-        let avatar = adw::Avatar::builder().size(40).show_initials(true).build();
+        let avatar = adw::Avatar::builder().size(48).show_initials(true).build();
         let title = gtk::Label::builder()
             .xalign(0.0)
             .hexpand(true)
@@ -16,18 +18,40 @@ pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
         let time = gtk::Label::builder()
             .css_classes(["dim-label", "caption"])
             .build();
-        let unread = gtk::Label::builder()
-            .css_classes(["caption-heading", "accent"])
+        let top = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        top.append(&title);
+        top.append(&time);
+        let status = gtk::Image::new();
+        let preview = gtk::Label::builder()
+            .xalign(0.0)
+            .hexpand(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .single_line_mode(true)
+            .css_classes(["dim-label"])
             .build();
+        let unread = gtk::Label::builder()
+            .valign(gtk::Align::Center)
+            .css_classes(["unread-pill", "numeric"])
+            .build();
+        let bottom = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+        bottom.append(&status);
+        bottom.append(&preview);
+        bottom.append(&unread);
+        let lines = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .valign(gtk::Align::Center)
+            .hexpand(true)
+            .build();
+        lines.append(&top);
+        lines.append(&bottom);
         let row = gtk::Box::builder()
             .spacing(12)
             .margin_top(6)
             .margin_bottom(6)
             .build();
         row.append(&avatar);
-        row.append(&title);
-        row.append(&time);
-        row.append(&unread);
+        row.append(&lines);
         item.downcast_ref::<gtk::ListItem>()
             .unwrap()
             .set_child(Some(&row));
@@ -38,7 +62,14 @@ pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
         let chat = chat.borrow::<ipc::Chat>();
         let row = item.child().unwrap();
         let avatar = row.first_child().and_downcast::<adw::Avatar>().unwrap();
-        let title = avatar.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let lines = avatar.next_sibling().unwrap();
+        let top = lines.first_child().unwrap();
+        let title = top.first_child().and_downcast::<gtk::Label>().unwrap();
+        let time = title.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let bottom = top.next_sibling().unwrap();
+        let status = bottom.first_child().and_downcast::<gtk::Image>().unwrap();
+        let preview = status.next_sibling().and_downcast::<gtk::Label>().unwrap();
+        let unread = preview.next_sibling().and_downcast::<gtk::Label>().unwrap();
         avatar_placeholder(&avatar, &chat);
         if chat.avatar_path.is_empty() {
             if let Some(ui) = owner.get().and_then(std::rc::Weak::upgrade) {
@@ -54,10 +85,26 @@ pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
                     .is_some_and(|c| c.borrow::<ipc::Chat>().jid == jid)
             });
         }
-        let time = title.next_sibling().and_downcast::<gtk::Label>().unwrap();
-        let unread = time.next_sibling().and_downcast::<gtk::Label>().unwrap();
         title.set_label(&chat_title(&chat));
         time.set_label(&format_time(chat.last_message_at_ms));
+        // An unread chat's time takes the accent, as its count does.
+        if chat.unread_count > 0 {
+            time.set_css_classes(&["caption", "accent"]);
+        } else {
+            time.set_css_classes(&["caption", "dim-label"]);
+        }
+        // Own messages show their ticks; group messages who wrote them.
+        if chat.last_from_me {
+            show_status(&status, chat.last_status());
+        } else {
+            status.set_visible(false);
+        }
+        let text = if chat.last_sender_name.is_empty() {
+            chat.last_message.clone()
+        } else {
+            format!("{}: {}", chat.last_sender_name, chat.last_message)
+        };
+        preview.set_label(&text);
         unread.set_label(&chat.unread_count.to_string());
         unread.set_visible(chat.unread_count > 0);
         // Read as one line, so the unread count is not a bare number.
@@ -67,6 +114,10 @@ pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
             // TRANSLATORS: {} is how many.
             label += &ngettext("{} unread message", "{} unread messages", chat.unread_count)
                 .replace("{}", &chat.unread_count.to_string());
+        }
+        if !text.is_empty() {
+            label += ", ";
+            label += &text;
         }
         item.set_accessible_label(&label);
     });
