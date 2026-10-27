@@ -204,6 +204,10 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 		Quote:       quote,
 		Link:        a.ipcLink(linkBlob),
 	}
+	if quote != nil {
+		// After the blob is made: the database keeps the image's bytes.
+		a.showQuoteThumbnail(quote)
+	}
 	if msg.FromMe {
 		msg.Status = ipc.MessageStatus_MESSAGE_STATUS_SENT
 	} else {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ func TestQuotes(t *testing.T) {
 	}
 	defer closeAccounts(accounts)
 	a := accounts[0]
+	a.mediaDir = t.TempDir()
 	chat := types.NewJID("120363000000000001", types.GroupServer)
 	reply := func(id string, quoted *waE2E.Message) {
 		t.Helper()
@@ -43,7 +45,7 @@ func TestQuotes(t *testing.T) {
 		}
 	}
 	reply("1", &waE2E.Message{Conversation: proto.String("original")})
-	reply("2", &waE2E.Message{ImageMessage: &waE2E.ImageMessage{}})
+	reply("2", &waE2E.Message{ImageMessage: &waE2E.ImageMessage{JPEGThumbnail: []byte("\xff\xd8\xffthumb")}})
 	reply("3", &waE2E.Message{Conversation: proto.String(strings.Repeat("x", 500))})
 
 	msgs, err := a.listMessages(ctx, chat.String(), "", "", 0)
@@ -52,6 +54,16 @@ func TestQuotes(t *testing.T) {
 	}
 	quotes := map[string]string{}
 	for _, m := range msgs {
+		if len(m.Quote.GetThumbnail()) > 0 {
+			t.Fatalf("message %s sent the thumbnail's bytes to the UI", m.Id)
+		}
+		if m.Id == "2" {
+			if data, err := os.ReadFile(m.Quote.GetThumbnailPath()); err != nil || string(data) != "\xff\xd8\xffthumb" {
+				t.Fatalf("quoted photo thumbnail %q: %q, %v", m.Quote.GetThumbnailPath(), data, err)
+			}
+		} else if m.Quote.GetThumbnailPath() != "" {
+			t.Fatalf("message %s quotes text but got a thumbnail", m.Id)
+		}
 		if m.Quote == nil || m.Quote.MessageId != "Q"+m.Id || m.Quote.SenderJid != "5215550000000@s.whatsapp.net" {
 			t.Fatalf("message %s quote %v", m.Id, m.Quote)
 		}

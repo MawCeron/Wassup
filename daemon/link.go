@@ -33,22 +33,23 @@ func (a *account) ipcLink(blob []byte) *ipc.LinkPreview {
 	}
 	return &ipc.LinkPreview{
 		Url: t.GetMatchedText(), Title: t.GetTitle(), Description: t.GetDescription(),
-		ThumbnailPath: a.linkThumbnail(t.GetJPEGThumbnail()),
+		ThumbnailPath: a.cacheThumbnail(t.GetJPEGThumbnail()),
 	}
 }
 
-// linkThumbPath is where a link preview's image is cached, by its hash.
-func (a *account) linkThumbPath(thumb []byte) string {
+// thumbCachePath is where a small image that came inside a message (a
+// link preview's, a quoted photo's) is cached, by its hash.
+func (a *account) thumbCachePath(thumb []byte) string {
 	if len(thumb) == 0 || a.mediaDir == "" {
 		return ""
 	}
 	sum := sha256.Sum256(thumb)
-	return filepath.Join(a.mediaDir, "link-"+hex.EncodeToString(sum[:])+".jpg")
+	return filepath.Join(a.mediaDir, "thumb-"+hex.EncodeToString(sum[:]))
 }
 
-// linkThumbnail writes a preview's image to the cache once and returns its path.
-func (a *account) linkThumbnail(thumb []byte) string {
-	path := a.linkThumbPath(thumb)
+// cacheThumbnail writes such an image to the cache once and returns its path.
+func (a *account) cacheThumbnail(thumb []byte) string {
+	path := a.thumbCachePath(thumb)
 	if path == "" {
 		return ""
 	}

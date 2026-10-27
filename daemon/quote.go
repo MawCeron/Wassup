@@ -48,7 +48,33 @@ func quoteOf(m *waE2E.Message) *ipc.Quote {
 	if len(text) > maxQuoteRunes {
 		text = append(text[:maxQuoteRunes-1], '…')
 	}
-	return &ipc.Quote{MessageId: c.GetStanzaID(), SenderJid: c.GetParticipant(), Text: string(text)}
+	return &ipc.Quote{
+		MessageId: c.GetStanzaID(), SenderJid: c.GetParticipant(), Text: string(text),
+		Thumbnail: quotedThumbnail(c.GetQuotedMessage()),
+	}
+}
+
+// quotedThumbnail is the small image a quoted photo, video, sticker or
+// document carries, if any.
+func quotedThumbnail(m *waE2E.Message) []byte {
+	for _, thumb := range [][]byte{
+		m.GetImageMessage().GetJPEGThumbnail(),
+		m.GetVideoMessage().GetJPEGThumbnail(),
+		m.GetStickerMessage().GetPngThumbnail(),
+		m.GetDocumentMessage().GetJPEGThumbnail(),
+	} {
+		if len(thumb) > 0 {
+			return thumb
+		}
+	}
+	return nil
+}
+
+// showQuoteThumbnail caches a quote's image and swaps its bytes for the
+// file's path, which is what the UI gets.
+func (a *account) showQuoteThumbnail(q *ipc.Quote) {
+	q.ThumbnailPath = a.cacheThumbnail(q.Thumbnail)
+	q.Thumbnail = nil
 }
 
 // quotedText is a quoted message's text or caption, or what kind of
@@ -100,6 +126,7 @@ func (a *account) quoteFromBlob(ctx context.Context, blob []byte) *ipc.Quote {
 		return nil
 	}
 	a.nameQuote(ctx, &q)
+	a.showQuoteThumbnail(&q)
 	return &q
 }
 

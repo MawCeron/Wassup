@@ -1975,7 +1975,13 @@ type Quote struct {
 	// The quoted text, or a label such as "Photo" for media.
 	Text string `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
 	// The quoted message was the user's own.
-	FromMe        bool `protobuf:"varint,5,opt,name=from_me,json=fromMe,proto3" json:"from_me,omitempty"`
+	FromMe bool `protobuf:"varint,5,opt,name=from_me,json=fromMe,proto3" json:"from_me,omitempty"`
+	// Small image of a quoted photo, video, sticker or document, in the
+	// daemon's cache; empty when it has none.
+	ThumbnailPath string `protobuf:"bytes,6,opt,name=thumbnail_path,json=thumbnailPath,proto3" json:"thumbnail_path,omitempty"`
+	// The same image as the reply carries it. Only kept in the daemon's
+	// database, never sent to the UI.
+	Thumbnail     []byte `protobuf:"bytes,7,opt,name=thumbnail,proto3" json:"thumbnail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2043,6 +2049,20 @@ func (x *Quote) GetFromMe() bool {
 		return x.FromMe
 	}
 	return false
+}
+
+func (x *Quote) GetThumbnailPath() string {
+	if x != nil {
+		return x.ThumbnailPath
+	}
+	return ""
+}
+
+func (x *Quote) GetThumbnail() []byte {
+	if x != nil {
+		return x.Thumbnail
+	}
+	return nil
 }
 
 type Media struct {
@@ -3216,7 +3236,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12%\n" +
-	"\x0ethumbnail_path\x18\x04 \x01(\tR\rthumbnailPath\"\x93\x01\n" +
+	"\x0ethumbnail_path\x18\x04 \x01(\tR\rthumbnailPath\"\xd8\x01\n" +
 	"\x05Quote\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x1d\n" +
@@ -3225,7 +3245,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\vsender_name\x18\x03 \x01(\tR\n" +
 	"senderName\x12\x12\n" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12\x17\n" +
-	"\afrom_me\x18\x05 \x01(\bR\x06fromMe\"\x99\x02\n" +
+	"\afrom_me\x18\x05 \x01(\bR\x06fromMe\x12%\n" +
+	"\x0ethumbnail_path\x18\x06 \x01(\tR\rthumbnailPath\x12\x1c\n" +
+	"\tthumbnail\x18\a \x01(\fR\tthumbnail\"\x99\x02\n" +
 	"\x05Media\x12,\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x18.wassup.ipc.v1.MediaKindR\x04kind\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +

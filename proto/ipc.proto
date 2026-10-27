@@ -212,6 +212,12 @@ message Quote {
   string text = 4;
   // The quoted message was the user's own.
   bool from_me = 5;
+  // Small image of a quoted photo, video, sticker or document, in the
+  // daemon's cache; empty when it has none.
+  string thumbnail_path = 6;
+  // The same image as the reply carries it. Only kept in the daemon's
+  // database, never sent to the UI.
+  bytes thumbnail = 7;
 }
 
 enum MediaKind {
