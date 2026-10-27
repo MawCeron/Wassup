@@ -1902,7 +1902,9 @@ type Message struct {
 	// Preview of the first link in the text, if the sender attached one.
 	Link *LinkPreview `protobuf:"bytes,12,opt,name=link,proto3" json:"link,omitempty"`
 	// Emoji reactions, grouped, most used first.
-	Reactions     []*Reaction `protobuf:"bytes,13,rep,name=reactions,proto3" json:"reactions,omitempty"`
+	Reactions []*Reaction `protobuf:"bytes,13,rep,name=reactions,proto3" json:"reactions,omitempty"`
+	// The people the text mentions whose name is known.
+	Mentions      []*Mention `protobuf:"bytes,14,rep,name=mentions,proto3" json:"mentions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2028,6 +2030,68 @@ func (x *Message) GetReactions() []*Reaction {
 	return nil
 }
 
+func (x *Message) GetMentions() []*Mention {
+	if x != nil {
+		return x.Mentions
+	}
+	return nil
+}
+
+// A mention in a message's text: WhatsApp writes it as "@" and the number of
+// the person's id, and the UI shows their name instead.
+type Mention struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The digits after the "@" in the text.
+	Token         string `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Mention) Reset() {
+	*x = Mention{}
+	mi := &file_ipc_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Mention) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Mention) ProtoMessage() {}
+
+func (x *Mention) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Mention.ProtoReflect.Descriptor instead.
+func (*Mention) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *Mention) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *Mention) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type Reaction struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Emoji string                 `protobuf:"bytes,1,opt,name=emoji,proto3" json:"emoji,omitempty"`
@@ -2041,7 +2105,7 @@ type Reaction struct {
 
 func (x *Reaction) Reset() {
 	*x = Reaction{}
-	mi := &file_ipc_proto_msgTypes[20]
+	mi := &file_ipc_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2053,7 +2117,7 @@ func (x *Reaction) String() string {
 func (*Reaction) ProtoMessage() {}
 
 func (x *Reaction) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[20]
+	mi := &file_ipc_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2066,7 +2130,7 @@ func (x *Reaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reaction.ProtoReflect.Descriptor instead.
 func (*Reaction) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{20}
+	return file_ipc_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Reaction) GetEmoji() string {
@@ -2103,7 +2167,7 @@ type LoadOlder struct {
 
 func (x *LoadOlder) Reset() {
 	*x = LoadOlder{}
-	mi := &file_ipc_proto_msgTypes[21]
+	mi := &file_ipc_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2115,7 +2179,7 @@ func (x *LoadOlder) String() string {
 func (*LoadOlder) ProtoMessage() {}
 
 func (x *LoadOlder) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[21]
+	mi := &file_ipc_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2128,7 +2192,7 @@ func (x *LoadOlder) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadOlder.ProtoReflect.Descriptor instead.
 func (*LoadOlder) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{21}
+	return file_ipc_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *LoadOlder) GetAccountId() string {
@@ -2157,7 +2221,7 @@ type HistoryAdded struct {
 
 func (x *HistoryAdded) Reset() {
 	*x = HistoryAdded{}
-	mi := &file_ipc_proto_msgTypes[22]
+	mi := &file_ipc_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2169,7 +2233,7 @@ func (x *HistoryAdded) String() string {
 func (*HistoryAdded) ProtoMessage() {}
 
 func (x *HistoryAdded) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[22]
+	mi := &file_ipc_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2182,7 +2246,7 @@ func (x *HistoryAdded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryAdded.ProtoReflect.Descriptor instead.
 func (*HistoryAdded) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{22}
+	return file_ipc_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *HistoryAdded) GetAccountId() string {
@@ -2213,7 +2277,7 @@ type React struct {
 
 func (x *React) Reset() {
 	*x = React{}
-	mi := &file_ipc_proto_msgTypes[23]
+	mi := &file_ipc_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2225,7 +2289,7 @@ func (x *React) String() string {
 func (*React) ProtoMessage() {}
 
 func (x *React) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[23]
+	mi := &file_ipc_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2238,7 +2302,7 @@ func (x *React) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use React.ProtoReflect.Descriptor instead.
 func (*React) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{23}
+	return file_ipc_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *React) GetAccountId() string {
@@ -2282,7 +2346,7 @@ type ReactionsChanged struct {
 
 func (x *ReactionsChanged) Reset() {
 	*x = ReactionsChanged{}
-	mi := &file_ipc_proto_msgTypes[24]
+	mi := &file_ipc_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2294,7 +2358,7 @@ func (x *ReactionsChanged) String() string {
 func (*ReactionsChanged) ProtoMessage() {}
 
 func (x *ReactionsChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[24]
+	mi := &file_ipc_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2307,7 +2371,7 @@ func (x *ReactionsChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReactionsChanged.ProtoReflect.Descriptor instead.
 func (*ReactionsChanged) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{24}
+	return file_ipc_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ReactionsChanged) GetAccountId() string {
@@ -2352,7 +2416,7 @@ type LinkPreview struct {
 
 func (x *LinkPreview) Reset() {
 	*x = LinkPreview{}
-	mi := &file_ipc_proto_msgTypes[25]
+	mi := &file_ipc_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2364,7 +2428,7 @@ func (x *LinkPreview) String() string {
 func (*LinkPreview) ProtoMessage() {}
 
 func (x *LinkPreview) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[25]
+	mi := &file_ipc_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2377,7 +2441,7 @@ func (x *LinkPreview) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkPreview.ProtoReflect.Descriptor instead.
 func (*LinkPreview) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{25}
+	return file_ipc_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *LinkPreview) GetUrl() string {
@@ -2431,7 +2495,7 @@ type Quote struct {
 
 func (x *Quote) Reset() {
 	*x = Quote{}
-	mi := &file_ipc_proto_msgTypes[26]
+	mi := &file_ipc_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2443,7 +2507,7 @@ func (x *Quote) String() string {
 func (*Quote) ProtoMessage() {}
 
 func (x *Quote) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[26]
+	mi := &file_ipc_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2456,7 +2520,7 @@ func (x *Quote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Quote.ProtoReflect.Descriptor instead.
 func (*Quote) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{26}
+	return file_ipc_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *Quote) GetMessageId() string {
@@ -2538,7 +2602,7 @@ type Media struct {
 
 func (x *Media) Reset() {
 	*x = Media{}
-	mi := &file_ipc_proto_msgTypes[27]
+	mi := &file_ipc_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2550,7 +2614,7 @@ func (x *Media) String() string {
 func (*Media) ProtoMessage() {}
 
 func (x *Media) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[27]
+	mi := &file_ipc_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2563,7 +2627,7 @@ func (x *Media) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Media.ProtoReflect.Descriptor instead.
 func (*Media) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{27}
+	return file_ipc_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *Media) GetKind() MediaKind {
@@ -2666,7 +2730,7 @@ type SendMedia struct {
 
 func (x *SendMedia) Reset() {
 	*x = SendMedia{}
-	mi := &file_ipc_proto_msgTypes[28]
+	mi := &file_ipc_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2678,7 +2742,7 @@ func (x *SendMedia) String() string {
 func (*SendMedia) ProtoMessage() {}
 
 func (x *SendMedia) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[28]
+	mi := &file_ipc_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2691,7 +2755,7 @@ func (x *SendMedia) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMedia.ProtoReflect.Descriptor instead.
 func (*SendMedia) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{28}
+	return file_ipc_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SendMedia) GetAccountId() string {
@@ -2755,7 +2819,7 @@ type ListStickers struct {
 
 func (x *ListStickers) Reset() {
 	*x = ListStickers{}
-	mi := &file_ipc_proto_msgTypes[29]
+	mi := &file_ipc_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2767,7 +2831,7 @@ func (x *ListStickers) String() string {
 func (*ListStickers) ProtoMessage() {}
 
 func (x *ListStickers) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[29]
+	mi := &file_ipc_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2780,7 +2844,7 @@ func (x *ListStickers) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStickers.ProtoReflect.Descriptor instead.
 func (*ListStickers) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{29}
+	return file_ipc_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListStickers) GetAccountId() string {
@@ -2799,7 +2863,7 @@ type StickerList struct {
 
 func (x *StickerList) Reset() {
 	*x = StickerList{}
-	mi := &file_ipc_proto_msgTypes[30]
+	mi := &file_ipc_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2811,7 +2875,7 @@ func (x *StickerList) String() string {
 func (*StickerList) ProtoMessage() {}
 
 func (x *StickerList) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[30]
+	mi := &file_ipc_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2824,7 +2888,7 @@ func (x *StickerList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StickerList.ProtoReflect.Descriptor instead.
 func (*StickerList) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{30}
+	return file_ipc_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *StickerList) GetStickers() []*Sticker {
@@ -2851,7 +2915,7 @@ type Sticker struct {
 
 func (x *Sticker) Reset() {
 	*x = Sticker{}
-	mi := &file_ipc_proto_msgTypes[31]
+	mi := &file_ipc_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2863,7 +2927,7 @@ func (x *Sticker) String() string {
 func (*Sticker) ProtoMessage() {}
 
 func (x *Sticker) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[31]
+	mi := &file_ipc_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2876,7 +2940,7 @@ func (x *Sticker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sticker.ProtoReflect.Descriptor instead.
 func (*Sticker) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{31}
+	return file_ipc_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Sticker) GetChatJid() string {
@@ -2923,7 +2987,7 @@ type SendSticker struct {
 
 func (x *SendSticker) Reset() {
 	*x = SendSticker{}
-	mi := &file_ipc_proto_msgTypes[32]
+	mi := &file_ipc_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2935,7 +2999,7 @@ func (x *SendSticker) String() string {
 func (*SendSticker) ProtoMessage() {}
 
 func (x *SendSticker) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[32]
+	mi := &file_ipc_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2948,7 +3012,7 @@ func (x *SendSticker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendSticker.ProtoReflect.Descriptor instead.
 func (*SendSticker) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{32}
+	return file_ipc_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SendSticker) GetAccountId() string {
@@ -3000,7 +3064,7 @@ type SetFavoriteSticker struct {
 
 func (x *SetFavoriteSticker) Reset() {
 	*x = SetFavoriteSticker{}
-	mi := &file_ipc_proto_msgTypes[33]
+	mi := &file_ipc_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3012,7 +3076,7 @@ func (x *SetFavoriteSticker) String() string {
 func (*SetFavoriteSticker) ProtoMessage() {}
 
 func (x *SetFavoriteSticker) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[33]
+	mi := &file_ipc_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3025,7 +3089,7 @@ func (x *SetFavoriteSticker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetFavoriteSticker.ProtoReflect.Descriptor instead.
 func (*SetFavoriteSticker) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{33}
+	return file_ipc_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SetFavoriteSticker) GetAccountId() string {
@@ -3069,7 +3133,7 @@ type UnlockChats struct {
 
 func (x *UnlockChats) Reset() {
 	*x = UnlockChats{}
-	mi := &file_ipc_proto_msgTypes[34]
+	mi := &file_ipc_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3081,7 +3145,7 @@ func (x *UnlockChats) String() string {
 func (*UnlockChats) ProtoMessage() {}
 
 func (x *UnlockChats) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[34]
+	mi := &file_ipc_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3094,7 +3158,7 @@ func (x *UnlockChats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnlockChats.ProtoReflect.Descriptor instead.
 func (*UnlockChats) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{34}
+	return file_ipc_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *UnlockChats) GetAccountId() string {
@@ -3121,7 +3185,7 @@ type Quit struct {
 
 func (x *Quit) Reset() {
 	*x = Quit{}
-	mi := &file_ipc_proto_msgTypes[35]
+	mi := &file_ipc_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3133,7 +3197,7 @@ func (x *Quit) String() string {
 func (*Quit) ProtoMessage() {}
 
 func (x *Quit) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[35]
+	mi := &file_ipc_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3146,7 +3210,7 @@ func (x *Quit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Quit.ProtoReflect.Descriptor instead.
 func (*Quit) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{35}
+	return file_ipc_proto_rawDescGZIP(), []int{36}
 }
 
 // The user's preferences, stored in config.json. Answered with settings.
@@ -3158,7 +3222,7 @@ type GetSettings struct {
 
 func (x *GetSettings) Reset() {
 	*x = GetSettings{}
-	mi := &file_ipc_proto_msgTypes[36]
+	mi := &file_ipc_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3170,7 +3234,7 @@ func (x *GetSettings) String() string {
 func (*GetSettings) ProtoMessage() {}
 
 func (x *GetSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[36]
+	mi := &file_ipc_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3183,7 +3247,7 @@ func (x *GetSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettings.ProtoReflect.Descriptor instead.
 func (*GetSettings) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{36}
+	return file_ipc_proto_rawDescGZIP(), []int{37}
 }
 
 // Saves and applies preferences. Answered with settings, or error if a
@@ -3197,7 +3261,7 @@ type SetSettings struct {
 
 func (x *SetSettings) Reset() {
 	*x = SetSettings{}
-	mi := &file_ipc_proto_msgTypes[37]
+	mi := &file_ipc_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3209,7 +3273,7 @@ func (x *SetSettings) String() string {
 func (*SetSettings) ProtoMessage() {}
 
 func (x *SetSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[37]
+	mi := &file_ipc_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3222,7 +3286,7 @@ func (x *SetSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSettings.ProtoReflect.Descriptor instead.
 func (*SetSettings) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{37}
+	return file_ipc_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *SetSettings) GetSettings() *Settings {
@@ -3256,7 +3320,7 @@ type Settings struct {
 
 func (x *Settings) Reset() {
 	*x = Settings{}
-	mi := &file_ipc_proto_msgTypes[38]
+	mi := &file_ipc_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3268,7 +3332,7 @@ func (x *Settings) String() string {
 func (*Settings) ProtoMessage() {}
 
 func (x *Settings) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[38]
+	mi := &file_ipc_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3281,7 +3345,7 @@ func (x *Settings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Settings.ProtoReflect.Descriptor instead.
 func (*Settings) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{38}
+	return file_ipc_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *Settings) GetHideNotificationContent() bool {
@@ -3345,7 +3409,7 @@ type FetchAvatar struct {
 
 func (x *FetchAvatar) Reset() {
 	*x = FetchAvatar{}
-	mi := &file_ipc_proto_msgTypes[39]
+	mi := &file_ipc_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3357,7 +3421,7 @@ func (x *FetchAvatar) String() string {
 func (*FetchAvatar) ProtoMessage() {}
 
 func (x *FetchAvatar) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[39]
+	mi := &file_ipc_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3370,7 +3434,7 @@ func (x *FetchAvatar) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAvatar.ProtoReflect.Descriptor instead.
 func (*FetchAvatar) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{39}
+	return file_ipc_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *FetchAvatar) GetAccountId() string {
@@ -3400,7 +3464,7 @@ type DownloadMedia struct {
 
 func (x *DownloadMedia) Reset() {
 	*x = DownloadMedia{}
-	mi := &file_ipc_proto_msgTypes[40]
+	mi := &file_ipc_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3412,7 +3476,7 @@ func (x *DownloadMedia) String() string {
 func (*DownloadMedia) ProtoMessage() {}
 
 func (x *DownloadMedia) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[40]
+	mi := &file_ipc_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3425,7 +3489,7 @@ func (x *DownloadMedia) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadMedia.ProtoReflect.Descriptor instead.
 func (*DownloadMedia) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{40}
+	return file_ipc_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *DownloadMedia) GetAccountId() string {
@@ -3463,7 +3527,7 @@ type MediaReady struct {
 
 func (x *MediaReady) Reset() {
 	*x = MediaReady{}
-	mi := &file_ipc_proto_msgTypes[41]
+	mi := &file_ipc_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3475,7 +3539,7 @@ func (x *MediaReady) String() string {
 func (*MediaReady) ProtoMessage() {}
 
 func (x *MediaReady) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[41]
+	mi := &file_ipc_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3488,7 +3552,7 @@ func (x *MediaReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaReady.ProtoReflect.Descriptor instead.
 func (*MediaReady) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{41}
+	return file_ipc_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *MediaReady) GetAccountId() string {
@@ -3539,7 +3603,7 @@ type MessagesExpired struct {
 
 func (x *MessagesExpired) Reset() {
 	*x = MessagesExpired{}
-	mi := &file_ipc_proto_msgTypes[42]
+	mi := &file_ipc_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3551,7 +3615,7 @@ func (x *MessagesExpired) String() string {
 func (*MessagesExpired) ProtoMessage() {}
 
 func (x *MessagesExpired) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[42]
+	mi := &file_ipc_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3564,7 +3628,7 @@ func (x *MessagesExpired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessagesExpired.ProtoReflect.Descriptor instead.
 func (*MessagesExpired) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{42}
+	return file_ipc_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *MessagesExpired) GetAccountId() string {
@@ -3601,7 +3665,7 @@ type MessageStatusChanged struct {
 
 func (x *MessageStatusChanged) Reset() {
 	*x = MessageStatusChanged{}
-	mi := &file_ipc_proto_msgTypes[43]
+	mi := &file_ipc_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3613,7 +3677,7 @@ func (x *MessageStatusChanged) String() string {
 func (*MessageStatusChanged) ProtoMessage() {}
 
 func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[43]
+	mi := &file_ipc_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3626,7 +3690,7 @@ func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageStatusChanged.ProtoReflect.Descriptor instead.
 func (*MessageStatusChanged) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{43}
+	return file_ipc_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *MessageStatusChanged) GetAccountId() string {
@@ -3789,7 +3853,7 @@ const file_ipc_proto_rawDesc = "" +
 	"lastFromMe\x12=\n" +
 	"\vlast_status\x18\v \x01(\x0e2\x1c.wassup.ipc.v1.MessageStatusR\n" +
 	"lastStatus\x12(\n" +
-	"\x10last_sender_name\x18\f \x01(\tR\x0elastSenderName\"\xd8\x03\n" +
+	"\x10last_sender_name\x18\f \x01(\tR\x0elastSenderName\"\x8c\x04\n" +
 	"\aMessage\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -3807,7 +3871,11 @@ const file_ipc_proto_rawDesc = "" +
 	" \x01(\v2\x14.wassup.ipc.v1.MediaR\x05media\x12*\n" +
 	"\x05quote\x18\v \x01(\v2\x14.wassup.ipc.v1.QuoteR\x05quote\x12.\n" +
 	"\x04link\x18\f \x01(\v2\x1a.wassup.ipc.v1.LinkPreviewR\x04link\x125\n" +
-	"\treactions\x18\r \x03(\v2\x17.wassup.ipc.v1.ReactionR\treactions\"J\n" +
+	"\treactions\x18\r \x03(\v2\x17.wassup.ipc.v1.ReactionR\treactions\x122\n" +
+	"\bmentions\x18\x0e \x03(\v2\x16.wassup.ipc.v1.MentionR\bmentions\"3\n" +
+	"\aMention\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"J\n" +
 	"\bReaction\x12\x14\n" +
 	"\x05emoji\x18\x01 \x01(\tR\x05emoji\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\rR\x05count\x12\x12\n" +
@@ -3984,7 +4052,7 @@ func file_ipc_proto_rawDescGZIP() []byte {
 }
 
 var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_ipc_proto_goTypes = []any{
 	(ConnectionState)(0),         // 0: wassup.ipc.v1.ConnectionState
 	(MediaKind)(0),               // 1: wassup.ipc.v1.MediaKind
@@ -4009,30 +4077,31 @@ var file_ipc_proto_goTypes = []any{
 	(*Account)(nil),              // 20: wassup.ipc.v1.Account
 	(*Chat)(nil),                 // 21: wassup.ipc.v1.Chat
 	(*Message)(nil),              // 22: wassup.ipc.v1.Message
-	(*Reaction)(nil),             // 23: wassup.ipc.v1.Reaction
-	(*LoadOlder)(nil),            // 24: wassup.ipc.v1.LoadOlder
-	(*HistoryAdded)(nil),         // 25: wassup.ipc.v1.HistoryAdded
-	(*React)(nil),                // 26: wassup.ipc.v1.React
-	(*ReactionsChanged)(nil),     // 27: wassup.ipc.v1.ReactionsChanged
-	(*LinkPreview)(nil),          // 28: wassup.ipc.v1.LinkPreview
-	(*Quote)(nil),                // 29: wassup.ipc.v1.Quote
-	(*Media)(nil),                // 30: wassup.ipc.v1.Media
-	(*SendMedia)(nil),            // 31: wassup.ipc.v1.SendMedia
-	(*ListStickers)(nil),         // 32: wassup.ipc.v1.ListStickers
-	(*StickerList)(nil),          // 33: wassup.ipc.v1.StickerList
-	(*Sticker)(nil),              // 34: wassup.ipc.v1.Sticker
-	(*SendSticker)(nil),          // 35: wassup.ipc.v1.SendSticker
-	(*SetFavoriteSticker)(nil),   // 36: wassup.ipc.v1.SetFavoriteSticker
-	(*UnlockChats)(nil),          // 37: wassup.ipc.v1.UnlockChats
-	(*Quit)(nil),                 // 38: wassup.ipc.v1.Quit
-	(*GetSettings)(nil),          // 39: wassup.ipc.v1.GetSettings
-	(*SetSettings)(nil),          // 40: wassup.ipc.v1.SetSettings
-	(*Settings)(nil),             // 41: wassup.ipc.v1.Settings
-	(*FetchAvatar)(nil),          // 42: wassup.ipc.v1.FetchAvatar
-	(*DownloadMedia)(nil),        // 43: wassup.ipc.v1.DownloadMedia
-	(*MediaReady)(nil),           // 44: wassup.ipc.v1.MediaReady
-	(*MessagesExpired)(nil),      // 45: wassup.ipc.v1.MessagesExpired
-	(*MessageStatusChanged)(nil), // 46: wassup.ipc.v1.MessageStatusChanged
+	(*Mention)(nil),              // 23: wassup.ipc.v1.Mention
+	(*Reaction)(nil),             // 24: wassup.ipc.v1.Reaction
+	(*LoadOlder)(nil),            // 25: wassup.ipc.v1.LoadOlder
+	(*HistoryAdded)(nil),         // 26: wassup.ipc.v1.HistoryAdded
+	(*React)(nil),                // 27: wassup.ipc.v1.React
+	(*ReactionsChanged)(nil),     // 28: wassup.ipc.v1.ReactionsChanged
+	(*LinkPreview)(nil),          // 29: wassup.ipc.v1.LinkPreview
+	(*Quote)(nil),                // 30: wassup.ipc.v1.Quote
+	(*Media)(nil),                // 31: wassup.ipc.v1.Media
+	(*SendMedia)(nil),            // 32: wassup.ipc.v1.SendMedia
+	(*ListStickers)(nil),         // 33: wassup.ipc.v1.ListStickers
+	(*StickerList)(nil),          // 34: wassup.ipc.v1.StickerList
+	(*Sticker)(nil),              // 35: wassup.ipc.v1.Sticker
+	(*SendSticker)(nil),          // 36: wassup.ipc.v1.SendSticker
+	(*SetFavoriteSticker)(nil),   // 37: wassup.ipc.v1.SetFavoriteSticker
+	(*UnlockChats)(nil),          // 38: wassup.ipc.v1.UnlockChats
+	(*Quit)(nil),                 // 39: wassup.ipc.v1.Quit
+	(*GetSettings)(nil),          // 40: wassup.ipc.v1.GetSettings
+	(*SetSettings)(nil),          // 41: wassup.ipc.v1.SetSettings
+	(*Settings)(nil),             // 42: wassup.ipc.v1.Settings
+	(*FetchAvatar)(nil),          // 43: wassup.ipc.v1.FetchAvatar
+	(*DownloadMedia)(nil),        // 44: wassup.ipc.v1.DownloadMedia
+	(*MediaReady)(nil),           // 45: wassup.ipc.v1.MediaReady
+	(*MessagesExpired)(nil),      // 46: wassup.ipc.v1.MessagesExpired
+	(*MessageStatusChanged)(nil), // 47: wassup.ipc.v1.MessageStatusChanged
 }
 var file_ipc_proto_depIdxs = []int32{
 	5,  // 0: wassup.ipc.v1.Request.list_accounts:type_name -> wassup.ipc.v1.ListAccounts
@@ -4042,19 +4111,19 @@ var file_ipc_proto_depIdxs = []int32{
 	10, // 4: wassup.ipc.v1.Request.link_account:type_name -> wassup.ipc.v1.LinkAccount
 	13, // 5: wassup.ipc.v1.Request.mark_read:type_name -> wassup.ipc.v1.MarkRead
 	14, // 6: wassup.ipc.v1.Request.set_active_chat:type_name -> wassup.ipc.v1.SetActiveChat
-	43, // 7: wassup.ipc.v1.Request.download_media:type_name -> wassup.ipc.v1.DownloadMedia
-	31, // 8: wassup.ipc.v1.Request.send_media:type_name -> wassup.ipc.v1.SendMedia
-	42, // 9: wassup.ipc.v1.Request.fetch_avatar:type_name -> wassup.ipc.v1.FetchAvatar
-	32, // 10: wassup.ipc.v1.Request.list_stickers:type_name -> wassup.ipc.v1.ListStickers
-	35, // 11: wassup.ipc.v1.Request.send_sticker:type_name -> wassup.ipc.v1.SendSticker
-	37, // 12: wassup.ipc.v1.Request.unlock_chats:type_name -> wassup.ipc.v1.UnlockChats
-	39, // 13: wassup.ipc.v1.Request.get_settings:type_name -> wassup.ipc.v1.GetSettings
-	40, // 14: wassup.ipc.v1.Request.set_settings:type_name -> wassup.ipc.v1.SetSettings
-	38, // 15: wassup.ipc.v1.Request.quit:type_name -> wassup.ipc.v1.Quit
+	44, // 7: wassup.ipc.v1.Request.download_media:type_name -> wassup.ipc.v1.DownloadMedia
+	32, // 8: wassup.ipc.v1.Request.send_media:type_name -> wassup.ipc.v1.SendMedia
+	43, // 9: wassup.ipc.v1.Request.fetch_avatar:type_name -> wassup.ipc.v1.FetchAvatar
+	33, // 10: wassup.ipc.v1.Request.list_stickers:type_name -> wassup.ipc.v1.ListStickers
+	36, // 11: wassup.ipc.v1.Request.send_sticker:type_name -> wassup.ipc.v1.SendSticker
+	38, // 12: wassup.ipc.v1.Request.unlock_chats:type_name -> wassup.ipc.v1.UnlockChats
+	40, // 13: wassup.ipc.v1.Request.get_settings:type_name -> wassup.ipc.v1.GetSettings
+	41, // 14: wassup.ipc.v1.Request.set_settings:type_name -> wassup.ipc.v1.SetSettings
+	39, // 15: wassup.ipc.v1.Request.quit:type_name -> wassup.ipc.v1.Quit
 	8,  // 16: wassup.ipc.v1.Request.search_messages:type_name -> wassup.ipc.v1.SearchMessages
-	26, // 17: wassup.ipc.v1.Request.react:type_name -> wassup.ipc.v1.React
-	24, // 18: wassup.ipc.v1.Request.load_older:type_name -> wassup.ipc.v1.LoadOlder
-	36, // 19: wassup.ipc.v1.Request.set_favorite_sticker:type_name -> wassup.ipc.v1.SetFavoriteSticker
+	27, // 17: wassup.ipc.v1.Request.react:type_name -> wassup.ipc.v1.React
+	25, // 18: wassup.ipc.v1.Request.load_older:type_name -> wassup.ipc.v1.LoadOlder
+	37, // 19: wassup.ipc.v1.Request.set_favorite_sticker:type_name -> wassup.ipc.v1.SetFavoriteSticker
 	16, // 20: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
 	17, // 21: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
 	18, // 22: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
@@ -4064,34 +4133,35 @@ var file_ipc_proto_depIdxs = []int32{
 	22, // 26: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
 	11, // 27: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
 	12, // 28: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
-	46, // 29: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
+	47, // 29: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
 	15, // 30: wassup.ipc.v1.Event.ack:type_name -> wassup.ipc.v1.Ack
-	44, // 31: wassup.ipc.v1.Event.media_ready:type_name -> wassup.ipc.v1.MediaReady
-	33, // 32: wassup.ipc.v1.Event.stickers:type_name -> wassup.ipc.v1.StickerList
-	45, // 33: wassup.ipc.v1.Event.messages_expired:type_name -> wassup.ipc.v1.MessagesExpired
-	41, // 34: wassup.ipc.v1.Event.settings:type_name -> wassup.ipc.v1.Settings
-	27, // 35: wassup.ipc.v1.Event.reactions_changed:type_name -> wassup.ipc.v1.ReactionsChanged
-	25, // 36: wassup.ipc.v1.Event.history_added:type_name -> wassup.ipc.v1.HistoryAdded
+	45, // 31: wassup.ipc.v1.Event.media_ready:type_name -> wassup.ipc.v1.MediaReady
+	34, // 32: wassup.ipc.v1.Event.stickers:type_name -> wassup.ipc.v1.StickerList
+	46, // 33: wassup.ipc.v1.Event.messages_expired:type_name -> wassup.ipc.v1.MessagesExpired
+	42, // 34: wassup.ipc.v1.Event.settings:type_name -> wassup.ipc.v1.Settings
+	28, // 35: wassup.ipc.v1.Event.reactions_changed:type_name -> wassup.ipc.v1.ReactionsChanged
+	26, // 36: wassup.ipc.v1.Event.history_added:type_name -> wassup.ipc.v1.HistoryAdded
 	20, // 37: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
 	21, // 38: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
 	22, // 39: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
 	0,  // 40: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
 	2,  // 41: wassup.ipc.v1.Chat.last_status:type_name -> wassup.ipc.v1.MessageStatus
 	2,  // 42: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
-	30, // 43: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
-	29, // 44: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
-	28, // 45: wassup.ipc.v1.Message.link:type_name -> wassup.ipc.v1.LinkPreview
-	23, // 46: wassup.ipc.v1.Message.reactions:type_name -> wassup.ipc.v1.Reaction
-	23, // 47: wassup.ipc.v1.ReactionsChanged.reactions:type_name -> wassup.ipc.v1.Reaction
-	1,  // 48: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
-	34, // 49: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
-	41, // 50: wassup.ipc.v1.SetSettings.settings:type_name -> wassup.ipc.v1.Settings
-	2,  // 51: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
-	52, // [52:52] is the sub-list for method output_type
-	52, // [52:52] is the sub-list for method input_type
-	52, // [52:52] is the sub-list for extension type_name
-	52, // [52:52] is the sub-list for extension extendee
-	0,  // [0:52] is the sub-list for field type_name
+	31, // 43: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
+	30, // 44: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
+	29, // 45: wassup.ipc.v1.Message.link:type_name -> wassup.ipc.v1.LinkPreview
+	24, // 46: wassup.ipc.v1.Message.reactions:type_name -> wassup.ipc.v1.Reaction
+	23, // 47: wassup.ipc.v1.Message.mentions:type_name -> wassup.ipc.v1.Mention
+	24, // 48: wassup.ipc.v1.ReactionsChanged.reactions:type_name -> wassup.ipc.v1.Reaction
+	1,  // 49: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
+	35, // 50: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
+	42, // 51: wassup.ipc.v1.SetSettings.settings:type_name -> wassup.ipc.v1.Settings
+	2,  // 52: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
+	53, // [53:53] is the sub-list for method output_type
+	53, // [53:53] is the sub-list for method input_type
+	53, // [53:53] is the sub-list for extension type_name
+	53, // [53:53] is the sub-list for extension extendee
+	0,  // [0:53] is the sub-list for field type_name
 }
 
 func init() { file_ipc_proto_init() }
@@ -4146,7 +4216,7 @@ func file_ipc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipc_proto_rawDesc), len(file_ipc_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   44,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

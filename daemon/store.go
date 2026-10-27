@@ -220,6 +220,7 @@ func (a *account) storeMessage(ctx context.Context, evt *events.Message, live bo
 		Quote:       quote,
 		Link:        a.ipcLink(linkBlob),
 	}
+	msg.Mentions = a.mentionsIn(ctx, text, map[string]string{})
 	if quote != nil {
 		// After the blob is made: the database keeps the image's bytes.
 		a.showQuoteThumbnail(quote)
@@ -401,7 +402,7 @@ func (a *account) scanChat(ctx context.Context, row interface{ Scan(...any) erro
 		return nil, err
 	}
 	if text.Valid {
-		c.LastMessage = lastMessageText(text.String, media)
+		c.LastMessage = a.namedMentions(ctx, lastMessageText(text.String, media))
 		c.LastFromMe, c.LastStatus = fromMe.Bool, ipc.MessageStatus(status.Int32)
 		if c.IsGroup && !c.LastFromMe {
 			if jid, err := types.ParseJID(sender.String); err == nil {
@@ -504,6 +505,7 @@ func (a *account) queryMessages(ctx context.Context, chatJID, query string, args
 	defer rows.Close()
 	var msgs []*ipc.Message
 	names := map[string]string{}
+	mentionNames := map[string]string{}
 	for rows.Next() {
 		m := &ipc.Message{AccountId: a.id, ChatJid: chatJID}
 		var mediaBlob, quoteBlob []byte
@@ -514,6 +516,7 @@ func (a *account) queryMessages(ctx context.Context, chatJID, query string, args
 		m.Media = a.ipcMedia(mediaBlob)
 		m.Link = a.ipcLink(linkBlob)
 		m.Quote = a.quoteFromBlob(ctx, quoteBlob)
+		m.Mentions = a.mentionsIn(ctx, m.Text, mentionNames)
 		if !m.FromMe {
 			name, ok := names[m.SenderJid]
 			if !ok {

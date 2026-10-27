@@ -131,6 +131,7 @@ func (a *account) quoteFromBlob(ctx context.Context, blob []byte) *ipc.Quote {
 }
 
 func (a *account) nameQuote(ctx context.Context, q *ipc.Quote) {
+	q.Text = a.namedMentions(ctx, q.Text)
 	sender, err := types.ParseJID(q.SenderJid)
 	if err != nil {
 		return

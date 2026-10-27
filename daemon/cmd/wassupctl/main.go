@@ -198,5 +198,9 @@ func printMessage(m *ipc.Message) {
 	if m.GetFromMe() {
 		who = "me"
 	}
-	fmt.Printf("%s  [%s] %s: %s\n", stamp(m.GetTimestampMs()), m.GetChatJid(), who, m.GetText())
+	fmt.Printf("%s  [%s] %s: %s", stamp(m.GetTimestampMs()), m.GetChatJid(), who, m.GetText())
+	for _, mention := range m.GetMentions() {
+		fmt.Printf("  [@%s = %s]", mention.GetToken(), mention.GetName())
+	}
+	fmt.Println()
 }

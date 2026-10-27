@@ -198,7 +198,7 @@ func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title
 	if title == "" {
 		title = tr("New message")
 	}
-	body = msg.Text
+	body = withMentionNames(msg.Text, msg.Mentions)
 	if kind := msg.GetMedia().GetKind(); kind != ipc.MediaKind_MEDIA_KIND_UNSPECIFIED {
 		label := map[ipc.MediaKind]string{
 			ipc.MediaKind_MEDIA_KIND_IMAGE:    tr("Photo"),

@@ -207,6 +207,16 @@ message Message {
   LinkPreview link = 12;
   // Emoji reactions, grouped, most used first.
   repeated Reaction reactions = 13;
+  // The people the text mentions whose name is known.
+  repeated Mention mentions = 14;
+}
+
+// A mention in a message's text: WhatsApp writes it as "@" and the number of
+// the person's id, and the UI shows their name instead.
+message Mention {
+  // The digits after the "@" in the text.
+  string token = 1;
+  string name = 2;
 }
 
 message Reaction {
