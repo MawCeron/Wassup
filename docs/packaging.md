@@ -24,7 +24,7 @@ as COPR and mock require. `REF=<commit>` packages another commit than HEAD.
 | Path | What |
 |---|---|
 | `/usr/bin/wassupd`, `/usr/bin/wassup` | The daemon and the UI |
-| `/usr/lib/systemd/user/wassupd.{service,socket}` | The daemon as a user service, started at login and by the UI after quitting |
+| `/usr/lib/systemd/user/wassupd.{service,socket}` | The daemon as a user service, started at login, by the UI after quitting, and by the UI when it cannot connect, as right after installing |
 | `/usr/lib/systemd/user-preset/80-wassup.preset` | Enables both for every user, so notifications work without setup |
 | `/usr/share/dbus-1/services/io.github.MawCeron.Wassup.service` | Starts the UI for notification clicks and the status icon |
 | `/usr/share/applications/io.github.MawCeron.Wassup.desktop` | The launcher, translated from `po/` |

@@ -158,7 +158,9 @@ at login and restarts it if it fails. Without network at login, the
 daemon keeps retrying in the background. `packaging/wassupd.socket`
 listens on its socket, so that opening Wassup starts the daemon again
 after the user quit with Ctrl+Q: quitting exits cleanly, which systemd
-does not restart. For development, install both against a local build:
+does not restart. A package installed during the session leaves the
+socket stopped until the next login, so the UI asks systemd to start it with
+`systemctl --user start wassupd.socket` the first time it cannot connect. For development, install both against a local build:
 
 ```sh
 go -C daemon build -o ~/.local/bin/wassupd .
