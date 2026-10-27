@@ -19,6 +19,7 @@ mod search;
 mod state;
 mod stickers;
 mod viewer;
+mod voice;
 
 use audio::*;
 use qr::*;
@@ -28,6 +29,7 @@ use search::*;
 use state::*;
 use stickers::*;
 use viewer::*;
+use voice::*;
 
 /// Side of the QR code on the link screen, in pixels: easy to scan without
 /// crowding the instructions.
@@ -45,6 +47,7 @@ const CSS: &str = "
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .media-button { padding: 0; }
+.recording-dot { color: var(--error-color); }
 .unread-pill { font-size: 0.8em; font-weight: bold; min-width: 12px; padding: 1px 6px; border-radius: 999px; background: var(--accent-bg-color); color: var(--accent-fg-color); }
 /* Opaque, with a ring of the backdrop, as they overlap the bubble's edge. */
 .reactions { font-size: 0.9em; padding: 2px 8px; border-radius: 999px; background: var(--popover-bg-color); box-shadow: 0 0 0 2px var(--view-bg-color); }
@@ -160,6 +163,8 @@ pub struct Window {
     viewer: Rc<Viewer>,
     search: MessageSearch,
     reply: ReplyBar,
+    voice: VoiceBar,
+    composer_bar: gtk::Box,
     message_list: gtk::ListView,
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
@@ -542,6 +547,23 @@ impl Window {
         composer_bar.append(&stickers_button);
         composer_bar.append(&composer_scroll);
         composer_bar.append(&send_button);
+        // As in WhatsApp, the microphone takes the send button's place while
+        // there is nothing to send.
+        let voice = VoiceBar::new();
+        composer_bar.append(&voice.mic);
+        send_button.set_visible(false);
+        composer.buffer().connect_changed(glib::clone!(
+            #[weak]
+            send_button,
+            #[weak(rename_to = mic)]
+            voice.mic,
+            move |buffer| {
+                let (start, end) = buffer.bounds();
+                let empty = buffer.text(&start, &end, false).trim().is_empty();
+                send_button.set_visible(!empty);
+                mic.set_visible(empty);
+            }
+        ));
         // The conversation's header shows the chat's picture next to its name.
         let header_avatar = adw::Avatar::builder().size(28).show_initials(true).build();
         let header_title = gtk::Label::builder()
@@ -566,6 +588,7 @@ impl Window {
         let reply = ReplyBar::new();
         content_view.add_bottom_bar(&reply.revealer);
         content_view.add_bottom_bar(&composer_bar);
+        content_view.add_bottom_bar(&voice.bar);
         content_view.set_reveal_bottom_bars(false);
         let content = adw::NavigationPage::new(&content_view, "Wassup");
         let split = adw::NavigationSplitView::builder()
@@ -674,6 +697,8 @@ impl Window {
             viewer,
             search,
             reply,
+            voice,
+            composer_bar,
             message_list,
             message_scroll,
             loading: Cell::new(false),
@@ -765,6 +790,7 @@ impl Window {
         ui.connect_viewer();
         ui.connect_message_search();
         ui.connect_reply_bar();
+        ui.connect_voice();
         let search_messages = gio::SimpleAction::new("search-messages", None);
         search_messages.connect_activate(glib::clone!(
             #[weak]
@@ -947,6 +973,7 @@ impl Window {
             #[upgrade_or]
             glib::Propagation::Proceed,
             move |window| {
+                ui.stop_recording(false); // Never left recording in the background.
                 let (width, height) = window.default_size();
                 let state = SavedState {
                     width,
@@ -1689,6 +1716,7 @@ impl Window {
     /// Leaves the conversation pane empty, as when no chat is selected.
     fn close_chat(&self) {
         self.close_viewer();
+        self.stop_recording(false);
         self.cancel_reply();
         self.search.bar.set_search_mode(false);
         self.stop_audio();
@@ -1762,6 +1790,7 @@ impl Window {
 
     fn open_chat(&self, chat: &ipc::Chat) {
         self.close_viewer();
+        self.stop_recording(false);
         self.cancel_reply();
         self.search.bar.set_search_mode(false);
         if chat.locked && !self.restricted.get() {
@@ -1819,7 +1848,7 @@ impl Window {
     }
 
     /// Sends a file with a caption. Returns whether the request went out.
-    fn send_file(&self, path: &str, caption: &str, as_document: bool) -> bool {
+    fn send_file(&self, path: &str, caption: &str, as_document: bool, voice_note: bool) -> bool {
         let Some((account_id, chat_jid)) = self.open_ids() else {
             return false;
         };
@@ -1831,6 +1860,7 @@ impl Window {
             caption: caption.clone(),
             as_sticker: false,
             as_document,
+            voice_note,
         });
         let Some(id) = self.send(request) else {
             return false;
@@ -1842,7 +1872,11 @@ impl Window {
             .unwrap_or_default();
         let toast = adw::Toast::builder()
             // TRANSLATORS: {} is a file name.
-            .title(gettext("Sending {}…").replace("{}", &name))
+            .title(if voice_note {
+                gettext("Sending voice message…")
+            } else {
+                gettext("Sending {}…").replace("{}", &name)
+            })
             .timeout(0)
             .build();
         self.toasts.add_toast(toast.clone());

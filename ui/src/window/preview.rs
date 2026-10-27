@@ -89,7 +89,7 @@ impl Window {
             #[strong(rename_to = path)]
             path.to_owned(),
             move || {
-                if ui.send_file(&path, caption.text().trim(), as_document) {
+                if ui.send_file(&path, caption.text().trim(), as_document, false) {
                     ui.composer.buffer().set_text("");
                 }
                 dialog.close();

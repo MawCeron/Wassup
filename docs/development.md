@@ -186,6 +186,17 @@ Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
 
+## Voice notes
+
+The UI records with `gst-launch-1.0` (package `gstreamer1`) in its own
+process: the default microphone through `autoaudiosrc`, encoded as Opus
+in Ogg (`opusenc`, from `gstreamer1-plugins-base`), which is what WhatsApp
+plays. Stopping sends it `SIGINT`, so `-e` closes the file properly. It
+runs under `setpriv --pdeathsig KILL` (util-linux), so the kernel ends the
+recording if the UI dies: the microphone never stays open after Wassup.
+Recordings under a second are dropped. The daemon sends the file as a voice
+note, with its length read from the last Ogg page.
+
 ## Link previews
 
 Received links show the preview the sender's phone attached to the

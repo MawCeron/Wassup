@@ -116,6 +116,7 @@ impl Window {
             caption: String::new(),
             as_sticker: true,
             as_document: false,
+            voice_note: false,
         });
         match self.send(request) {
             Some(id) => {
