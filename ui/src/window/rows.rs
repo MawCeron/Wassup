@@ -242,6 +242,14 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .wrap(true)
             .wrap_mode(gtk::pango::WrapMode::WordChar)
             .build();
+        // A mention is a link only to take the accent color: it goes nowhere.
+        text.connect_activate_link(|_, uri| {
+            if uri.starts_with("mention:") {
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
         let time = gtk::Label::builder()
             .css_classes(["caption", "dim-label"])
             .build();
@@ -645,7 +653,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
                 );
             }
         }
-        text.set_markup(&linkify(&msg.text));
+        text.set_markup(&message_markup(&msg.text, &msg.mentions));
         text.set_visible(!msg.text.is_empty());
         time.set_label(&time_of_day(msg.timestamp_ms));
         show_status(&status, msg.status());
@@ -862,6 +870,42 @@ pub(super) fn link_host(url: &str) -> String {
         .and_then(|u| u.host())
         .map(|h| h.trim_start_matches("www.").to_owned())
         .unwrap_or_else(|| url.to_owned())
+}
+
+/// Message text as Pango markup: web addresses are links, and the mention of
+/// a person the daemon knows shows their name, as a link that goes nowhere so
+/// that it takes the accent color. The rest is escaped.
+pub(super) fn message_markup(text: &str, mentions: &[ipc::Mention]) -> String {
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    loop {
+        // The next "@" that starts a word and is followed by a known number
+        // that ends there.
+        let found = rest.match_indices('@').find_map(|(at, _)| {
+            if rest[..at].chars().next_back().is_some_and(word) {
+                return None;
+            }
+            let after = &rest[at + 1..];
+            let m = mentions
+                .iter()
+                .filter(|m| !m.token.is_empty() && after.starts_with(&m.token))
+                .max_by_key(|m| m.token.len())?;
+            let end = at + 1 + m.token.len();
+            (!rest[end..].chars().next().is_some_and(word)).then_some((at, end, m))
+        });
+        let Some((at, end, mention)) = found else {
+            out += &linkify(rest);
+            return out;
+        };
+        out += &linkify(&rest[..at]);
+        out += &format!(
+            "<a href=\"mention:{}\">@{}</a>",
+            mention.token,
+            glib::markup_escape_text(&mention.name)
+        );
+        rest = &rest[end..];
+    }
 }
 
 /// Message text as Pango markup, with web addresses made into links. The
@@ -1096,6 +1140,37 @@ mod tests {
             linkify("¿ves https://ñ.mx?"),
             "¿ves <a href=\"https://ñ.mx\">https://ñ.mx</a>?"
         );
+    }
+
+    #[test]
+    fn a_mention_shows_the_name_and_unknown_numbers_stay() {
+        let ana = ipc::Mention {
+            token: "5215551111111".into(),
+            name: "Ana <&>".into(),
+        };
+        assert_eq!(
+            message_markup(
+                "hi @5215551111111, see https://a.b!",
+                std::slice::from_ref(&ana)
+            ),
+            "hi <a href=\"mention:5215551111111\">@Ana &lt;&amp;&gt;</a>, see <a href=\"https://a.b\">https://a.b</a>!"
+        );
+        assert_eq!(
+            message_markup(
+                "@5215551111111 and @5215559999999",
+                std::slice::from_ref(&ana)
+            ),
+            "<a href=\"mention:5215551111111\">@Ana &lt;&amp;&gt;</a> and @5215559999999"
+        );
+        assert_eq!(
+            message_markup(
+                "a@5215551111111 or @52155511111119",
+                std::slice::from_ref(&ana)
+            ),
+            "a@5215551111111 or @52155511111119",
+            "an address and a longer number are not mentions"
+        );
+        assert_eq!(message_markup("<b>", &[]), "&lt;b&gt;");
     }
 
     #[test]
