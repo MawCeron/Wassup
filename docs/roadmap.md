@@ -31,12 +31,13 @@ in [GitHub issues](https://github.com/MawCeron/Wassup/issues).
 
 **Packaging**
 - RPM for Fedora, built offline from vendored dependencies.
+- A sandboxed systemd unit, and a daemon that accepts connections only from
+  its own user.
+- CI on every push, and GitHub releases built from tags.
 
 ## Next
 
 - **COPR repository**, so Fedora users can install and update with `dnf`.
-- **Hardening:** a stricter systemd unit, and checking which process
-  connects to the daemon's socket.
 - **Installation guide.**
 
 ## Later
