@@ -105,7 +105,7 @@ fn main() -> glib::ExitCode {
     let config = std::fs::read_to_string(glib::user_config_dir().join("wassup/config.json"))
         .unwrap_or_default();
     choose_renderer(&config);
-    emoji_font::prefer_twemoji();
+    emoji_font::use_bundled_font();
     init_locale(&config);
     gio::resources_register_include!("wassup.gresource").expect("bundled resources");
     // Every launch is forwarded to the running instance, if there is one.
