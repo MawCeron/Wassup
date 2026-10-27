@@ -175,6 +175,19 @@ Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
 
+## Locked chats
+
+Chats locked on the phone stay out of the chat list, unread counts
+included, behind a "Restricted chats" entry that asks for the secret code
+set on the phone. The phone shares only a salted PBKDF2 hash of the code;
+the daemon checks what the user types against it and pauses a second
+after a wrong code. Going back locks the chats again and closes an open
+one. Notifications for locked chats only say there is a new message.
+
+This is a screen against people looking over your shoulder, as in
+WhatsApp Web: the messages are stored like any others, so it does not
+protect them from someone with access to your user account.
+
 ## Disappearing messages
 
 Chats with disappearing messages are respected. Each message keeps the

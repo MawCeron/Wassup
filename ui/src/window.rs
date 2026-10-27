@@ -124,6 +124,14 @@ pub struct Window {
     sending: RefCell<std::collections::HashMap<u64, String>>,
     /// Chat that was open when the window last closed, reopened once chats load.
     restore_chat: RefCell<Option<String>>,
+    /// Showing the chats locked on the phone, after their secret code.
+    restricted: Rc<Cell<bool>>,
+    chat_filter: gtk::CustomFilter,
+    shown_chats: gtk::FilterListModel,
+    restricted_entry: gtk::Button,
+    restricted_back: gtk::Button,
+    /// Id of the UnlockChats request awaiting its reply, or 0.
+    unlock_request: Cell<u64>,
     conn: RefCell<Option<ipc::Connection>>,
     account: RefCell<Option<ipc::Account>>,
 }
@@ -157,8 +165,18 @@ impl Window {
 
         let owner = Owner::default();
         let chats = gio::ListStore::new::<glib::BoxedAnyObject>();
+        // Locked chats show only in the restricted view, and only there.
+        let restricted = Rc::new(Cell::new(false));
+        let chat_filter = gtk::CustomFilter::new({
+            let restricted = restricted.clone();
+            move |item| {
+                let chat = item.downcast_ref::<glib::BoxedAnyObject>().unwrap();
+                chat.borrow::<ipc::Chat>().locked == restricted.get()
+            }
+        });
+        let shown_chats = gtk::FilterListModel::new(Some(chats.clone()), Some(chat_filter.clone()));
         let chat_selection = gtk::SingleSelection::builder()
-            .model(&chats)
+            .model(&shown_chats)
             .autoselect(false)
             .can_unselect(true)
             .build();
@@ -170,12 +188,34 @@ impl Window {
         let sidebar_title = adw::WindowTitle::new("Chats", "");
         let sidebar_header = adw::HeaderBar::new();
         sidebar_header.set_title_widget(Some(&sidebar_title));
+        let restricted_back = gtk::Button::builder()
+            .icon_name("go-previous-symbolic")
+            .tooltip_text("Lock Restricted Chats")
+            .visible(false)
+            .build();
+        sidebar_header.pack_start(&restricted_back);
+        let restricted_entry = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name("changes-prevent-symbolic")
+                    .label("Restricted chats")
+                    .halign(gtk::Align::Start)
+                    .build(),
+            )
+            .css_classes(["flat"])
+            .margin_start(6)
+            .margin_end(6)
+            .visible(false)
+            .build();
+        let chat_column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        chat_column.append(&restricted_entry);
+        chat_column.append(&chat_list);
         let sidebar = adw::ToolbarView::new();
         sidebar.add_top_bar(&sidebar_header);
         sidebar.set_content(Some(
             &gtk::ScrolledWindow::builder()
                 .hscrollbar_policy(gtk::PolicyType::Never)
-                .child(&chat_list)
+                .child(&chat_column)
                 .build(),
         ));
         let placeholder = adw::StatusPage::builder()
@@ -383,6 +423,12 @@ impl Window {
             content,
             chats,
             chat_selection,
+            restricted,
+            chat_filter,
+            shown_chats,
+            restricted_entry,
+            restricted_back,
+            unlock_request: Cell::new(0),
             chats_loaded: Cell::new(false),
             current_chat: Rc::default(),
             content_stack,
@@ -415,6 +461,16 @@ impl Window {
             #[weak]
             ui,
             move |_| ui.start_link()
+        ));
+        ui.restricted_entry.connect_clicked(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.ask_secret_code()
+        ));
+        ui.restricted_back.connect_clicked(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.leave_restricted()
         ));
         ui.chat_selection.connect_selected_item_notify(glib::clone!(
             #[weak]
@@ -617,7 +673,7 @@ impl Window {
         if other_account {
             return; // TODO: switch account once the UI supports several.
         }
-        match self.position_of(chat_jid) {
+        match self.shown_position(chat_jid) {
             Some(pos) => {
                 self.chat_selection.set_selected(pos);
                 self.split.set_show_content(true);
@@ -724,6 +780,23 @@ impl Window {
     }
 
     fn handle(self: &Rc<Self>, event: ipc::Event) {
+        if event.request_id != 0 && event.request_id == self.unlock_request.get() {
+            self.unlock_request.set(0);
+            match event.kind {
+                Some(event::Kind::Ack(_)) => self.enter_restricted(),
+                Some(event::Kind::Error(e)) => {
+                    // The daemon's errors are lowercase, Go style.
+                    let mut chars = e.message.chars();
+                    let message = chars
+                        .next()
+                        .map(|c| c.to_uppercase().chain(chars).collect::<String>())
+                        .unwrap_or_default();
+                    self.toast(&message);
+                }
+                _ => {}
+            }
+            return;
+        }
         if let Some(toast) = self.uploads.borrow_mut().remove(&event.request_id) {
             toast.dismiss();
         }
@@ -760,8 +833,9 @@ impl Window {
                     self.chats.append(&glib::BoxedAnyObject::new(chat));
                 }
                 self.reselect_current();
+                self.show_restricted_entry();
                 let restore = self.restore_chat.take();
-                if let Some(pos) = restore.and_then(|jid| self.position_of(&jid)) {
+                if let Some(pos) = restore.and_then(|jid| self.shown_position(&jid)) {
                     self.chat_selection.set_selected(pos);
                 }
             }
@@ -838,6 +912,128 @@ impl Window {
         })
     }
 
+    /// Position of a chat in the list on screen, which hides either the
+    /// locked chats or the others.
+    fn shown_position(&self, jid: &str) -> Option<u32> {
+        (0..self.shown_chats.n_items()).find(|&i| {
+            self.shown_chats
+                .item(i)
+                .and_downcast::<glib::BoxedAnyObject>()
+                .is_some_and(|c| c.borrow::<ipc::Chat>().jid == jid)
+        })
+    }
+
+    /// The entry to the restricted view shows while there are locked chats
+    /// and they are hidden.
+    fn show_restricted_entry(&self) {
+        let any_locked = (0..self.chats.n_items()).any(|i| {
+            self.chat_at(i)
+                .is_some_and(|c| c.borrow::<ipc::Chat>().locked)
+        });
+        self.restricted_entry
+            .set_visible(any_locked && !self.restricted.get());
+    }
+
+    fn ask_secret_code(self: &Rc<Self>) {
+        let code = gtk::PasswordEntry::builder()
+            .show_peek_icon(true)
+            .placeholder_text("Secret code")
+            .activates_default(true)
+            .build();
+        let dialog = adw::AlertDialog::builder()
+            .heading("Enter Secret Code")
+            .body("Enter the secret code you set on your phone to see your restricted chats.")
+            .extra_child(&code)
+            .default_response("continue")
+            .close_response("cancel")
+            .build();
+        dialog.add_responses(&[("cancel", "Cancel"), ("continue", "Continue")]);
+        dialog.set_response_appearance("continue", adw::ResponseAppearance::Suggested);
+        dialog.set_response_enabled("continue", false);
+        code.connect_changed(glib::clone!(
+            #[weak]
+            dialog,
+            move |code| dialog.set_response_enabled("continue", !code.text().is_empty())
+        ));
+        dialog.connect_response(
+            Some("continue"),
+            glib::clone!(
+                #[weak(rename_to = ui)]
+                self,
+                #[weak]
+                code,
+                move |_, _| {
+                    let Some(account) = ui.account.borrow().as_ref().map(|a| a.id.clone()) else {
+                        return;
+                    };
+                    let request = request::Kind::UnlockChats(ipc::UnlockChats {
+                        account_id: account,
+                        secret_code: code.text().to_string(),
+                    });
+                    if let Some(id) = ui.send(request) {
+                        ui.unlock_request.set(id);
+                    }
+                }
+            ),
+        );
+        dialog.present(Some(&self.window));
+    }
+
+    fn enter_restricted(&self) {
+        self.restricted.set(true);
+        self.chat_filter.changed(gtk::FilterChange::Different);
+        self.restricted_back.set_visible(true);
+        self.show_restricted_entry();
+        self.sidebar_title.set_title("Restricted chats");
+        self.reselect_current();
+        self.toast("Restricted chats unlocked");
+    }
+
+    /// Hides the locked chats again, closing one if it is open.
+    fn leave_restricted(&self) {
+        self.restricted.set(false);
+        self.chat_filter.changed(gtk::FilterChange::Different);
+        self.restricted_back.set_visible(false);
+        self.show_restricted_entry();
+        let name = self
+            .account
+            .borrow()
+            .as_ref()
+            .map(|a| a.push_name.clone())
+            .unwrap_or_default();
+        self.sidebar_title
+            .set_title(if name.is_empty() { "Chats" } else { &name });
+        if self.open_chat_is_locked() {
+            self.close_chat();
+        }
+        self.reselect_current();
+        self.toast("Restricted chats locked");
+    }
+
+    fn open_chat_is_locked(&self) -> bool {
+        let current = self.current_chat.borrow().clone();
+        current
+            .and_then(|jid| self.position_of(&jid))
+            .and_then(|pos| self.chat_at(pos))
+            .is_some_and(|c| c.borrow::<ipc::Chat>().locked)
+    }
+
+    /// Leaves the conversation pane empty, as when no chat is selected.
+    fn close_chat(&self) {
+        self.stop_audio();
+        self.current_chat.replace(None);
+        self.messages.remove_all();
+        self.content.set_title("Wassup");
+        self.content_stack.set_visible_child_name("empty");
+        self.content_view.set_reveal_bottom_bars(false);
+        if let Some(header) = self.header_title.parent() {
+            header.set_visible(false);
+        }
+        self.chat_selection.set_selected(gtk::INVALID_LIST_POSITION);
+        self.split.set_show_content(false);
+        self.report_active();
+    }
+
     fn show_header(&self, chat: &ipc::Chat) {
         self.header_title.set_label(&chat_title(chat));
         avatar_placeholder(&self.header_avatar, chat);
@@ -865,7 +1061,10 @@ impl Window {
 
     /// Moves or inserts a chat, keeping the list newest first.
     fn upsert_chat(&self, chat: ipc::Chat) {
-        if self.current_chat.borrow().as_deref() == Some(chat.jid.as_str()) {
+        let is_open = self.current_chat.borrow().as_deref() == Some(chat.jid.as_str());
+        if is_open && chat.locked && !self.restricted.get() {
+            self.close_chat(); // Locked on the phone while on screen.
+        } else if is_open {
             self.show_header(&chat);
         }
         if let Some(pos) = self.position_of(&chat.jid) {
@@ -880,16 +1079,20 @@ impl Window {
             .unwrap_or(self.chats.n_items());
         self.chats.insert(pos, &glib::BoxedAnyObject::new(chat));
         self.reselect_current();
+        self.show_restricted_entry();
     }
 
     fn reselect_current(&self) {
         let current = self.current_chat.borrow().clone();
-        if let Some(pos) = current.and_then(|jid| self.position_of(&jid)) {
+        if let Some(pos) = current.and_then(|jid| self.shown_position(&jid)) {
             self.chat_selection.set_selected(pos);
         }
     }
 
     fn open_chat(&self, chat: &ipc::Chat) {
+        if chat.locked && !self.restricted.get() {
+            return; // Only reachable through the restricted view.
+        }
         self.split.set_show_content(true);
         if self.current_chat.borrow().as_deref() == Some(chat.jid.as_str()) {
             return;
