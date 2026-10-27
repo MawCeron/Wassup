@@ -29,6 +29,7 @@ message Request {
     Quit quit = 17;
     SearchMessages search_messages = 18;
     React react = 19;
+    LoadOlder load_older = 20;
   }
 }
 
@@ -53,6 +54,7 @@ message Event {
     MessagesExpired messages_expired = 15;
     Settings settings = 16;
     ReactionsChanged reactions_changed = 17;
+    HistoryAdded history_added = 18;
   }
 }
 
@@ -212,6 +214,21 @@ message Reaction {
   uint32 count = 2;
   // The user is one of them.
   bool mine = 3;
+}
+
+// Asks the phone for the messages before the oldest one stored for a chat,
+// when the user scrolls past it. Answered with ack; history_added follows
+// if the phone, which must be online, sends any.
+message LoadOlder {
+  string account_id = 1;
+  string chat_jid = 2;
+}
+
+// Chats that got messages from the phone's history, after linking or
+// asked for with LoadOlder. Their lists and pages may have grown.
+message HistoryAdded {
+  string account_id = 1;
+  repeated string chat_jids = 2;
 }
 
 // Sends the user's reaction to a message; an empty emoji takes it back.

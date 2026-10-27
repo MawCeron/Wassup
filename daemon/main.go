@@ -207,6 +207,10 @@ func newDaemon(accounts []*account, notify *notifier) *daemon {
 					a.connectedAt.Store(0)
 				}
 				d.broadcast(&ipc.Event{Kind: &ipc.Event_AccountChanged{AccountChanged: a.info()}})
+			case *events.HistorySync:
+				if chats := a.onHistory(context.Background(), e.Data); len(chats) > 0 {
+					d.broadcast(historyAdded(a.id, chats))
+				}
 			case *events.AppState:
 				if chat := a.onAppState(context.Background(), e.Index, e.SyncActionValue); chat != nil {
 					d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
@@ -505,6 +509,15 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 			}
 		}()
 		return nil
+	case *ipc.Request_LoadOlder:
+		r := k.LoadOlder
+		if a := d.find(r.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else if err := a.loadOlder(context.Background(), r.GetChatJid()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
+		}
 	case *ipc.Request_React:
 		r := k.React
 		if a := d.find(r.GetAccountId()); a == nil {

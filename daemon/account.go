@@ -19,6 +19,7 @@ import (
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	waLog "go.mau.fi/whatsmeow/util/log"
+	"google.golang.org/protobuf/proto"
 	_ "modernc.org/sqlite"
 )
 
@@ -52,6 +53,9 @@ func init() {
 	// icon, so the desktop one it is.
 	store.SetOSInfo("Wassup", version)
 	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_DESKTOP.Enum()
+	// The phone sends this much history when linking; older messages come
+	// on demand. See history.go.
+	store.DeviceProps.HistorySyncConfig.FullSyncDaysLimit = proto.Uint32(historyDays)
 }
 
 // openAccounts opens every account under dataDir/accounts.

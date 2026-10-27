@@ -172,6 +172,13 @@ func messageText(evt *events.Message) string {
 // saveMessage stores a text message and updates its chat. It returns nil
 // for messages that are not text or were already stored.
 func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Message, *ipc.Chat, error) {
+	return a.storeMessage(ctx, evt, true)
+}
+
+// storeMessage keeps a message. A live one counts as unread unless it is
+// the user's own, which means the chat was read; one from the history
+// leaves the unread count alone.
+func (a *account) storeMessage(ctx context.Context, evt *events.Message, live bool) (*ipc.Message, *ipc.Chat, error) {
 	text := messageText(evt)
 	media := mediaOf(evt.Message)
 	info := evt.Info
@@ -274,8 +281,8 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	// Replying from any device means the chat was read.
 	_, err = tx.ExecContext(ctx, `UPDATE wassup_chats SET
 		last_message_at_ms = max(last_message_at_ms, ?),
-		unread_count = CASE WHEN ? THEN 0 ELSE unread_count + 1 END
-		WHERE jid = ?`, msg.TimestampMs, msg.FromMe, msg.ChatJid)
+		unread_count = CASE WHEN NOT ? THEN unread_count WHEN ? THEN 0 ELSE unread_count + 1 END
+		WHERE jid = ?`, msg.TimestampMs, live, msg.FromMe, msg.ChatJid)
 	if err != nil {
 		return nil, nil, err
 	}
