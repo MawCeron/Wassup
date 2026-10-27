@@ -14,6 +14,7 @@ mod animation;
 mod audio;
 mod background;
 mod gif;
+mod mention;
 mod preview;
 mod qr;
 mod reply;
@@ -27,6 +28,7 @@ mod voice;
 
 use audio::*;
 use background::*;
+use mention::*;
 use qr::*;
 use reply::*;
 use rows::*;
@@ -201,6 +203,7 @@ pub struct Window {
     /// A scroll to the newest message is queued for after layout.
     pin_pending: Cell<bool>,
     composer: gtk::TextView,
+    mentions: Mentions,
     content_view: adw::ToolbarView,
     /// Text of each SendText request awaiting its reply, by request id, so
     /// a message that fails can be put back.
@@ -719,6 +722,7 @@ impl Window {
         );
         window.add_breakpoint(narrow);
 
+        let mentions = Mentions::new(&composer);
         let ui = Rc::new(Self {
             banner,
             ever_connected: Cell::new(false),
@@ -786,6 +790,7 @@ impl Window {
             asked_older: Cell::new(false),
             stick_bottom: Cell::new(false),
             pin_pending: Cell::new(false),
+            mentions,
             composer,
             content_view,
             sending: RefCell::default(),
@@ -1022,6 +1027,9 @@ impl Window {
             #[upgrade_or]
             glib::Propagation::Proceed,
             move |_, key, _, modifiers| {
+                if ui.mention_key(key) {
+                    return glib::Propagation::Stop;
+                }
                 if key == gdk::Key::Escape {
                     if ui.cancel_reply() {
                         return glib::Propagation::Stop;
@@ -1039,6 +1047,7 @@ impl Window {
             }
         ));
         ui.composer.add_controller(keys);
+        ui.connect_mentions();
         send_button.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -1384,6 +1393,7 @@ impl Window {
             Some(event::Kind::MediaReady(ready)) => self.media_ready(ready),
             Some(event::Kind::MessagesExpired(gone)) => self.remove_expired(gone),
             Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
+            Some(event::Kind::Participants(list)) => self.participants_arrived(list),
             Some(event::Kind::ReactionsChanged(changed)) => self.reactions_changed(changed),
             Some(event::Kind::HistoryAdded(added)) => self.history_added(added),
             Some(event::Kind::Settings(settings)) => {
@@ -2146,11 +2156,13 @@ impl Window {
         }
         // The composer stays usable while sending: disabling it would move
         // the keyboard focus into the message list and scroll it.
+        let (sent, mentioned_jids) = self.take_mentions(&text);
         let request = request::Kind::SendText(ipc::SendText {
             account_id,
             chat_jid,
-            text: text.clone(),
+            text: sent,
             reply_to_id: self.reply.target.borrow().clone().unwrap_or_default(),
+            mentioned_jids,
         });
         if let Some(id) = self.send(request) {
             buffer.set_text("");
