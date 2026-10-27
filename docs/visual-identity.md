@@ -120,13 +120,10 @@ shell, sun). The background is transparent, so it works over any color.
 Strokes are 1.5 px with round caps. This is a decorative pattern, not a UI icon, so the 2 px rule does not apply.
 
 The doodles are drawn for Wassup and do not copy WhatsApp's wallpaper.
-GTK CSS cannot switch images with the color scheme, so apply one of two
-classes from Rust according to `adw::StyleManager::is_dark()`:
-
-```css
-.chat-bg-dark  { background-image: url("<path to wassup-pattern-dark.svg>");  background-repeat: repeat; }
-.chat-bg-light { background-image: url("<path to wassup-pattern-light.svg>"); background-repeat: repeat; }
-```
+Both tiles are bundled into the UI binary with the icons. The `.chat-bg`
+rule in `ui/src/window.rs` picks one with a `prefers-color-scheme` media
+query, and in light mode tints the backdrop slightly so white received
+bubbles stand out. The pattern stays fixed while messages scroll.
 
 Change the opacity on the root `<g>` of each file to make it more or less
 visible.

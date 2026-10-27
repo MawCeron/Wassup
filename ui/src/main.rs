@@ -61,7 +61,7 @@ fn choose_renderer() {
 
 fn main() -> glib::ExitCode {
     choose_renderer();
-    gio::resources_register_include!("icons.gresource").expect("bundled icons");
+    gio::resources_register_include!("wassup.gresource").expect("bundled resources");
     // Every launch is forwarded to the running instance, if there is one.
     let app = adw::Application::builder()
         .application_id(APP_ID)
