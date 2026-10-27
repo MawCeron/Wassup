@@ -442,6 +442,22 @@ impl Window {
             .hexpand(true)
             .child(&composer)
             .build();
+        // When a line is added, GTK keeps the old page size in the scroll
+        // adjustment and scrolls the new line into a view one line tall,
+        // which pushes the text against the top edge of the field. Text that
+        // fits in the field never scrolls.
+        let adjustment = composer_scroll.vadjustment();
+        adjustment.connect_value_changed(glib::clone!(
+            #[weak]
+            composer_scroll,
+            move |adjustment| {
+                if adjustment.value() != 0.0
+                    && adjustment.upper() <= f64::from(composer_scroll.height())
+                {
+                    adjustment.set_value(0.0);
+                }
+            }
+        ));
         let send_button = gtk::Button::builder()
             .icon_name("wassup-send-symbolic")
             .tooltip_text(gettext("Send"))
