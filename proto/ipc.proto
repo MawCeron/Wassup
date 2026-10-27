@@ -88,6 +88,8 @@ message SendText {
   string account_id = 1;
   string chat_jid = 2;
   string text = 3;
+  // Message of the chat this one replies to, quoting it; empty for none.
+  string reply_to_id = 4;
 }
 
 // Starts QR linking for an unlinked account. Answered with account_changed

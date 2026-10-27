@@ -62,3 +62,45 @@ func TestReactions(t *testing.T) {
 		t.Fatal("a plain message was taken for a reaction")
 	}
 }
+
+func TestReplyContext(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := openAccounts(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeAccounts(accounts)
+	a := accounts[0]
+	a.client.Store.ID = &types.JID{User: "5215511111111", Device: 3, Server: types.DefaultUserServer}
+	chat := types.NewJID("5215522222222", types.DefaultUserServer)
+	save := func(id string, fromMe bool, m *waE2E.Message) {
+		t.Helper()
+		sender := chat
+		if fromMe {
+			sender = *a.client.Store.ID
+		}
+		if _, _, err := a.saveMessage(ctx, &events.Message{
+			Info:    types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: sender, IsFromMe: fromMe}, ID: types.MessageID(id), Timestamp: time.Unix(1_700_000_000, 0)},
+			Message: m,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	save("T", false, &waE2E.Message{Conversation: proto.String("¿vienes?")})
+	save("P", true, &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Caption: proto.String("mira"), Mimetype: proto.String("image/jpeg")}})
+
+	c, err := a.replyContext(ctx, chat.String(), "T")
+	if err != nil || c.GetStanzaID() != "T" || c.GetParticipant() != chat.String() || c.GetQuotedMessage().GetConversation() != "¿vienes?" {
+		t.Fatalf("reply to text: %v, %v", c, err)
+	}
+	c, err = a.replyContext(ctx, chat.String(), "P")
+	if err != nil || c.GetParticipant() != "5215511111111@s.whatsapp.net" || c.GetQuotedMessage().GetImageMessage().GetCaption() != "mira" {
+		t.Fatalf("reply to own photo: %v, %v", c, err)
+	}
+	if _, err := a.replyContext(ctx, chat.String(), "missing"); err == nil {
+		t.Fatal("replied to a message that is not stored")
+	}
+	if q := quoteOf(&waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("sí"), ContextInfo: c}}); q.GetText() != "mira" {
+		t.Fatalf("the sent reply quotes %v", q)
+	}
+}

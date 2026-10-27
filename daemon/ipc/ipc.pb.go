@@ -1075,10 +1075,12 @@ func (x *SearchMessages) GetQuery() string {
 // With link previews on, the daemon first fetches the linked page; texts
 // still go out in the order they were sent.
 type SendText struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	ChatJid       string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
-	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ChatJid   string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
+	Text      string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	// Message of the chat this one replies to, quoting it; empty for none.
+	ReplyToId     string `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3" json:"reply_to_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1130,6 +1132,13 @@ func (x *SendText) GetChatJid() string {
 func (x *SendText) GetText() string {
 	if x != nil {
 		return x.Text
+	}
+	return ""
+}
+
+func (x *SendText) GetReplyToId() string {
+	if x != nil {
+		return x.ReplyToId
 	}
 	return ""
 }
@@ -3406,12 +3415,13 @@ const file_ipc_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
 	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12\x14\n" +
-	"\x05query\x18\x03 \x01(\tR\x05query\"X\n" +
+	"\x05query\x18\x03 \x01(\tR\x05query\"x\n" +
 	"\bSendText\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
 	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\",\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\x12\x1e\n" +
+	"\vreply_to_id\x18\x04 \x01(\tR\treplyToId\",\n" +
 	"\vLinkAccount\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\"Z\n" +

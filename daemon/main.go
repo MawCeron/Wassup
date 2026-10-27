@@ -441,7 +441,7 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		// without holding up the connection's other requests.
 		a.sends <- func() {
 			done := &ipc.Event{RequestId: req.GetId()}
-			msg, chat, err := a.sendText(context.Background(), r.GetChatJid(), r.GetText())
+			msg, chat, err := a.sendText(context.Background(), r.GetChatJid(), r.GetText(), r.GetReplyToId())
 			if err != nil {
 				done.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
 			} else {

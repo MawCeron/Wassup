@@ -142,10 +142,10 @@ func TestSaveAndListMessages(t *testing.T) {
 		}
 	}
 
-	if _, _, err := a.sendText(ctx, chat.String(), ""); err == nil {
+	if _, _, err := a.sendText(ctx, chat.String(), "", ""); err == nil {
 		t.Fatal("sent an empty message")
 	}
-	if _, _, err := a.sendText(ctx, chat.String(), "hi"); err == nil {
+	if _, _, err := a.sendText(ctx, chat.String(), "hi", ""); err == nil {
 		t.Fatal("sent from an unlinked account")
 	}
 }

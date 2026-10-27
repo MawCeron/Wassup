@@ -503,15 +503,53 @@ func (a *account) queryMessages(ctx context.Context, chatJID, query string, args
 }
 
 // sendText sends a text message and stores it like a received one.
-func (a *account) sendText(ctx context.Context, chat, text string) (*ipc.Message, *ipc.Chat, error) {
+func (a *account) sendText(ctx context.Context, chat, text, replyTo string) (*ipc.Message, *ipc.Chat, error) {
 	if text == "" {
 		return nil, nil, errors.New("empty message")
+	}
+	var reply *waE2E.ContextInfo
+	if replyTo != "" {
+		var err error
+		if reply, err = a.replyContext(ctx, chat, replyTo); err != nil {
+			return nil, nil, err
+		}
 	}
 	content := &waE2E.Message{Conversation: proto.String(text)}
 	if a.linkPreviews.Load() {
 		content = withLinkPreview(ctx, text)
 	}
+	if reply != nil {
+		// Replies need the extended form, which carries the quote.
+		if content.ExtendedTextMessage == nil {
+			content = &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String(text)}}
+		}
+		content.ExtendedTextMessage.ContextInfo = reply
+	}
 	return a.send(ctx, chat, content)
+}
+
+// replyContext quotes a stored message of the chat: its text, or its media
+// with the caption, and who sent it, as WhatsApp shows a reply.
+func (a *account) replyContext(ctx context.Context, chat, id string) (*waE2E.ContextInfo, error) {
+	var sender, text string
+	var fromMe bool
+	var mediaBlob []byte
+	err := a.db.QueryRowContext(ctx, `SELECT sender_jid, from_me, text, media FROM wassup_messages
+		WHERE chat_jid = ? AND id = ?`, chat, id).Scan(&sender, &fromMe, &text, &mediaBlob)
+	if err != nil {
+		return nil, fmt.Errorf("message to reply to: %w", err)
+	}
+	if fromMe && a.client.Store.ID != nil {
+		sender = a.client.Store.ID.ToNonAD().String()
+	}
+	quoted := &waE2E.Message{Conversation: proto.String(text)}
+	if mediaBlob != nil {
+		quoted = &waE2E.Message{}
+		if err := proto.Unmarshal(mediaBlob, quoted); err != nil {
+			return nil, err
+		}
+	}
+	return &waE2E.ContextInfo{StanzaID: proto.String(id), Participant: proto.String(sender), QuotedMessage: quoted}, nil
 }
 
 // send delivers content to a chat and stores it like a received message.
