@@ -120,10 +120,12 @@ shell, sun). The background is transparent, so it works over any color.
 Strokes are 1.5 px with round caps. This is a decorative pattern, not a UI icon, so the 2 px rule does not apply.
 
 The doodles are drawn for Wassup and do not copy WhatsApp's wallpaper.
-Both tiles are bundled into the UI binary with the icons. The `.chat-bg`
-rule in `ui/src/window.rs` picks one with a `prefers-color-scheme` media
-query, and in light mode tints the backdrop slightly so white received
-bubbles stand out. The pattern stays fixed while messages scroll.
+Both tiles are bundled into the UI binary with the icons. CSS media
+queries do not follow libadwaita's color scheme, so `ui/src/window.rs`
+switches between the `.chat-bg-light` and `.chat-bg-dark` classes from
+`adw::StyleManager::is_dark()`. In light mode the backdrop is tinted
+slightly so white received bubbles stand out. The pattern stays fixed
+while messages scroll.
 
 Change the opacity on the root `<g>` of each file to make it more or less
 visible.

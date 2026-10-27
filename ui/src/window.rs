@@ -42,16 +42,11 @@ const CSS: &str = "
 /* After .mine, which has the same weight: own stickers have no bubble either. */
 .bubble.sticker { background: none; padding: 0; }
 .composer { border-radius: 10px; background: var(--card-bg-color); }
-/* The doodles stay put while messages scroll over them. */
-.chat-bg { background: var(--view-bg-color) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-light.svg\") repeat; }
-.chat-bg listview { background: none; }
-@media (prefers-color-scheme: light) {
-  /* White bubbles need a darker backdrop than the white view. */
-  .chat-bg { background-color: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color)); }
-}
-@media (prefers-color-scheme: dark) {
-  .chat-bg { background-image: url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-dark.svg\"); }
-}
+/* The doodles stay put while messages scroll over them. White bubbles
+   need a darker backdrop than the white view. */
+.chat-bg-light { background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color)) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-light.svg\") repeat; }
+.chat-bg-dark { background: var(--view-bg-color) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-dark.svg\") repeat; }
+.chat-bg-light listview, .chat-bg-dark listview { background: none; }
 ";
 
 /// Widgets of each bound message row, by message id, so receipts and
@@ -325,7 +320,6 @@ impl Window {
         let message_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vexpand(true)
-            .css_classes(["chat-bg"])
             .child(&message_list)
             .build();
         let content_stack = gtk::Stack::new();
@@ -584,6 +578,23 @@ impl Window {
                 }
             }
         ));
+        // CSS media queries do not follow libadwaita's color scheme, so the
+        // background tile is switched from here.
+        let style = adw::StyleManager::default();
+        let set_background = glib::clone!(
+            #[weak(rename_to = scroll)]
+            ui.message_scroll,
+            move |style: &adw::StyleManager| {
+                let dark = style.is_dark();
+                scroll.set_css_classes(&[if dark {
+                    "chat-bg-dark"
+                } else {
+                    "chat-bg-light"
+                }]);
+            }
+        );
+        set_background(&style);
+        style.connect_dark_notify(set_background);
         let adj = ui.message_scroll.vadjustment();
         // Rows get their real height only once drawn, so the bottom keeps moving.
         adj.connect_changed(glib::clone!(
