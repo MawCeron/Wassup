@@ -70,7 +70,8 @@ const CSS: &str = "
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
 /* After .mine, which has the same weight: own stickers have no bubble either. */
 .bubble.sticker { background: none; padding: 0; }
-.composer { border-radius: 10px; background: var(--card-bg-color); outline: 0 solid transparent; outline-offset: -2px; }
+.composer { padding: 8px 10px; border-radius: 10px; background: var(--card-bg-color); outline: 0 solid transparent; outline-offset: -2px; }
+.composer textview { background: none; }
 /* The focus ring libadwaita draws on entries. */
 .composer:focus-within { outline: 2px solid color-mix(in srgb, var(--accent-color) 50%, transparent); }
 /* Clipped by the widget's overflow, so opaque stickers get round corners too. */
@@ -424,11 +425,6 @@ impl Window {
         let composer = gtk::TextView::builder()
             .wrap_mode(gtk::WrapMode::WordChar)
             .accepts_tab(false)
-            .top_margin(8)
-            .bottom_margin(8)
-            .left_margin(10)
-            .right_margin(10)
-            .css_classes(["composer"])
             .build();
         composer.update_property(&[gtk::accessible::Property::Label(&gettext("Message"))]);
         // Grows with the text up to a few lines, then scrolls. No scrollbar:
@@ -438,7 +434,7 @@ impl Window {
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vscrollbar_policy(gtk::PolicyType::External)
             .propagate_natural_height(true)
-            .max_content_height(140)
+            .max_content_height(124)
             .hexpand(true)
             .child(&composer)
             .build();
@@ -458,6 +454,22 @@ impl Window {
                 }
             }
         ));
+        // The field's padding sits outside the scrolled text, so a long text
+        // scrolls under it instead of reaching the border.
+        let composer_box = gtk::Box::builder()
+            .css_classes(["composer"])
+            .hexpand(true)
+            .build();
+        composer_box.append(&composer_scroll);
+        let focus_composer = gtk::GestureClick::new();
+        focus_composer.connect_pressed(glib::clone!(
+            #[weak]
+            composer,
+            move |_, _, _, _| {
+                composer.grab_focus();
+            }
+        ));
+        composer_box.add_controller(focus_composer);
         let send_button = gtk::Button::builder()
             .icon_name("wassup-send-symbolic")
             .tooltip_text(gettext("Send"))
@@ -582,7 +594,7 @@ impl Window {
         composer_bar.append(&attach);
         composer_bar.append(&emoji_button);
         composer_bar.append(&stickers_button);
-        composer_bar.append(&composer_scroll);
+        composer_bar.append(&composer_box);
         composer_bar.append(&send_button);
         // As in WhatsApp, the microphone takes the send button's place while
         // there is nothing to send.
