@@ -73,6 +73,8 @@ All of them live in `data/icons/hicolor/symbolic/actions/`.
 | `wassup-document-symbolic` | Attach a document (page with a folded corner) | 16×16 |
 | `wassup-contact-symbolic` | Share a contact (head and shoulders) | 16×16 |
 | `wassup-poll-symbolic` | Create a poll (three vertical bars) | 16×16 |
+| `wassup-attach-symbolic` | Attach a file (paperclip, tilted 35°) | 16×16 |
+| `wassup-lock-symbolic` | Restricted chats and end-to-end encryption (padlock) | 16×16 |
 | `wassup-voice-note-symbolic` | Voice notes (microphone) | 16×16 |
 
 Rules for any new interface icon, from the GNOME guidelines for UI icons:
