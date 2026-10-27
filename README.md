@@ -7,23 +7,27 @@
 An **unofficial** WhatsApp client for Linux (GNOME), with a native protocol
 implementation and low RAM usage.
 
-> Early development: there are no packages yet, and it is built from source.
+> Early development. Packages for Fedora are on the way; until then it is
+> built from source.
 
 **Warning:** since this is an unofficial client, Meta could restrict accounts that use it. Try it with a secondary number first.
 
 ## What it does
 
-- Links your account by QR code, as another device of your phone.
-- Sends and receives text, photos, documents, stickers, audio and voice
-  notes, with replies that show what they quote.
-- Shows delivery and read marks, unread counts, and profile and group pictures.
-- Creates stickers from images, and offers your favorite stickers from the phone.
-- Notifies through the desktop, opens the chat when you click one, and can
-  hide the message text.
-- Keeps receiving messages with the window closed.
+- Links your account by QR code, as another device of your phone, and
+  brings in your recent history; older messages load as you scroll up.
+- Sends and receives text, photos, videos, documents, stickers and voice
+  notes, with replies, reactions and link previews.
+- Shows delivery and read marks, unread counts, and profile and group
+  pictures; keeps disappearing messages and locked chats as the phone does.
+- Searches chats, and messages inside a chat.
+- Notifies through the desktop even with the window closed, can hide the
+  message text, and shows the unread count as a status icon.
+- Follows the GNOME guidelines, works with the keyboard and screen readers,
+  and is translated (Spanish so far).
 
-It does not store the history WhatsApp sends when linking, and supports
-one account.
+It supports one account. What comes next is in
+[`docs/roadmap.md`](docs/roadmap.md).
 
 ## How it works
 
@@ -45,12 +49,16 @@ order of magnitude. Method, caveats and every figure are in
 
 ## Building
 
-Packages for Fedora and the daemon and UI commands are in
-[`docs/development.md`](docs/development.md).
+Building the daemon and the UI for development is in
+[`docs/development.md`](docs/development.md); building the RPM, in
+[`docs/packaging.md`](docs/packaging.md).
 
 ## Documentation
 
+- What is done and what comes next: [`docs/roadmap.md`](docs/roadmap.md).
 - Development setup, configuration and how media works: [`docs/development.md`](docs/development.md).
+- Building the RPM: [`docs/packaging.md`](docs/packaging.md).
+- Translating: [`docs/translating.md`](docs/translating.md).
 - IPC between the daemon and the UI: [`docs/ipc.md`](docs/ipc.md).
 - Memory measurements: [`docs/performance.md`](docs/performance.md).
 - Icons and look: [`docs/visual-identity.md`](docs/visual-identity.md).
