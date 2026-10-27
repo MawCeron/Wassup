@@ -1,8 +1,8 @@
 //! Draws every emoji with Twemoji when it is installed.
 //!
 //! Cairo keeps the color glyphs of Noto Color Emoji in a cache that grows
-//! to hundreds of megabytes and is never freed, while Twemoji's layered
-//! glyphs cost almost nothing. Pango picks the emoji font by itself, so
+//! to hundreds of megabytes and is never freed, while Fedora's Twemoji, a
+//! bitmap font, costs almost nothing. Pango picks the emoji font by itself, so
 //! the only way to switch it for the chat and the emoji picker alike is to
 //! take both Noto emoji fonts out of the process's fontconfig, since without
 //! the color one Pango falls back to the monochrome one. See
