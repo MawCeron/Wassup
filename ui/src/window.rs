@@ -175,6 +175,8 @@ pub struct Window {
     message_scroll: gtk::ScrolledWindow,
     loading: Cell<bool>,
     has_more: Cell<bool>,
+    /// Older messages were asked of the phone for the open chat.
+    asked_older: Cell<bool>,
     /// Keep the newest message in view while the list grows, until the user scrolls up.
     stick_bottom: Cell<bool>,
     /// A scroll to the newest message is queued for after layout.
@@ -718,6 +720,7 @@ impl Window {
             message_scroll,
             loading: Cell::new(false),
             has_more: Cell::new(false),
+            asked_older: Cell::new(false),
             stick_bottom: Cell::new(false),
             pin_pending: Cell::new(false),
             composer,
@@ -912,12 +915,17 @@ impl Window {
             #[weak]
             ui,
             move |_, edge| {
-                if edge == gtk::PositionType::Top && ui.has_more.get() && !ui.loading.get() {
+                if edge != gtk::PositionType::Top || ui.loading.get() {
+                    return;
+                }
+                if ui.has_more.get() {
                     let first = ui.messages.item(0).and_downcast::<glib::BoxedAnyObject>();
                     if let Some(first) = first {
                         let id = first.borrow::<ipc::Message>().id.clone();
                         ui.load_messages(id);
                     }
+                } else {
+                    ui.ask_older();
                 }
             }
         ));
@@ -1285,6 +1293,7 @@ impl Window {
             Some(event::Kind::MessagesExpired(gone)) => self.remove_expired(gone),
             Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
             Some(event::Kind::ReactionsChanged(changed)) => self.reactions_changed(changed),
+            Some(event::Kind::HistoryAdded(added)) => self.history_added(added),
             Some(event::Kind::Settings(settings)) => {
                 if *self.chat_background.borrow() != settings.chat_background {
                     self.chat_background
@@ -1879,6 +1888,7 @@ impl Window {
     }
 
     fn open_chat(&self, chat: &ipc::Chat) {
+        self.asked_older.set(false);
         self.close_viewer();
         self.stop_recording(false);
         self.cancel_reply();
@@ -2062,6 +2072,53 @@ impl Window {
             limit: PAGE_SIZE,
             ..Default::default()
         }));
+    }
+
+    /// Asks the phone for messages older than the oldest stored, once until
+    /// they come or a while passes: the phone may be offline.
+    fn ask_older(self: &Rc<Self>) {
+        if self.asked_older.replace(true) {
+            return;
+        }
+        let Some((account_id, chat_jid)) = self.open_ids() else {
+            return;
+        };
+        self.send(request::Kind::LoadOlder(ipc::LoadOlder {
+            account_id,
+            chat_jid,
+        }));
+        glib::timeout_add_local_once(
+            std::time::Duration::from_secs(15),
+            glib::clone!(
+                #[weak(rename_to = ui)]
+                self,
+                move || ui.asked_older.set(false)
+            ),
+        );
+    }
+
+    /// Chats got messages from the phone's history: the list may have new
+    /// chats, and the open one older pages.
+    fn history_added(&self, added: ipc::HistoryAdded) {
+        if !self.is_current(&added.account_id) {
+            return;
+        }
+        self.send(request::Kind::ListChats(ipc::ListChats {
+            account_id: added.account_id.clone(),
+        }));
+        let open = self.current_chat.borrow().clone();
+        if open.is_some_and(|jid| added.chat_jids.contains(&jid)) {
+            self.has_more.set(true);
+            self.asked_older.set(false);
+            let first = self.messages.item(0).and_downcast::<glib::BoxedAnyObject>();
+            match first {
+                Some(first) => {
+                    let id = first.borrow::<ipc::Message>().id.clone();
+                    self.load_messages(id);
+                }
+                None => self.load_messages(String::new()),
+            }
+        }
     }
 
     fn mark_read(&self) {

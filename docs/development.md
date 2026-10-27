@@ -187,6 +187,17 @@ Audio and voice notes download when their play button is pressed, and
 play through GTK's media support, which uses GStreamer. One plays at a
 time, and the player only exists while it does.
 
+## History
+
+When a device is linked, the phone sends the last three months of every
+chat (`historyDays` in `daemon/history.go`), which the daemon stores
+without notifying or counting them as unread; the phone's own unread
+counts are kept instead. Older messages come on demand: when the user
+scrolls past the oldest stored message, the UI asks the daemon, which asks
+the phone for the 50 before it. The phone must be online. A device linked
+before this existed did not keep its first history; scrolling up loads it
+chat by chat, and linking again brings it all at once.
+
 ## Voice notes
 
 The UI records with `gst-launch-1.0` (package `gstreamer1`) in its own
