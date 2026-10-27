@@ -8,12 +8,7 @@ Version:        0.1.0
 Release:        1%{?dist}
 Summary:        Unofficial WhatsApp client for GNOME
 
-# Wassup is GPL-3.0-or-later. Bundled Go modules: GPL-3.0-only (libsignal),
-# MPL-2.0 (whatsmeow), BSD-3-Clause, BSD-2-Clause, MIT, Apache-2.0, ISC,
-# and SQLite's blessing. Bundled Rust crates: MIT, Apache-2.0,
-# (MIT OR Apache-2.0), (Unlicense OR MIT) and Unicode-3.0. The emoji font
-# is CC-BY-4.0: the Twemoji graphics of Twitter and the Twemoji contributors.
-License:        GPL-3.0-or-later AND GPL-3.0-only AND MPL-2.0 AND BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND ISC AND blessing AND (MIT OR Apache-2.0) AND (Unlicense OR MIT) AND Unicode-3.0 AND CC-BY-4.0
+License:        GPL-3.0-or-later
 URL:            https://github.com/MawCeron/Wassup
 Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.xz
