@@ -212,6 +212,7 @@ type Request struct {
 	//	*Request_SearchMessages
 	//	*Request_React
 	//	*Request_LoadOlder
+	//	*Request_SetFavoriteSticker
 	Kind          isRequest_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -432,6 +433,15 @@ func (x *Request) GetLoadOlder() *LoadOlder {
 	return nil
 }
 
+func (x *Request) GetSetFavoriteSticker() *SetFavoriteSticker {
+	if x != nil {
+		if x, ok := x.Kind.(*Request_SetFavoriteSticker); ok {
+			return x.SetFavoriteSticker
+		}
+	}
+	return nil
+}
+
 type isRequest_Kind interface {
 	isRequest_Kind()
 }
@@ -512,6 +522,10 @@ type Request_LoadOlder struct {
 	LoadOlder *LoadOlder `protobuf:"bytes,20,opt,name=load_older,json=loadOlder,proto3,oneof"`
 }
 
+type Request_SetFavoriteSticker struct {
+	SetFavoriteSticker *SetFavoriteSticker `protobuf:"bytes,21,opt,name=set_favorite_sticker,json=setFavoriteSticker,proto3,oneof"`
+}
+
 func (*Request_ListAccounts) isRequest_Kind() {}
 
 func (*Request_ListChats) isRequest_Kind() {}
@@ -549,6 +563,8 @@ func (*Request_SearchMessages) isRequest_Kind() {}
 func (*Request_React) isRequest_Kind() {}
 
 func (*Request_LoadOlder) isRequest_Kind() {}
+
+func (*Request_SetFavoriteSticker) isRequest_Kind() {}
 
 // Daemon -> UI. Either the reply to a Request or a pushed update.
 type Event struct {
@@ -2512,6 +2528,8 @@ type Media struct {
 	// Small preview image of a video, cached from the message itself, so it
 	// shows before the video is downloaded. Empty when the sender sent none.
 	ThumbnailPath string `protobuf:"bytes,9,opt,name=thumbnail_path,json=thumbnailPath,proto3" json:"thumbnail_path,omitempty"`
+	// A sticker that is one of the account's favorites.
+	Favorite      bool `protobuf:"varint,10,opt,name=favorite,proto3" json:"favorite,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2607,6 +2625,13 @@ func (x *Media) GetThumbnailPath() string {
 		return x.ThumbnailPath
 	}
 	return ""
+}
+
+func (x *Media) GetFavorite() bool {
+	if x != nil {
+		return x.Favorite
+	}
+	return false
 }
 
 // Sends a local file chosen by the user: JPEG and PNG as a photo, MP4 as a
@@ -2952,6 +2977,76 @@ func (x *SendSticker) GetFavoriteId() string {
 	return ""
 }
 
+// Adds the sticker of a message to the account's favorites, or removes it,
+// on the phone too. Answered with ack, or error.
+type SetFavoriteSticker struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ChatJid       string                 `protobuf:"bytes,2,opt,name=chat_jid,json=chatJid,proto3" json:"chat_jid,omitempty"`
+	MessageId     string                 `protobuf:"bytes,3,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	Favorite      bool                   `protobuf:"varint,4,opt,name=favorite,proto3" json:"favorite,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetFavoriteSticker) Reset() {
+	*x = SetFavoriteSticker{}
+	mi := &file_ipc_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetFavoriteSticker) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetFavoriteSticker) ProtoMessage() {}
+
+func (x *SetFavoriteSticker) ProtoReflect() protoreflect.Message {
+	mi := &file_ipc_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetFavoriteSticker.ProtoReflect.Descriptor instead.
+func (*SetFavoriteSticker) Descriptor() ([]byte, []int) {
+	return file_ipc_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *SetFavoriteSticker) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SetFavoriteSticker) GetChatJid() string {
+	if x != nil {
+		return x.ChatJid
+	}
+	return ""
+}
+
+func (x *SetFavoriteSticker) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *SetFavoriteSticker) GetFavorite() bool {
+	if x != nil {
+		return x.Favorite
+	}
+	return false
+}
+
 // Checks the secret code set on the phone for locked chats. Answered with
 // ack if it matches, error otherwise. The code is verified against the
 // phone's salted hash; neither leaves the daemon.
@@ -2965,7 +3060,7 @@ type UnlockChats struct {
 
 func (x *UnlockChats) Reset() {
 	*x = UnlockChats{}
-	mi := &file_ipc_proto_msgTypes[33]
+	mi := &file_ipc_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2977,7 +3072,7 @@ func (x *UnlockChats) String() string {
 func (*UnlockChats) ProtoMessage() {}
 
 func (x *UnlockChats) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[33]
+	mi := &file_ipc_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2990,7 +3085,7 @@ func (x *UnlockChats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnlockChats.ProtoReflect.Descriptor instead.
 func (*UnlockChats) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{33}
+	return file_ipc_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *UnlockChats) GetAccountId() string {
@@ -3017,7 +3112,7 @@ type Quit struct {
 
 func (x *Quit) Reset() {
 	*x = Quit{}
-	mi := &file_ipc_proto_msgTypes[34]
+	mi := &file_ipc_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3029,7 +3124,7 @@ func (x *Quit) String() string {
 func (*Quit) ProtoMessage() {}
 
 func (x *Quit) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[34]
+	mi := &file_ipc_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3042,7 +3137,7 @@ func (x *Quit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Quit.ProtoReflect.Descriptor instead.
 func (*Quit) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{34}
+	return file_ipc_proto_rawDescGZIP(), []int{35}
 }
 
 // The user's preferences, stored in config.json. Answered with settings.
@@ -3054,7 +3149,7 @@ type GetSettings struct {
 
 func (x *GetSettings) Reset() {
 	*x = GetSettings{}
-	mi := &file_ipc_proto_msgTypes[35]
+	mi := &file_ipc_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3066,7 +3161,7 @@ func (x *GetSettings) String() string {
 func (*GetSettings) ProtoMessage() {}
 
 func (x *GetSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[35]
+	mi := &file_ipc_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3079,7 +3174,7 @@ func (x *GetSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettings.ProtoReflect.Descriptor instead.
 func (*GetSettings) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{35}
+	return file_ipc_proto_rawDescGZIP(), []int{36}
 }
 
 // Saves and applies preferences. Answered with settings, or error if a
@@ -3093,7 +3188,7 @@ type SetSettings struct {
 
 func (x *SetSettings) Reset() {
 	*x = SetSettings{}
-	mi := &file_ipc_proto_msgTypes[36]
+	mi := &file_ipc_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3105,7 +3200,7 @@ func (x *SetSettings) String() string {
 func (*SetSettings) ProtoMessage() {}
 
 func (x *SetSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[36]
+	mi := &file_ipc_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3118,7 +3213,7 @@ func (x *SetSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSettings.ProtoReflect.Descriptor instead.
 func (*SetSettings) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{36}
+	return file_ipc_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SetSettings) GetSettings() *Settings {
@@ -3152,7 +3247,7 @@ type Settings struct {
 
 func (x *Settings) Reset() {
 	*x = Settings{}
-	mi := &file_ipc_proto_msgTypes[37]
+	mi := &file_ipc_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3164,7 +3259,7 @@ func (x *Settings) String() string {
 func (*Settings) ProtoMessage() {}
 
 func (x *Settings) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[37]
+	mi := &file_ipc_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3177,7 +3272,7 @@ func (x *Settings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Settings.ProtoReflect.Descriptor instead.
 func (*Settings) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{37}
+	return file_ipc_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *Settings) GetHideNotificationContent() bool {
@@ -3241,7 +3336,7 @@ type FetchAvatar struct {
 
 func (x *FetchAvatar) Reset() {
 	*x = FetchAvatar{}
-	mi := &file_ipc_proto_msgTypes[38]
+	mi := &file_ipc_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3253,7 +3348,7 @@ func (x *FetchAvatar) String() string {
 func (*FetchAvatar) ProtoMessage() {}
 
 func (x *FetchAvatar) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[38]
+	mi := &file_ipc_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3266,7 +3361,7 @@ func (x *FetchAvatar) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAvatar.ProtoReflect.Descriptor instead.
 func (*FetchAvatar) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{38}
+	return file_ipc_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *FetchAvatar) GetAccountId() string {
@@ -3296,7 +3391,7 @@ type DownloadMedia struct {
 
 func (x *DownloadMedia) Reset() {
 	*x = DownloadMedia{}
-	mi := &file_ipc_proto_msgTypes[39]
+	mi := &file_ipc_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3308,7 +3403,7 @@ func (x *DownloadMedia) String() string {
 func (*DownloadMedia) ProtoMessage() {}
 
 func (x *DownloadMedia) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[39]
+	mi := &file_ipc_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3321,7 +3416,7 @@ func (x *DownloadMedia) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadMedia.ProtoReflect.Descriptor instead.
 func (*DownloadMedia) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{39}
+	return file_ipc_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *DownloadMedia) GetAccountId() string {
@@ -3359,7 +3454,7 @@ type MediaReady struct {
 
 func (x *MediaReady) Reset() {
 	*x = MediaReady{}
-	mi := &file_ipc_proto_msgTypes[40]
+	mi := &file_ipc_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3371,7 +3466,7 @@ func (x *MediaReady) String() string {
 func (*MediaReady) ProtoMessage() {}
 
 func (x *MediaReady) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[40]
+	mi := &file_ipc_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3384,7 +3479,7 @@ func (x *MediaReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaReady.ProtoReflect.Descriptor instead.
 func (*MediaReady) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{40}
+	return file_ipc_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *MediaReady) GetAccountId() string {
@@ -3435,7 +3530,7 @@ type MessagesExpired struct {
 
 func (x *MessagesExpired) Reset() {
 	*x = MessagesExpired{}
-	mi := &file_ipc_proto_msgTypes[41]
+	mi := &file_ipc_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3447,7 +3542,7 @@ func (x *MessagesExpired) String() string {
 func (*MessagesExpired) ProtoMessage() {}
 
 func (x *MessagesExpired) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[41]
+	mi := &file_ipc_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3460,7 +3555,7 @@ func (x *MessagesExpired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessagesExpired.ProtoReflect.Descriptor instead.
 func (*MessagesExpired) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{41}
+	return file_ipc_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *MessagesExpired) GetAccountId() string {
@@ -3497,7 +3592,7 @@ type MessageStatusChanged struct {
 
 func (x *MessageStatusChanged) Reset() {
 	*x = MessageStatusChanged{}
-	mi := &file_ipc_proto_msgTypes[42]
+	mi := &file_ipc_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3509,7 +3604,7 @@ func (x *MessageStatusChanged) String() string {
 func (*MessageStatusChanged) ProtoMessage() {}
 
 func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_ipc_proto_msgTypes[42]
+	mi := &file_ipc_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3522,7 +3617,7 @@ func (x *MessageStatusChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageStatusChanged.ProtoReflect.Descriptor instead.
 func (*MessageStatusChanged) Descriptor() ([]byte, []int) {
-	return file_ipc_proto_rawDescGZIP(), []int{42}
+	return file_ipc_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *MessageStatusChanged) GetAccountId() string {
@@ -3557,7 +3652,8 @@ var File_ipc_proto protoreflect.FileDescriptor
 
 const file_ipc_proto_rawDesc = "" +
 	"\n" +
-	"\tipc.proto\x12\rwassup.ipc.v1\"\xc6\t\n" +
+	"\tipc.proto\x12\rwassup.ipc.v1\"\x9d\n" +
+	"\n" +
 	"\aRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12B\n" +
 	"\rlist_accounts\x18\x02 \x01(\v2\x1b.wassup.ipc.v1.ListAccountsH\x00R\flistAccounts\x129\n" +
@@ -3582,7 +3678,8 @@ const file_ipc_proto_rawDesc = "" +
 	"\x0fsearch_messages\x18\x12 \x01(\v2\x1d.wassup.ipc.v1.SearchMessagesH\x00R\x0esearchMessages\x12,\n" +
 	"\x05react\x18\x13 \x01(\v2\x14.wassup.ipc.v1.ReactH\x00R\x05react\x129\n" +
 	"\n" +
-	"load_older\x18\x14 \x01(\v2\x18.wassup.ipc.v1.LoadOlderH\x00R\tloadOlderB\x06\n" +
+	"load_older\x18\x14 \x01(\v2\x18.wassup.ipc.v1.LoadOlderH\x00R\tloadOlder\x12U\n" +
+	"\x14set_favorite_sticker\x18\x15 \x01(\v2!.wassup.ipc.v1.SetFavoriteStickerH\x00R\x12setFavoriteStickerB\x06\n" +
 	"\x04kind\"\xc8\b\n" +
 	"\x05Event\x12\x1d\n" +
 	"\n" +
@@ -3743,7 +3840,7 @@ const file_ipc_proto_rawDesc = "" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12\x17\n" +
 	"\afrom_me\x18\x05 \x01(\bR\x06fromMe\x12%\n" +
 	"\x0ethumbnail_path\x18\x06 \x01(\tR\rthumbnailPath\x12\x1c\n" +
-	"\tthumbnail\x18\a \x01(\fR\tthumbnail\"\x99\x02\n" +
+	"\tthumbnail\x18\a \x01(\fR\tthumbnail\"\xb5\x02\n" +
 	"\x05Media\x12,\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x18.wassup.ipc.v1.MediaKindR\x04kind\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
@@ -3754,7 +3851,9 @@ const file_ipc_proto_rawDesc = "" +
 	"\x10duration_seconds\x18\a \x01(\rR\x0fdurationSeconds\x12\x1d\n" +
 	"\n" +
 	"voice_note\x18\b \x01(\bR\tvoiceNote\x12%\n" +
-	"\x0ethumbnail_path\x18\t \x01(\tR\rthumbnailPath\"\xd2\x01\n" +
+	"\x0ethumbnail_path\x18\t \x01(\tR\rthumbnailPath\x12\x1a\n" +
+	"\bfavorite\x18\n" +
+	" \x01(\bR\bfavorite\"\xd2\x01\n" +
 	"\tSendMedia\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
@@ -3786,7 +3885,14 @@ const file_ipc_proto_rawDesc = "" +
 	"\x0fsource_chat_jid\x18\x03 \x01(\tR\rsourceChatJid\x12*\n" +
 	"\x11source_message_id\x18\x04 \x01(\tR\x0fsourceMessageId\x12\x1f\n" +
 	"\vfavorite_id\x18\x05 \x01(\tR\n" +
-	"favoriteId\"M\n" +
+	"favoriteId\"\x89\x01\n" +
+	"\x12SetFavoriteSticker\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\bchat_jid\x18\x02 \x01(\tR\achatJid\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x03 \x01(\tR\tmessageId\x12\x1a\n" +
+	"\bfavorite\x18\x04 \x01(\bR\bfavorite\"M\n" +
 	"\vUnlockChats\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1f\n" +
@@ -3868,7 +3974,7 @@ func file_ipc_proto_rawDescGZIP() []byte {
 }
 
 var file_ipc_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
+var file_ipc_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_ipc_proto_goTypes = []any{
 	(ConnectionState)(0),         // 0: wassup.ipc.v1.ConnectionState
 	(MediaKind)(0),               // 1: wassup.ipc.v1.MediaKind
@@ -3906,16 +4012,17 @@ var file_ipc_proto_goTypes = []any{
 	(*StickerList)(nil),          // 33: wassup.ipc.v1.StickerList
 	(*Sticker)(nil),              // 34: wassup.ipc.v1.Sticker
 	(*SendSticker)(nil),          // 35: wassup.ipc.v1.SendSticker
-	(*UnlockChats)(nil),          // 36: wassup.ipc.v1.UnlockChats
-	(*Quit)(nil),                 // 37: wassup.ipc.v1.Quit
-	(*GetSettings)(nil),          // 38: wassup.ipc.v1.GetSettings
-	(*SetSettings)(nil),          // 39: wassup.ipc.v1.SetSettings
-	(*Settings)(nil),             // 40: wassup.ipc.v1.Settings
-	(*FetchAvatar)(nil),          // 41: wassup.ipc.v1.FetchAvatar
-	(*DownloadMedia)(nil),        // 42: wassup.ipc.v1.DownloadMedia
-	(*MediaReady)(nil),           // 43: wassup.ipc.v1.MediaReady
-	(*MessagesExpired)(nil),      // 44: wassup.ipc.v1.MessagesExpired
-	(*MessageStatusChanged)(nil), // 45: wassup.ipc.v1.MessageStatusChanged
+	(*SetFavoriteSticker)(nil),   // 36: wassup.ipc.v1.SetFavoriteSticker
+	(*UnlockChats)(nil),          // 37: wassup.ipc.v1.UnlockChats
+	(*Quit)(nil),                 // 38: wassup.ipc.v1.Quit
+	(*GetSettings)(nil),          // 39: wassup.ipc.v1.GetSettings
+	(*SetSettings)(nil),          // 40: wassup.ipc.v1.SetSettings
+	(*Settings)(nil),             // 41: wassup.ipc.v1.Settings
+	(*FetchAvatar)(nil),          // 42: wassup.ipc.v1.FetchAvatar
+	(*DownloadMedia)(nil),        // 43: wassup.ipc.v1.DownloadMedia
+	(*MediaReady)(nil),           // 44: wassup.ipc.v1.MediaReady
+	(*MessagesExpired)(nil),      // 45: wassup.ipc.v1.MessagesExpired
+	(*MessageStatusChanged)(nil), // 46: wassup.ipc.v1.MessageStatusChanged
 }
 var file_ipc_proto_depIdxs = []int32{
 	5,  // 0: wassup.ipc.v1.Request.list_accounts:type_name -> wassup.ipc.v1.ListAccounts
@@ -3925,55 +4032,56 @@ var file_ipc_proto_depIdxs = []int32{
 	10, // 4: wassup.ipc.v1.Request.link_account:type_name -> wassup.ipc.v1.LinkAccount
 	13, // 5: wassup.ipc.v1.Request.mark_read:type_name -> wassup.ipc.v1.MarkRead
 	14, // 6: wassup.ipc.v1.Request.set_active_chat:type_name -> wassup.ipc.v1.SetActiveChat
-	42, // 7: wassup.ipc.v1.Request.download_media:type_name -> wassup.ipc.v1.DownloadMedia
+	43, // 7: wassup.ipc.v1.Request.download_media:type_name -> wassup.ipc.v1.DownloadMedia
 	31, // 8: wassup.ipc.v1.Request.send_media:type_name -> wassup.ipc.v1.SendMedia
-	41, // 9: wassup.ipc.v1.Request.fetch_avatar:type_name -> wassup.ipc.v1.FetchAvatar
+	42, // 9: wassup.ipc.v1.Request.fetch_avatar:type_name -> wassup.ipc.v1.FetchAvatar
 	32, // 10: wassup.ipc.v1.Request.list_stickers:type_name -> wassup.ipc.v1.ListStickers
 	35, // 11: wassup.ipc.v1.Request.send_sticker:type_name -> wassup.ipc.v1.SendSticker
-	36, // 12: wassup.ipc.v1.Request.unlock_chats:type_name -> wassup.ipc.v1.UnlockChats
-	38, // 13: wassup.ipc.v1.Request.get_settings:type_name -> wassup.ipc.v1.GetSettings
-	39, // 14: wassup.ipc.v1.Request.set_settings:type_name -> wassup.ipc.v1.SetSettings
-	37, // 15: wassup.ipc.v1.Request.quit:type_name -> wassup.ipc.v1.Quit
+	37, // 12: wassup.ipc.v1.Request.unlock_chats:type_name -> wassup.ipc.v1.UnlockChats
+	39, // 13: wassup.ipc.v1.Request.get_settings:type_name -> wassup.ipc.v1.GetSettings
+	40, // 14: wassup.ipc.v1.Request.set_settings:type_name -> wassup.ipc.v1.SetSettings
+	38, // 15: wassup.ipc.v1.Request.quit:type_name -> wassup.ipc.v1.Quit
 	8,  // 16: wassup.ipc.v1.Request.search_messages:type_name -> wassup.ipc.v1.SearchMessages
 	26, // 17: wassup.ipc.v1.Request.react:type_name -> wassup.ipc.v1.React
 	24, // 18: wassup.ipc.v1.Request.load_older:type_name -> wassup.ipc.v1.LoadOlder
-	16, // 19: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
-	17, // 20: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
-	18, // 21: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
-	19, // 22: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
-	20, // 23: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
-	21, // 24: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
-	22, // 25: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
-	11, // 26: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
-	12, // 27: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
-	45, // 28: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
-	15, // 29: wassup.ipc.v1.Event.ack:type_name -> wassup.ipc.v1.Ack
-	43, // 30: wassup.ipc.v1.Event.media_ready:type_name -> wassup.ipc.v1.MediaReady
-	33, // 31: wassup.ipc.v1.Event.stickers:type_name -> wassup.ipc.v1.StickerList
-	44, // 32: wassup.ipc.v1.Event.messages_expired:type_name -> wassup.ipc.v1.MessagesExpired
-	40, // 33: wassup.ipc.v1.Event.settings:type_name -> wassup.ipc.v1.Settings
-	27, // 34: wassup.ipc.v1.Event.reactions_changed:type_name -> wassup.ipc.v1.ReactionsChanged
-	25, // 35: wassup.ipc.v1.Event.history_added:type_name -> wassup.ipc.v1.HistoryAdded
-	20, // 36: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
-	21, // 37: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
-	22, // 38: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
-	0,  // 39: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
-	2,  // 40: wassup.ipc.v1.Chat.last_status:type_name -> wassup.ipc.v1.MessageStatus
-	2,  // 41: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
-	30, // 42: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
-	29, // 43: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
-	28, // 44: wassup.ipc.v1.Message.link:type_name -> wassup.ipc.v1.LinkPreview
-	23, // 45: wassup.ipc.v1.Message.reactions:type_name -> wassup.ipc.v1.Reaction
-	23, // 46: wassup.ipc.v1.ReactionsChanged.reactions:type_name -> wassup.ipc.v1.Reaction
-	1,  // 47: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
-	34, // 48: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
-	40, // 49: wassup.ipc.v1.SetSettings.settings:type_name -> wassup.ipc.v1.Settings
-	2,  // 50: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
-	51, // [51:51] is the sub-list for method output_type
-	51, // [51:51] is the sub-list for method input_type
-	51, // [51:51] is the sub-list for extension type_name
-	51, // [51:51] is the sub-list for extension extendee
-	0,  // [0:51] is the sub-list for field type_name
+	36, // 19: wassup.ipc.v1.Request.set_favorite_sticker:type_name -> wassup.ipc.v1.SetFavoriteSticker
+	16, // 20: wassup.ipc.v1.Event.error:type_name -> wassup.ipc.v1.Error
+	17, // 21: wassup.ipc.v1.Event.accounts:type_name -> wassup.ipc.v1.AccountList
+	18, // 22: wassup.ipc.v1.Event.chats:type_name -> wassup.ipc.v1.ChatList
+	19, // 23: wassup.ipc.v1.Event.messages:type_name -> wassup.ipc.v1.MessageList
+	20, // 24: wassup.ipc.v1.Event.account_changed:type_name -> wassup.ipc.v1.Account
+	21, // 25: wassup.ipc.v1.Event.chat_changed:type_name -> wassup.ipc.v1.Chat
+	22, // 26: wassup.ipc.v1.Event.message_received:type_name -> wassup.ipc.v1.Message
+	11, // 27: wassup.ipc.v1.Event.qr_code:type_name -> wassup.ipc.v1.QrCode
+	12, // 28: wassup.ipc.v1.Event.link_failed:type_name -> wassup.ipc.v1.LinkFailed
+	46, // 29: wassup.ipc.v1.Event.message_status_changed:type_name -> wassup.ipc.v1.MessageStatusChanged
+	15, // 30: wassup.ipc.v1.Event.ack:type_name -> wassup.ipc.v1.Ack
+	44, // 31: wassup.ipc.v1.Event.media_ready:type_name -> wassup.ipc.v1.MediaReady
+	33, // 32: wassup.ipc.v1.Event.stickers:type_name -> wassup.ipc.v1.StickerList
+	45, // 33: wassup.ipc.v1.Event.messages_expired:type_name -> wassup.ipc.v1.MessagesExpired
+	41, // 34: wassup.ipc.v1.Event.settings:type_name -> wassup.ipc.v1.Settings
+	27, // 35: wassup.ipc.v1.Event.reactions_changed:type_name -> wassup.ipc.v1.ReactionsChanged
+	25, // 36: wassup.ipc.v1.Event.history_added:type_name -> wassup.ipc.v1.HistoryAdded
+	20, // 37: wassup.ipc.v1.AccountList.accounts:type_name -> wassup.ipc.v1.Account
+	21, // 38: wassup.ipc.v1.ChatList.chats:type_name -> wassup.ipc.v1.Chat
+	22, // 39: wassup.ipc.v1.MessageList.messages:type_name -> wassup.ipc.v1.Message
+	0,  // 40: wassup.ipc.v1.Account.state:type_name -> wassup.ipc.v1.ConnectionState
+	2,  // 41: wassup.ipc.v1.Chat.last_status:type_name -> wassup.ipc.v1.MessageStatus
+	2,  // 42: wassup.ipc.v1.Message.status:type_name -> wassup.ipc.v1.MessageStatus
+	30, // 43: wassup.ipc.v1.Message.media:type_name -> wassup.ipc.v1.Media
+	29, // 44: wassup.ipc.v1.Message.quote:type_name -> wassup.ipc.v1.Quote
+	28, // 45: wassup.ipc.v1.Message.link:type_name -> wassup.ipc.v1.LinkPreview
+	23, // 46: wassup.ipc.v1.Message.reactions:type_name -> wassup.ipc.v1.Reaction
+	23, // 47: wassup.ipc.v1.ReactionsChanged.reactions:type_name -> wassup.ipc.v1.Reaction
+	1,  // 48: wassup.ipc.v1.Media.kind:type_name -> wassup.ipc.v1.MediaKind
+	34, // 49: wassup.ipc.v1.StickerList.stickers:type_name -> wassup.ipc.v1.Sticker
+	41, // 50: wassup.ipc.v1.SetSettings.settings:type_name -> wassup.ipc.v1.Settings
+	2,  // 51: wassup.ipc.v1.MessageStatusChanged.status:type_name -> wassup.ipc.v1.MessageStatus
+	52, // [52:52] is the sub-list for method output_type
+	52, // [52:52] is the sub-list for method input_type
+	52, // [52:52] is the sub-list for extension type_name
+	52, // [52:52] is the sub-list for extension extendee
+	0,  // [0:52] is the sub-list for field type_name
 }
 
 func init() { file_ipc_proto_init() }
@@ -4001,6 +4109,7 @@ func file_ipc_proto_init() {
 		(*Request_SearchMessages)(nil),
 		(*Request_React)(nil),
 		(*Request_LoadOlder)(nil),
+		(*Request_SetFavoriteSticker)(nil),
 	}
 	file_ipc_proto_msgTypes[1].OneofWrappers = []any{
 		(*Event_Error)(nil),
@@ -4027,7 +4136,7 @@ func file_ipc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipc_proto_rawDesc), len(file_ipc_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   43,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

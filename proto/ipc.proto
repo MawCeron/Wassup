@@ -30,6 +30,7 @@ message Request {
     SearchMessages search_messages = 18;
     React react = 19;
     LoadOlder load_older = 20;
+    SetFavoriteSticker set_favorite_sticker = 21;
   }
 }
 
@@ -303,6 +304,8 @@ message Media {
   // Small preview image of a video, cached from the message itself, so it
   // shows before the video is downloaded. Empty when the sender sent none.
   string thumbnail_path = 9;
+  // A sticker that is one of the account's favorites.
+  bool favorite = 10;
 }
 
 // Sends a local file chosen by the user: JPEG and PNG as a photo, MP4 as a
@@ -355,6 +358,15 @@ message SendSticker {
   string source_message_id = 4;
   // Sends a favorite instead of a sticker from a message.
   string favorite_id = 5;
+}
+
+// Adds the sticker of a message to the account's favorites, or removes it,
+// on the phone too. Answered with ack, or error.
+message SetFavoriteSticker {
+  string account_id = 1;
+  string chat_jid = 2;
+  string message_id = 3;
+  bool favorite = 4;
 }
 
 // Checks the secret code set on the phone for locked chats. Answered with

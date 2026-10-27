@@ -72,21 +72,82 @@ func (a *account) sendSticker(ctx context.Context, chat, sourceChat, sourceID, f
 		}
 		return a.send(ctx, chat, &waE2E.Message{StickerMessage: sticker})
 	}
+	stored, err := a.stickerMessage(ctx, sourceChat, sourceID)
+	if err != nil {
+		return nil, nil, err
+	}
+	sticker := proto.Clone(stored).(*waE2E.StickerMessage)
+	sticker.ContextInfo = nil // Not a reply or forward of the original.
+	return a.send(ctx, chat, &waE2E.Message{StickerMessage: sticker})
+}
+
+// stickerMessage is the sticker of a stored message.
+func (a *account) stickerMessage(ctx context.Context, chat, id string) (*waE2E.StickerMessage, error) {
 	var blob []byte
 	err := a.db.QueryRowContext(ctx, `SELECT media FROM wassup_messages WHERE chat_jid = ? AND id = ?`,
-		sourceChat, sourceID).Scan(&blob)
+		chat, id).Scan(&blob)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, errors.New("unknown sticker")
+		return nil, errors.New("unknown sticker")
 	} else if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var m waE2E.Message
 	if err := proto.Unmarshal(blob, &m); err != nil || m.GetStickerMessage() == nil {
-		return nil, nil, errors.New("not a sticker")
+		return nil, errors.New("not a sticker")
 	}
-	sticker := proto.Clone(m.GetStickerMessage()).(*waE2E.StickerMessage)
-	sticker.ContextInfo = nil // Not a reply or forward of the original.
-	return a.send(ctx, chat, &waE2E.Message{StickerMessage: sticker})
+	return m.GetStickerMessage(), nil
+}
+
+// favoriteStickerVersion is the version of the favoriteSticker app state
+// action. It is a guess: it has not been read from a mutation of the phone.
+const favoriteStickerVersion = 2
+
+// favoriteAction describes a sticker as the phone does in its favorites: the
+// id is the base64 of the file's hash, and the action carries what is needed
+// to download the file again.
+func favoriteAction(s *waE2E.StickerMessage, favorite bool) (string, *waSyncAction.StickerAction, error) {
+	if len(s.GetFileSHA256()) != sha256.Size {
+		return "", nil, errors.New("the sticker has no file hash")
+	}
+	return base64.StdEncoding.EncodeToString(s.GetFileSHA256()), &waSyncAction.StickerAction{
+		URL: s.URL, FileEncSHA256: s.FileEncSHA256, MediaKey: s.MediaKey, Mimetype: s.Mimetype,
+		Height: s.Height, Width: s.Width, DirectPath: s.DirectPath, FileLength: s.FileLength,
+		IsFavorite: proto.Bool(favorite), IsLottie: proto.Bool(false), DeviceIDHint: proto.Uint32(0),
+	}, nil
+}
+
+// setFavorite adds the sticker of a stored message to the favorites, or
+// removes it, on the phone too.
+func (a *account) setFavorite(ctx context.Context, chat, messageID string, favorite bool) error {
+	sticker, err := a.stickerMessage(ctx, chat, messageID)
+	if err != nil {
+		return err
+	}
+	id, action, err := favoriteAction(sticker, favorite)
+	if err != nil {
+		return err
+	}
+	value := &waSyncAction.SyncActionValue{Timestamp: proto.Int64(time.Now().UnixMilli()), StickerAction: action}
+	err = a.client.SendAppState(ctx, appstate.PatchInfo{
+		Type: appstate.WAPatchRegularLow,
+		Mutations: []appstate.MutationInfo{{
+			Index: []string{appstate.IndexFavoriteSticker, id}, Version: favoriteStickerVersion, Value: value,
+		}},
+	})
+	if err != nil {
+		return err
+	}
+	// The server does not send our own change back.
+	a.onFavorite(ctx, id, value)
+	return nil
+}
+
+// isFavorite says whether a sticker's file is one of the favorites.
+func (a *account) isFavorite(ctx context.Context, fileHash []byte) bool {
+	var one int
+	err := a.db.QueryRowContext(ctx, `SELECT 1 FROM wassup_favorite_stickers WHERE id = ?`,
+		base64.StdEncoding.EncodeToString(fileHash)).Scan(&one)
+	return err == nil
 }
 
 // onAppState keeps favorite stickers and chat locks in step with the

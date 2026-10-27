@@ -119,6 +119,7 @@ func (a *account) ipcMedia(blob []byte) *ipc.Media {
 	case m.GetStickerMessage() != nil:
 		s := m.GetStickerMessage()
 		media.Kind, media.Width, media.Height, media.Size = ipc.MediaKind_MEDIA_KIND_STICKER, s.GetWidth(), s.GetHeight(), s.GetFileLength()
+		media.Favorite = a.isFavorite(context.Background(), s.GetFileSHA256())
 	case m.GetDocumentMessage() != nil:
 		d := m.GetDocumentMessage()
 		media.Kind, media.FileName, media.Size = ipc.MediaKind_MEDIA_KIND_DOCUMENT, d.GetFileName(), d.GetFileLength()
