@@ -1,0 +1,10 @@
+[Unit]
+Description=Wassup daemon socket, to start it when the UI connects
+Documentation=https://github.com/MawCeron/Wassup
+
+[Socket]
+ListenStream=%t/wassup.sock
+SocketMode=0600
+
+[Install]
+WantedBy=sockets.target

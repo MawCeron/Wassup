@@ -148,16 +148,20 @@ Wayland, bind it to a key in Settings → Keyboard → Custom Shortcuts.
 
 `packaging/wassupd.service` is a systemd user unit that starts the daemon
 at login and restarts it if it fails. Without network at login, the
-daemon keeps retrying in the background. For development, install it
-against a local build:
+daemon keeps retrying in the background. `packaging/wassupd.socket`
+listens on its socket, so that opening Wassup starts the daemon again
+after the user quit with Ctrl+Q: quitting exits cleanly, which systemd
+does not restart. For development, install both against a local build:
 
 ```sh
 go -C daemon build -o ~/.local/bin/wassupd .
 mkdir -p ~/.config/systemd/user
 sed "s|/usr/bin/wassupd|$HOME/.local/bin/wassupd|" packaging/wassupd.service \
   > ~/.config/systemd/user/wassupd.service
+cp packaging/wassupd.socket ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now wassupd
+systemctl --user enable wassupd.socket wassupd
+systemctl --user stop wassupd && systemctl --user start wassupd.socket wassupd
 journalctl --user -u wassupd -f   # logs
 ```
 
@@ -198,7 +202,8 @@ is unlinked and linked again.
 | Tab | Conversation | Reach photos, documents and audio controls, which open with Enter or Space |
 | Ctrl+, | Anywhere | Preferences |
 | Ctrl+? | Anywhere | Keyboard shortcuts |
-| Ctrl+W / Ctrl+Q | Anywhere | Close the window / quit the UI; the daemon keeps running |
+| Ctrl+W | Anywhere | Close the window; the daemon keeps notifying |
+| Ctrl+Q | Anywhere | Quit, stopping the daemon and notifications until Wassup is opened again |
 
 Every control has a name for screen readers, and a chat row reads its
 unread count. Messages that arrive in the open chat are announced. To

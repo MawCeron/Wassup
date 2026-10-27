@@ -605,14 +605,19 @@ impl Window {
             move |_, _| ui.show_about()
         ));
         ui.window.add_action(&about);
-        // GtkWindow already has window.close; Ctrl+Q quits the UI only,
-        // the daemon keeps notifying.
+        // GtkWindow already has window.close, which leaves the daemon
+        // notifying. Quit stops it too, until Wassup is opened again.
         app.set_accels_for_action("window.close", &["<Control>w"]);
         let quit = gio::SimpleAction::new("quit", None);
         quit.connect_activate(glib::clone!(
             #[weak]
             app,
-            move |_, _| app.quit()
+            #[weak]
+            ui,
+            move |_, _| {
+                ui.send(request::Kind::Quit(ipc::Quit {}));
+                app.quit();
+            }
         ));
         app.add_action(&quit);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
@@ -1295,7 +1300,7 @@ impl Window {
                 (gettext("Preferences"), "<Control>comma"),
                 (gettext("Keyboard shortcuts"), "<Control>question"),
                 (gettext("Close the window"), "<Control>w"),
-                (gettext("Quit"), "<Control>q"),
+                (gettext("Quit and stop notifications"), "<Control>q"),
             ],
         ));
         dialog.present(Some(&self.window));

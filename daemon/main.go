@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -103,7 +104,11 @@ func run() error {
 		}
 	}
 	slog.Info("started", "socket", ln.Addr(), "data", data, "cache", cache, "accounts", len(accounts))
+	d.stop = func() { ln.Close() }
 	d.serve(ln)
+	// A clean exit, so systemd does not restart it; the socket unit
+	// starts it again when the UI next connects.
+	slog.Info("quit")
 	return nil
 }
 
@@ -137,6 +142,13 @@ func socketPath() (string, error) {
 }
 
 func listen() (net.Listener, error) {
+	// Started by wassupd.socket: systemd already listens and hands the
+	// socket over as file descriptor 3.
+	if os.Getenv("LISTEN_PID") == strconv.Itoa(os.Getpid()) && os.Getenv("LISTEN_FDS") == "1" {
+		f := os.NewFile(3, "wassup.sock")
+		defer f.Close()
+		return net.FileListener(f)
+	}
 	path, err := socketPath()
 	if err != nil {
 		return nil, err
@@ -170,6 +182,8 @@ type daemon struct {
 	conns map[net.Conn]struct{}
 	// Chat each UI is showing, as "account/chat", so it is not notified.
 	active map[net.Conn]string
+	// Stops serve; set by run.
+	stop func()
 	// Preferences, saved to configDir/config.json when changed.
 	configMu  sync.Mutex
 	configDir string
@@ -281,6 +295,10 @@ func (d *daemon) handle(conn net.Conn) {
 		d.mu.Unlock()
 		if err != nil {
 			slog.Warn("write event", "err", err)
+			return
+		}
+		if _, quit := req.Kind.(*ipc.Request_Quit); quit && d.stop != nil {
+			d.stop() // After the ack, so the UI knows it was heard.
 			return
 		}
 	}
@@ -434,6 +452,8 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 			}
 		}()
 		return nil
+	case *ipc.Request_Quit:
+		ev.Kind = &ipc.Event_Ack{Ack: &ipc.Ack{}}
 	case *ipc.Request_GetSettings:
 		ev.Kind = &ipc.Event_Settings{Settings: d.settings()}
 	case *ipc.Request_SetSettings:

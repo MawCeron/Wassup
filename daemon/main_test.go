@@ -52,6 +52,38 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+func TestQuit(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	ln, err := listen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := newDaemon(nil, nil)
+	d.stop = func() { ln.Close() }
+	done := make(chan struct{})
+	go func() { d.serve(ln); close(done) }()
+
+	path, _ := socketPath()
+	conn, err := net.Dial("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	req := &ipc.Request{Id: 3, Kind: &ipc.Request_Quit{Quit: &ipc.Quit{}}}
+	if _, err := protodelim.MarshalTo(conn, req); err != nil {
+		t.Fatal(err)
+	}
+	var ev ipc.Event
+	if err := protodelim.UnmarshalFrom(bufio.NewReader(conn), &ev); err != nil || ev.GetAck() == nil {
+		t.Fatalf("quit answered %v, %v", &ev, err)
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve still running after quit")
+	}
+}
+
 func TestXDGDir(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

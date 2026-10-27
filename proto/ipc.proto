@@ -26,6 +26,7 @@ message Request {
     UnlockChats unlock_chats = 14;
     GetSettings get_settings = 15;
     SetSettings set_settings = 16;
+    Quit quit = 17;
   }
 }
 
@@ -268,6 +269,10 @@ message UnlockChats {
   string account_id = 1;
   string secret_code = 2;
 }
+
+// Stops the daemon, and with it notifications, until the UI starts it
+// again through socket activation. Answered with ack.
+message Quit {}
 
 // The user's preferences, stored in config.json. Answered with settings.
 message GetSettings {}
