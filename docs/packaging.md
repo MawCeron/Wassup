@@ -65,3 +65,22 @@ module and Rust crate, as Fedora asks of vendored code. When dependencies
 change, list them again: for Rust, the `license` field of each crate in
 `cargo metadata`; for Go, the license file of each module that
 `go mod vendor` brings in.
+
+## Releases
+
+Every push and pull request runs `.github/workflows/ci.yml` on Fedora:
+formatting, vet, lints and tests for both halves, and the translations and
+desktop metadata.
+
+To publish a version:
+
+1. Set it in `ui/Cargo.toml`, in `Version:` and a new `%changelog` entry in
+   `packaging/wassup.spec`, and in a new `<release>` in
+   `data/io.github.MawCeron.Wassup.metainfo.xml`. Commit.
+2. Tag the commit and push the tag: `git tag v0.2.0 && git push origin v0.2.0`.
+
+`.github/workflows/release.yml` checks that the tag matches both versions,
+builds the RPM as above in a Fedora container, and creates a GitHub
+release with the RPM, the source RPM and both source tarballs. Running it
+by hand from the Actions tab builds everything without publishing, and
+keeps the RPMs as an artifact of the run.
