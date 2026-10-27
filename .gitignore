@@ -3,3 +3,5 @@ target/
 
 # Go build output
 /daemon/daemon
+reports/
+research_notes/
