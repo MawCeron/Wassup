@@ -5,7 +5,7 @@
 Fedora 44 packages:
 
 ```sh
-sudo dnf install golang rust cargo rustfmt clippy protobuf-compiler gtk4-devel libadwaita-devel libwebp-devel
+sudo dnf install golang rust cargo rustfmt clippy protobuf-compiler gtk4-devel libadwaita-devel libwebp-devel fontconfig-devel twitter-twemoji-fonts
 ```
 
 Versions in use: Go 1.26, Rust 1.99, protoc 3.19, GTK 4.22, libadwaita 1.9.
@@ -256,6 +256,46 @@ is capped at 5 seconds, 512 KB of page and a 5 MB image of at most 8
 megapixels, shrunk to a 200 px JPEG. Texts go out in the order they were
 written even while a preview is fetched. If anything fails the text goes
 without a preview. Preferences can turn this off.
+
+## Emoji
+
+The composer's emoji button opens GTK's own `GtkEmojiChooser`. Two things
+keep its memory in check; the measurements are in
+[`performance.md`](performance.md#emoji-picker).
+
+- **Created on first use.** `GtkEmojiChooser` builds a widget for every
+  emoji when it is created, so the button creates it the first time it is
+  pressed (`set_create_popup_func` in `ui/src/window.rs`), not with the
+  composer.
+- **Twemoji instead of Noto Color Emoji.** Drawing the emoji of Noto Color
+  Emoji fills a cache in cairo that reaches hundreds of megabytes and is
+  never freed, whether the emoji are in the picker or in a message.
+  `ui/src/emoji_font.rs` takes both Noto emoji fonts out of the UI's
+  fontconfig when Twemoji (`twitter-twemoji-fonts`) is installed, so Pango
+  draws every emoji with it; the monochrome Noto Emoji has to go too, or
+  Pango falls back to it. Without Twemoji nothing changes and the emoji
+  use Noto Color Emoji. It runs at the start of `main`, before GTK uses
+  fonts, and only changes the UI process, not the rest of the system.
+
+Pango picks the font for emoji characters itself, so a `font-family` in
+CSS does not change it.
+
+To try Twemoji without installing it, put its `.ttf` in a directory and
+point `FONTCONFIG_FILE` at a configuration that adds it:
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <dir>/path/to/directory/with/Twemoji</dir>
+</fontconfig>
+```
+
+The Fedora package is Twemoji 14.0.2, which lacks the emoji added to
+Unicode after version 14; the picker leaves those out. The
+[jdecked/twemoji](https://github.com/jdecked/twemoji) fork publishes the
+artwork up to Emoji 17 as images, not as a font file.
 
 ## Status icon
 
