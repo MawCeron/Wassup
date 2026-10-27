@@ -41,6 +41,8 @@ const CSS: &str = "
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
 .media-button { padding: 0; }
+.video-badge { border-radius: 999px; padding: 10px; }
+.video-length { border-radius: 6px; padding: 1px 6px; }
 .viewer { background: rgba(0, 0, 0, 0.92); }
 .viewer-text { color: white; }
 .viewer-caption { background: rgba(0, 0, 0, 0.5); border-radius: 8px; padding: 6px 10px; }
@@ -1642,8 +1644,8 @@ impl Window {
     /// downloading it first if needed.
     fn open_media(&self, msg: &ipc::Message) {
         let Some(media) = &msg.media else { return };
-        if media.kind() == ipc::MediaKind::Image {
-            return self.show_photo(msg);
+        if matches!(media.kind(), ipc::MediaKind::Image | ipc::MediaKind::Video) {
+            return self.show_in_viewer(msg);
         }
         if media.path.is_empty() {
             self.open_when_ready.borrow_mut().insert(msg.id.clone());
@@ -1808,9 +1810,9 @@ impl Window {
             media.path = ready.path.clone();
             if matches!(
                 media.kind(),
-                ipc::MediaKind::Document | ipc::MediaKind::Audio
+                ipc::MediaKind::Document | ipc::MediaKind::Audio | ipc::MediaKind::Video
             ) {
-                break; // Nothing to draw.
+                break; // Nothing to draw: a video's row keeps its thumbnail.
             }
             let size = media_size(media);
             let picture = self

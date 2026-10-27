@@ -7,6 +7,9 @@ use gettextrs::gettext;
 pub(super) struct Viewer {
     pub(super) root: gtk::Overlay,
     picture: gtk::Picture,
+    /// Plays videos, with GTK's own play/pause, progress and time.
+    video: gtk::Video,
+    stack: gtk::Stack,
     spinner: adw::Spinner,
     title: gtk::Label,
     caption: gtk::Label,
@@ -25,6 +28,14 @@ impl Viewer {
             .vexpand(true)
             .build();
         picture.update_property(&[gtk::accessible::Property::Label(&gettext("Photo"))]);
+        let video = gtk::Video::builder()
+            .autoplay(true)
+            .hexpand(true)
+            .vexpand(true)
+            .build();
+        let stack = gtk::Stack::new();
+        stack.add_named(&picture, Some("photo"));
+        stack.add_named(&video, Some("video"));
         let spinner = adw::Spinner::builder()
             .width_request(48)
             .height_request(48)
@@ -80,7 +91,7 @@ impl Viewer {
             .css_classes(["viewer-text", "viewer-caption"])
             .build();
         let root = gtk::Overlay::builder()
-            .child(&picture)
+            .child(&stack)
             .visible(false)
             .css_classes(["viewer"])
             .build();
@@ -97,6 +108,8 @@ impl Viewer {
         Self {
             root,
             picture,
+            video,
+            stack,
             spinner,
             title,
             caption,
@@ -147,9 +160,19 @@ impl Window {
         v.root.add_controller(keys);
     }
 
-    /// Opens the viewer on a photo of the open chat.
-    pub(super) fn show_photo(&self, msg: &ipc::Message) {
+    /// Opens the viewer on a photo or video of the open chat.
+    pub(super) fn show_in_viewer(&self, msg: &ipc::Message) {
         let v = &self.viewer;
+        let is_video = msg
+            .media
+            .as_ref()
+            .is_some_and(|m| m.kind() == ipc::MediaKind::Video);
+        v.video.set_media_stream(None::<&gtk::MediaStream>);
+        v.stack
+            .set_visible_child_name(if is_video { "video" } else { "photo" });
+        if is_video {
+            self.stop_audio(); // One player at a time.
+        }
         let first = !v.root.is_visible();
         v.msg.replace(Some(msg.id.clone()));
         v.title.set_label(&format!(
@@ -174,6 +197,7 @@ impl Window {
         v.spinner.set_visible(true);
         match msg.media.as_ref().map(|m| m.path.as_str()) {
             Some("") => self.request_media(msg), // photo_ready shows it.
+            Some(path) if is_video => self.play_video(path),
             Some(path) => self.load_photo(&msg.id, path),
             None => {}
         }
@@ -207,12 +231,23 @@ impl Window {
         });
     }
 
+    fn play_video(&self, path: &str) {
+        self.viewer.spinner.set_visible(false);
+        self.viewer.video.set_file(Some(&gio::File::for_path(path)));
+    }
+
     /// Called when a download ends, in case the viewer waits for it.
     pub(super) fn photo_ready(&self, ready: &ipc::MediaReady) {
         if self.viewer.msg.borrow().as_deref() != Some(ready.message_id.as_str()) {
             return;
         }
-        if ready.error.is_empty() {
+        let is_video = self
+            .message(&ready.message_id)
+            .and_then(|m| m.media)
+            .is_some_and(|m| m.kind() == ipc::MediaKind::Video);
+        if ready.error.is_empty() && is_video {
+            self.play_video(&ready.path);
+        } else if ready.error.is_empty() {
             self.load_photo(&ready.message_id, &ready.path);
         } else {
             self.close_viewer();
@@ -230,7 +265,7 @@ impl Window {
             return;
         };
         if let Some(msg) = self.message(id) {
-            self.show_photo(&msg);
+            self.show_in_viewer(&msg);
         }
     }
 
@@ -242,6 +277,7 @@ impl Window {
         v.root.set_visible(false);
         v.msg.replace(None);
         v.picture.set_paintable(None::<&gdk::Paintable>); // Frees the large texture.
+        v.video.set_media_stream(None::<&gtk::MediaStream>); // And the video pipeline.
         self.page.set_can_focus(true);
         self.page.set_can_target(true);
         self.composer.grab_focus();
@@ -253,10 +289,9 @@ impl Window {
             .filter_map(|i| self.messages.item(i).and_downcast::<glib::BoxedAnyObject>())
             .filter_map(|item| {
                 let msg = item.borrow::<ipc::Message>();
-                let photo = msg
-                    .media
-                    .as_ref()
-                    .is_some_and(|m| m.kind() == ipc::MediaKind::Image);
+                let photo = msg.media.as_ref().is_some_and(|m| {
+                    matches!(m.kind(), ipc::MediaKind::Image | ipc::MediaKind::Video)
+                });
                 photo.then(|| msg.id.clone())
             })
             .collect()

@@ -105,9 +105,27 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .content_fit(gtk::ContentFit::Contain)
             .css_classes(["media"])
             .build();
+        // Videos show their thumbnail with a play badge and their length.
+        let play_badge = gtk::Image::builder()
+            .icon_name("media-playback-start-symbolic")
+            .pixel_size(24)
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::Center)
+            .css_classes(["osd", "video-badge"])
+            .build();
+        let video_length = gtk::Label::builder()
+            .halign(gtk::Align::End)
+            .valign(gtk::Align::End)
+            .margin_end(6)
+            .margin_bottom(6)
+            .css_classes(["osd", "caption", "numeric", "video-length"])
+            .build();
+        let media_overlay = gtk::Overlay::builder().child(&picture).build();
+        media_overlay.add_overlay(&play_badge);
+        media_overlay.add_overlay(&video_length);
         // Buttons, so photos and documents also open from the keyboard.
         let media_button = gtk::Button::builder()
-            .child(&picture)
+            .child(&media_overlay)
             .halign(gtk::Align::Start)
             .css_classes(["flat", "media-button"])
             .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
@@ -288,7 +306,17 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .and_downcast::<gtk::Label>()
             .unwrap();
         let media_button = quote.next_sibling().and_downcast::<gtk::Button>().unwrap();
-        let picture = media_button.child().and_downcast::<gtk::Picture>().unwrap();
+        let picture = media_button
+            .child()
+            .and_downcast::<gtk::Overlay>()
+            .and_then(|o| o.child())
+            .and_downcast::<gtk::Picture>()
+            .unwrap();
+        let play_badge = picture.next_sibling().unwrap();
+        let video_length = play_badge
+            .next_sibling()
+            .and_downcast::<gtk::Label>()
+            .unwrap();
         let document = media_button.next_sibling().unwrap();
         let doc_labels = document.first_child().and_then(|b| b.last_child()).unwrap();
         let doc_name = doc_labels
@@ -339,11 +367,14 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let is_document = kind == Some(ipc::MediaKind::Document);
         let is_audio = kind == Some(ipc::MediaKind::Audio);
         let is_picture = matches!(kind, Some(ipc::MediaKind::Image | ipc::MediaKind::Sticker));
-        media_button.set_visible(is_picture);
-        let media_label = if kind == Some(ipc::MediaKind::Sticker) {
-            gettext("Sticker")
-        } else {
-            gettext("Photo")
+        let is_video = kind == Some(ipc::MediaKind::Video);
+        media_button.set_visible(is_picture || is_video);
+        play_badge.set_visible(is_video);
+        video_length.set_visible(is_video);
+        let media_label = match kind {
+            Some(ipc::MediaKind::Sticker) => gettext("Sticker"),
+            Some(ipc::MediaKind::Video) => gettext("Video"),
+            _ => gettext("Photo"),
         };
         media_button.update_property(&[gtk::accessible::Property::Label(&media_label)]);
         document.set_visible(is_document);
@@ -376,6 +407,22 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         } else {
             bubble.remove_css_class("sticker");
             picture.add_css_class("media");
+        }
+        if let Some(media) = msg.media.as_ref().filter(|_| is_video) {
+            // Only the thumbnail: the video downloads when played.
+            let (width, height) = media_size(media);
+            picture.set_size_request(width, height);
+            video_length.set_label(&clock(media.duration_seconds as f64));
+            if !media.thumbnail_path.is_empty() {
+                show_media(
+                    &picture,
+                    &media.thumbnail_path,
+                    width,
+                    height,
+                    &msg.id,
+                    &bound,
+                );
+            }
         }
         if let Some(media) = msg.media.as_ref().filter(|_| is_picture) {
             // Reserve the final size now so the row does not grow later.
