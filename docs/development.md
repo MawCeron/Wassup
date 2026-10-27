@@ -5,7 +5,7 @@
 Fedora 44 packages:
 
 ```sh
-sudo dnf install golang rust cargo rustfmt clippy protobuf-compiler gtk4-devel libadwaita-devel libwebp-devel fontconfig-devel twitter-twemoji-fonts
+sudo dnf install golang rust cargo rustfmt clippy protobuf-compiler gtk4-devel libadwaita-devel libwebp-devel fontconfig-devel
 ```
 
 Versions in use: Go 1.26, Rust 1.99, protoc 3.19, GTK 4.22, libadwaita 1.9.
@@ -267,17 +267,23 @@ keep its memory in check; the measurements are in
   emoji when it is created, so the button creates it the first time it is
   pressed (`set_create_popup_func` in `ui/src/window.rs`), not with the
   composer.
-- **Twemoji instead of Noto Color Emoji.** Drawing the emoji of Noto Color
-  Emoji fills a cache in cairo that reaches hundreds of megabytes and is
-  never freed, whether the emoji are in the picker or in a message.
-  `ui/src/emoji_font.rs` takes both Noto emoji fonts out of the UI's
-  fontconfig when Twemoji (`twitter-twemoji-fonts`) is installed, so Pango
-  draws every emoji with it; the monochrome Noto Emoji has to go too, or
-  Pango falls back to it. So does Symbola, a symbol font many systems
-  have: Pango draws the emoji GTK measures to size the others with it, and
-  the picker then drops the wide ones, such as flags. Without Twemoji nothing changes and the emoji
-  use Noto Color Emoji. It runs at the start of `main`, before GTK uses
-  fonts, and only changes the UI process, not the rest of the system.
+- **A bitmap emoji font instead of Noto Color Emoji.** Drawing the emoji of
+  Noto Color Emoji fills a cache in cairo that reaches hundreds of
+  megabytes and is never freed, whether the emoji are in the picker or in
+  a message. Wassup carries
+  [Twemoji CBDT](https://github.com/MawCeron/twemoji-cbdt), a bitmap font
+  built from the current Twemoji artwork, in `wassup/fonts/` under the
+  data directories (`/usr/share` once installed, `~/.local/share` to try
+  it or to replace it). `ui/src/emoji_font.rs` adds it to the UI's
+  fontconfig and takes the other emoji fonts out: both Noto ones, since
+  without the color one Pango falls back to the monochrome one, other
+  Twemoji fonts, so that Pango cannot pick them, and Symbola, a symbol font
+  many systems have, which Pango uses to draw the emoji GTK measures to
+  size the others, so the picker then drops the wide ones, such as flags.
+  The font is private to the UI process: nothing is installed in the
+  system's font directories, and the rest of the system is unchanged.
+  Without the file, nothing changes and the emoji use Noto Color Emoji. It
+  runs at the start of `main`, before GTK uses fonts.
 
 Pango picks the font for emoji characters itself, so a `font-family` in
 CSS does not change it.
@@ -290,25 +296,17 @@ the emoji, which makes them about twice the text size; the CSS in
 change that, so `set_emoji_columns` sets `max-children-per-line` on each
 section's flow box to `EMOJI_COLUMNS`, 10.
 
-To try Twemoji without installing it, put its `.ttf` in a directory and
-point `FONTCONFIG_FILE` at a configuration that adds it:
+To run a build from the repository with the font, download
+`TwemojiCBDT.ttf` from a [release of twemoji-cbdt](https://github.com/MawCeron/twemoji-cbdt/releases)
+and copy it into place:
 
-```xml
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig>
-  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
-  <dir>/path/to/directory/with/Twemoji</dir>
-</fontconfig>
+```sh
+mkdir -p ~/.local/share/wassup/fonts
+cp TwemojiCBDT.ttf ~/.local/share/wassup/fonts/
 ```
 
-The Fedora package is Twemoji 14.0.2, a bitmap font, which lacks the emoji
-added to Unicode after version 14; the picker leaves those out.
-[twemoji-cbdt](https://github.com/MawCeron/twemoji-cbdt) builds a bitmap
-font with the same family name from the current Twemoji artwork, which
-covers Emoji 17: with it the picker shows all 1910 emoji and the UI uses
-63 MB after the picker has been opened. Installing it replaces Fedora's
-package, since both are called `Twemoji`.
+The font covers Emoji 17: with it the picker shows all 1910 emoji and the UI
+uses 63 MB after the picker has been opened.
 
 A font built from the same artwork with
 [twemoji-colr](https://github.com/mozilla/twemoji-colr) is a COLR font
