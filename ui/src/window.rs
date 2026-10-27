@@ -13,6 +13,7 @@ use crate::ipc::{self, event, request};
 mod animation;
 mod audio;
 mod background;
+mod gif;
 mod preview;
 mod qr;
 mod reply;
@@ -2291,10 +2292,10 @@ impl Window {
                 break;
             };
             media.path = ready.path.clone();
-            if matches!(
-                media.kind(),
-                ipc::MediaKind::Document | ipc::MediaKind::Audio | ipc::MediaKind::Video
-            ) {
+            let (kind, gif) = (media.kind(), media.gif);
+            if matches!(kind, ipc::MediaKind::Document | ipc::MediaKind::Audio)
+                || (kind == ipc::MediaKind::Video && !gif)
+            {
                 break; // Nothing to draw: a video's row keeps its thumbnail.
             }
             let size = media_size(media);
@@ -2304,8 +2305,16 @@ impl Window {
                 .get(&msg.id)
                 .and_then(|r| r.picture.upgrade());
             if let Some(picture) = picture {
-                let (width, height) = size;
-                show_media(&picture, &ready.path, width, height, &msg.id, &self.rows);
+                let wanted = still_shows(&self.rows, &msg.id);
+                if kind == ipc::MediaKind::Video {
+                    gif::play(&picture, &ready.path, wanted);
+                } else {
+                    let (width, height) = size;
+                    show_media(&picture, &ready.path, width, height, &msg.id, &self.rows);
+                    if kind == ipc::MediaKind::Sticker {
+                        animation::play(&picture, &ready.path, wanted);
+                    }
+                }
             }
             break;
         }

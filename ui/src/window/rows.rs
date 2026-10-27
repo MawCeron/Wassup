@@ -664,7 +664,8 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let is_picture = matches!(kind, Some(ipc::MediaKind::Image | ipc::MediaKind::Sticker));
         let is_video = kind == Some(ipc::MediaKind::Video);
         media_button.set_visible(is_picture || is_video);
-        play_badge.set_visible(is_video);
+        let is_gif = msg.media.as_ref().is_some_and(|m| m.gif);
+        play_badge.set_visible(is_video && !is_gif);
         video_length.set_visible(is_video);
         let media_label = match kind {
             Some(ipc::MediaKind::Sticker) => gettext("Sticker"),
@@ -706,10 +707,15 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             picture.add_css_class("media");
         }
         if let Some(media) = msg.media.as_ref().filter(|_| is_video) {
-            // Only the thumbnail: the video downloads when played.
+            // Only the thumbnail: a video downloads when played, a GIF at once.
             let (width, height) = media_size(media);
             fit_picture(&picture, width, height, false);
-            video_length.set_label(&clock(media.duration_seconds as f64));
+            // A GIF says what it is instead of its length.
+            video_length.set_label(&if media.gif {
+                "GIF".to_owned()
+            } else {
+                clock(media.duration_seconds as f64)
+            });
             if !media.thumbnail_path.is_empty() {
                 show_media(
                     &picture,
@@ -719,6 +725,16 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
                     &msg.id,
                     &bound,
                 );
+            }
+            if media.gif {
+                // A GIF plays by itself, so it downloads without being asked.
+                if media.path.is_empty() {
+                    if let Some(ui) = owner.get().and_then(std::rc::Weak::upgrade) {
+                        ui.request_media(&msg);
+                    }
+                } else {
+                    gif::play(&picture, &media.path, still_shows(&bound, &msg.id));
+                }
             }
         }
         if let Some(media) = msg.media.as_ref().filter(|_| is_picture) {
@@ -732,15 +748,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             } else {
                 show_media(&picture, &media.path, width, height, &msg.id, &bound);
                 if sticker {
-                    // Until the row shows another message or goes away.
-                    let (rows, id) = (bound.clone(), msg.id.clone());
-                    animation::play(&picture, &media.path, move |picture| {
-                        rows.borrow()
-                            .get(&id)
-                            .and_then(|r| r.picture.upgrade())
-                            .as_ref()
-                            == Some(picture)
-                    });
+                    animation::play(&picture, &media.path, still_shows(&bound, &msg.id));
                 }
             }
         }
@@ -784,6 +792,19 @@ fn fit_picture(picture: &gtk::Picture, width: i32, height: i32, sticker: bool) {
             clamp.set_maximum_size(max);
             clamp.set_tightening_threshold(max);
         }
+    }
+}
+
+/// Whether a picture still shows the message `id`, for a playback that ends
+/// with its row.
+pub(super) fn still_shows(rows: &BoundRows, id: &str) -> impl Fn(&gtk::Picture) -> bool + 'static {
+    let (rows, id) = (rows.clone(), id.to_owned());
+    move |picture| {
+        rows.borrow()
+            .get(&id)
+            .and_then(|r| r.picture.upgrade())
+            .as_ref()
+            == Some(picture)
     }
 }
 
