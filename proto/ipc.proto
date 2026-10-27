@@ -31,6 +31,7 @@ message Request {
     React react = 19;
     LoadOlder load_older = 20;
     SetFavoriteSticker set_favorite_sticker = 21;
+    ListParticipants list_participants = 22;
   }
 }
 
@@ -56,6 +57,7 @@ message Event {
     Settings settings = 16;
     ReactionsChanged reactions_changed = 17;
     HistoryAdded history_added = 18;
+    ParticipantList participants = 19;
   }
 }
 
@@ -93,6 +95,9 @@ message SendText {
   string text = 3;
   // Message of the chat this one replies to, quoting it; empty for none.
   string reply_to_id = 4;
+  // Ids of the people the text mentions, each written in the text as "@"
+  // and the user part of its id.
+  repeated string mentioned_jids = 5;
 }
 
 // Starts QR linking for an unlinked account. Answered with account_changed
@@ -379,6 +384,24 @@ message SetFavoriteSticker {
   string chat_jid = 2;
   string message_id = 3;
   bool favorite = 4;
+}
+
+// Lists the members of a group, to pick who to mention. Answered with
+// participants, or error.
+message ListParticipants {
+  string account_id = 1;
+  string chat_jid = 2;
+}
+
+message ParticipantList {
+  string chat_jid = 1;
+  repeated Participant participants = 2;
+}
+
+message Participant {
+  // The id to mention: the one the group uses to address the person.
+  string jid = 1;
+  string name = 2;
 }
 
 // Checks the secret code set on the phone for locked chats. Answered with

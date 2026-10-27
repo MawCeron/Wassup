@@ -544,7 +544,7 @@ func (a *account) queryMessages(ctx context.Context, chatJID, query string, args
 }
 
 // sendText sends a text message and stores it like a received one.
-func (a *account) sendText(ctx context.Context, chat, text, replyTo string) (*ipc.Message, *ipc.Chat, error) {
+func (a *account) sendText(ctx context.Context, chat, text, replyTo string, mentioned []string) (*ipc.Message, *ipc.Chat, error) {
 	if text == "" {
 		return nil, nil, errors.New("empty message")
 	}
@@ -559,11 +559,16 @@ func (a *account) sendText(ctx context.Context, chat, text, replyTo string) (*ip
 	if a.linkPreviews.Load() {
 		content = withLinkPreview(ctx, text)
 	}
-	if reply != nil {
-		// Replies need the extended form, which carries the quote.
+	mentioned = mentionedIn(text, mentioned)
+	if reply != nil || len(mentioned) > 0 {
+		// Replies and mentions need the extended form, which carries their context.
 		if content.ExtendedTextMessage == nil {
 			content = &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String(text)}}
 		}
+		if reply == nil {
+			reply = &waE2E.ContextInfo{}
+		}
+		reply.MentionedJID = mentioned
 		content.ExtendedTextMessage.ContextInfo = reply
 	}
 	return a.send(ctx, chat, content)

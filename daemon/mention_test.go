@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/MawCeron/Wassup/daemon/ipc"
@@ -70,5 +71,32 @@ func TestMentionsUser(t *testing.T) {
 	}
 	if mentionsUser(mentioning("@s.whatsapp.net"), "") {
 		t.Error("an empty user matched")
+	}
+}
+
+func TestMentionedInKeepsOnlyWhatTheTextShows(t *testing.T) {
+	text := "hola @98765432109876 y @5215551111111"
+	got := mentionedIn(text, []string{"98765432109876@lid", "5215559999999@s.whatsapp.net", "not an id", "5215551111111:3@s.whatsapp.net"})
+	want := []string{"98765432109876@lid", "5215551111111@s.whatsapp.net"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("mentionedIn = %v, want %v", got, want)
+	}
+}
+
+func TestParticipantListSkipsTheUserAndSortsByName(t *testing.T) {
+	members := []types.GroupParticipant{
+		{JID: types.NewJID("111111", types.HiddenUserServer)},
+		{JID: types.NewJID("222222", types.HiddenUserServer)},
+		{JID: types.NewJID("333333", types.HiddenUserServer), PhoneNumber: types.NewJID("5215553333333", types.DefaultUserServer)},
+		{JID: types.NewJID("444444", types.HiddenUserServer)},
+	}
+	names := map[string]string{"111111": "zoe", "222222": "Ana"}
+	got := participantList(members, []string{"444444"}, func(j types.JID) string { return names[j.User] })
+	var order []string
+	for _, p := range got {
+		order = append(order, p.Name)
+	}
+	if want := []string{"5215553333333", "Ana", "zoe"}; len(order) != 3 || order[0] != want[0] || order[1] != want[1] || order[2] != want[2] {
+		t.Errorf("names = %v, want %v", order, want)
 	}
 }

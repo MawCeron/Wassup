@@ -454,7 +454,7 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		// without holding up the connection's other requests.
 		a.sends <- func() {
 			done := &ipc.Event{RequestId: req.GetId()}
-			msg, chat, err := a.sendText(context.Background(), r.GetChatJid(), r.GetText(), r.GetReplyToId())
+			msg, chat, err := a.sendText(context.Background(), r.GetChatJid(), r.GetText(), r.GetReplyToId(), r.GetMentionedJids())
 			if err != nil {
 				done.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
 			} else {
@@ -564,6 +564,15 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		} else {
 			ev.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}
 			d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+		}
+	case *ipc.Request_ListParticipants:
+		r := k.ListParticipants
+		if a := d.find(r.GetAccountId()); a == nil {
+			fail(errors.New("unknown account"))
+		} else if people, err := a.listParticipants(context.Background(), r.GetChatJid()); err != nil {
+			fail(err)
+		} else {
+			ev.Kind = &ipc.Event_Participants{Participants: &ipc.ParticipantList{ChatJid: r.GetChatJid(), Participants: people}}
 		}
 	case *ipc.Request_SetFavoriteSticker:
 		r := k.SetFavoriteSticker

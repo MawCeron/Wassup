@@ -2,7 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"time"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -111,4 +116,96 @@ func (a *account) mentionsMe(m *waE2E.Message) bool {
 		phone = store.ID.User
 	}
 	return mentionsUser(m, phone, store.LID.User)
+}
+
+// mentionedIn keeps the ids from a request that the text really mentions: an
+// id whose user part is not written as "@user" in the text would tag a
+// person the message does not show.
+func mentionedIn(text string, ids []string) []string {
+	var kept []string
+	for _, id := range ids {
+		jid, err := types.ParseJID(id)
+		if err != nil || jid.User == "" {
+			continue
+		}
+		for _, m := range mentionToken.FindAllStringSubmatch(text, -1) {
+			if m[2] == jid.User {
+				kept = append(kept, jid.ToNonAD().String())
+				break
+			}
+		}
+	}
+	return kept
+}
+
+// participantList names the members of a group, without the user, in
+// alphabetical order. name gives the best known name of a member, or "".
+func participantList(members []types.GroupParticipant, self []string, name func(types.JID) string) []*ipc.Participant {
+	var people []*ipc.Participant
+	for _, m := range members {
+		jid := m.JID.ToNonAD()
+		if jid.User == "" || slicesContain(self, jid.User) {
+			continue
+		}
+		shown := name(jid)
+		if shown == "" {
+			shown = m.DisplayName
+		}
+		if shown == "" {
+			shown = m.PhoneNumber.User
+		}
+		if shown == "" {
+			shown = jid.User
+		}
+		people = append(people, &ipc.Participant{Jid: jid.String(), Name: shown})
+	}
+	sort.Slice(people, func(i, j int) bool {
+		return strings.ToLower(people[i].Name) < strings.ToLower(people[j].Name)
+	})
+	return people
+}
+
+func slicesContain(list []string, s string) bool {
+	for _, x := range list {
+		if x != "" && x == s {
+			return true
+		}
+	}
+	return false
+}
+
+// participantsTTL is how long the members of a group are remembered, so that
+// typing "@" does not ask the server every time.
+const participantsTTL = 10 * time.Minute
+
+type cachedParticipants struct {
+	at     time.Time
+	people []*ipc.Participant
+}
+
+var participantsCache sync.Map // "account/chat" -> cachedParticipants
+
+// listParticipants lists the members of a group to mention.
+func (a *account) listParticipants(ctx context.Context, chat string) ([]*ipc.Participant, error) {
+	key := chatKey(a.id, chat)
+	if c, ok := participantsCache.Load(key); ok && time.Since(c.(cachedParticipants).at) < participantsTTL {
+		return c.(cachedParticipants).people, nil
+	}
+	jid, err := types.ParseJID(chat)
+	if err != nil || jid.Server != types.GroupServer {
+		return nil, errors.New("not a group")
+	}
+	info, err := a.client.GetGroupInfo(ctx, jid)
+	if err != nil {
+		return nil, err
+	}
+	store := a.client.Store
+	var self []string
+	if store.ID != nil {
+		self = append(self, store.ID.User)
+	}
+	self = append(self, store.LID.User)
+	people := participantList(info.Participants, self, func(j types.JID) string { return a.contactName(ctx, j) })
+	participantsCache.Store(key, cachedParticipants{at: time.Now(), people: people})
+	return people, nil
 }
