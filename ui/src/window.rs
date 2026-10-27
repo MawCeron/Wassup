@@ -42,6 +42,8 @@ const BUBBLE_MAX_WIDTH: i32 = 520;
 
 /// Messages fetched per request when opening a chat or scrolling back.
 const PAGE_SIZE: u32 = 50;
+/// Emoji per row in the picker; GTK shows 7.
+const EMOJI_COLUMNS: u32 = 10;
 
 const CSS: &str = "
 .bubble { border-radius: 12px; padding: 6px 10px; background: var(--card-bg-color); }
@@ -549,6 +551,7 @@ impl Window {
             composer,
             move |button| {
                 let chooser = gtk::EmojiChooser::new();
+                set_emoji_columns(chooser.upcast_ref(), EMOJI_COLUMNS);
                 chooser.connect_emoji_picked(glib::clone!(
                     #[weak]
                     composer,
@@ -2351,6 +2354,21 @@ impl Window {
 }
 
 /// Wraps a page in a toolbar view with a plain header bar.
+/// Sets how many emoji the picker shows per row, in each of its sections.
+fn set_emoji_columns(widget: &gtk::Widget, columns: u32) {
+    let mut child = widget.first_child();
+    while let Some(w) = child {
+        if let Some(flow) = w
+            .downcast_ref::<gtk::FlowBox>()
+            .filter(|f| f.is_homogeneous())
+        {
+            flow.set_max_children_per_line(columns);
+        }
+        set_emoji_columns(&w, columns);
+        child = w.next_sibling();
+    }
+}
+
 fn with_header(child: &impl IsA<gtk::Widget>) -> adw::ToolbarView {
     let view = adw::ToolbarView::new();
     view.add_top_bar(&adw::HeaderBar::new());
