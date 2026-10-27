@@ -35,7 +35,12 @@ type account struct {
 	mediaDir     string
 	avatarDir    string
 	mediaCacheMB atomic.Int32
-	downloads    *downloads
+	// Whether sent links get a preview of the page.
+	linkPreviews atomic.Bool
+	// Texts to send, one after another, so a slow link preview does not
+	// let a later message overtake it.
+	sends     chan func()
+	downloads *downloads
 }
 
 // version is the release, matching ui/Cargo.toml; the phone shows it for
@@ -108,7 +113,13 @@ func openAccount(ctx context.Context, dir, id string) (*account, error) {
 	client := whatsmeow.NewClient(device, log.Sub("client"))
 	// Favorite stickers only arrive as app state events, also on full syncs.
 	client.EmitAppStateEventsOnFullSync = true
-	return &account{id: id, db: db, client: client, log: l, downloads: newDownloads()}, nil
+	a := &account{id: id, db: db, client: client, log: l, downloads: newDownloads(), sends: make(chan func(), 64)}
+	go func() {
+		for send := range a.sends {
+			send()
+		}
+	}()
+	return a, nil
 }
 
 func closeAccounts(accounts []*account) {

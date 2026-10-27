@@ -31,6 +31,9 @@ type config struct {
 	// The tray icon is on unless turned off, as it only shows where the
 	// desktop has a tray.
 	HideTrayIcon bool `json:"hide_tray_icon"`
+	// Sent links go with a preview of the page unless turned off: fetching
+	// it visits the site, as the phone does.
+	NoLinkPreviews bool `json:"no_link_previews"`
 }
 
 // languageCode is what a language setting may look like. It becomes part

@@ -483,7 +483,11 @@ func (a *account) sendText(ctx context.Context, chat, text string) (*ipc.Message
 	if text == "" {
 		return nil, nil, errors.New("empty message")
 	}
-	return a.send(ctx, chat, &waE2E.Message{Conversation: proto.String(text)})
+	content := &waE2E.Message{Conversation: proto.String(text)}
+	if a.linkPreviews.Load() {
+		content = withLinkPreview(ctx, text)
+	}
+	return a.send(ctx, chat, content)
 }
 
 // send delivers content to a chat and stores it like a received message.

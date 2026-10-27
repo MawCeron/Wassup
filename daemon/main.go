@@ -81,6 +81,7 @@ func run() error {
 		a.mediaDir = filepath.Join(cache, "media", a.id)
 		a.avatarDir = filepath.Join(cache, "avatars", a.id)
 		a.mediaCacheMB.Store(int32(cfg.MediaCacheMB))
+		a.linkPreviews.Store(!cfg.NoLinkPreviews)
 		for _, dir := range []string{a.mediaDir, a.avatarDir} {
 			if err := os.MkdirAll(dir, 0o700); err != nil {
 				closeAccounts(accounts)
@@ -416,13 +417,29 @@ func (d *daemon) reply(conn net.Conn, req *ipc.Request) *ipc.Event {
 		a := d.find(r.GetAccountId())
 		if a == nil {
 			fail(errors.New("unknown account"))
-		} else if msg, chat, err := a.sendText(context.Background(), r.GetChatJid(), r.GetText()); err != nil {
-			fail(err)
-		} else {
-			ev.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}
-			// TODO: other connected UIs only learn about it through the chat update.
-			d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+			break
 		}
+		// Fetching a link preview takes a moment: reply when sent, in order,
+		// without holding up the connection's other requests.
+		a.sends <- func() {
+			done := &ipc.Event{RequestId: req.GetId()}
+			msg, chat, err := a.sendText(context.Background(), r.GetChatJid(), r.GetText())
+			if err != nil {
+				done.Kind = &ipc.Event_Error{Error: &ipc.Error{Message: err.Error()}}
+			} else {
+				done.Kind = &ipc.Event_MessageReceived{MessageReceived: msg}
+			}
+			d.mu.Lock()
+			if err := write(conn, done); err != nil {
+				slog.Warn("write event", "err", err)
+			}
+			d.mu.Unlock()
+			if chat != nil {
+				// TODO: other connected UIs only learn about it through the chat update.
+				d.broadcast(&ipc.Event{Kind: &ipc.Event_ChatChanged{ChatChanged: chat}})
+			}
+		}
+		return nil
 	case *ipc.Request_MarkRead:
 		a := d.find(k.MarkRead.GetAccountId())
 		if a == nil {

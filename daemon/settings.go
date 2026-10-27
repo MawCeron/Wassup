@@ -22,6 +22,7 @@ func (d *daemon) settings() *ipc.Settings {
 		GpuRendering:            d.config.GPURendering,
 		Language:                d.config.Language,
 		TrayIcon:                !d.config.HideTrayIcon,
+		LinkPreviews:            !d.config.NoLinkPreviews,
 	}
 }
 
@@ -42,6 +43,7 @@ func (d *daemon) setSettings(s *ipc.Settings) (*ipc.Settings, error) {
 		GPURendering:            s.GetGpuRendering(),
 		Language:                s.GetLanguage(),
 		HideTrayIcon:            !s.GetTrayIcon(),
+		NoLinkPreviews:          !s.GetLinkPreviews(),
 	}
 	if err := c.validate(); err != nil {
 		return nil, err
@@ -66,6 +68,7 @@ func (d *daemon) setSettings(s *ipc.Settings) (*ipc.Settings, error) {
 	}
 	for _, a := range d.accounts {
 		a.mediaCacheMB.Store(int32(c.MediaCacheMB))
+		a.linkPreviews.Store(!c.NoLinkPreviews)
 		// A smaller cache takes effect now, not at the next download.
 		if a.mediaDir != "" {
 			go evictMedia(filepath.Dir(a.mediaDir), a.cacheLimit())
