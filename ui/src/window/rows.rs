@@ -1,7 +1,7 @@
 //! The list rows of chats and messages, and the pictures in them.
 
 use super::*;
-use gettextrs::gettext;
+use gettextrs::{gettext, ngettext};
 
 pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
@@ -60,6 +60,15 @@ pub(super) fn chat_row_factory(owner: Owner) -> gtk::SignalListItemFactory {
         time.set_label(&format_time(chat.last_message_at_ms));
         unread.set_label(&chat.unread_count.to_string());
         unread.set_visible(chat.unread_count > 0);
+        // Read as one line, so the unread count is not a bare number.
+        let mut label = chat_title(&chat);
+        if chat.unread_count > 0 {
+            label += ", ";
+            // TRANSLATORS: {} is how many.
+            label += &ngettext("{} unread message", "{} unread messages", chat.unread_count)
+                .replace("{}", &chat.unread_count.to_string());
+        }
+        item.set_accessible_label(&label);
     });
     factory
 }
@@ -72,6 +81,7 @@ pub(super) fn show_status(icon: &gtk::Image, status: ipc::MessageStatus) {
         ipc::MessageStatus::Unspecified => (None, "", false),
     };
     icon.set_icon_name(name);
+    icon.set_visible(name.is_some()); // Received messages have none.
     icon.set_tooltip_text(Some(tooltip));
     icon.update_property(&[gtk::accessible::Property::Label(tooltip)]);
     icon.set_css_classes(if read { &["accent"] } else { &["dim-label"] });
@@ -93,8 +103,13 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let picture = gtk::Picture::builder()
             .can_shrink(true)
             .content_fit(gtk::ContentFit::Contain)
-            .halign(gtk::Align::Start)
             .css_classes(["media"])
+            .build();
+        // Buttons, so photos and documents also open from the keyboard.
+        let media_button = gtk::Button::builder()
+            .child(&picture)
+            .halign(gtk::Align::Start)
+            .css_classes(["flat", "media-button"])
             .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
             .build();
         // Clicking opens the file with the desktop's default application.
@@ -110,12 +125,10 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
                 }
             }
         };
-        let open = gtk::GestureClick::new();
-        open.connect_released({
+        media_button.connect_clicked({
             let on_click = on_click.clone();
-            move |_, _, _, _| on_click()
+            move |_| on_click()
         });
-        picture.add_controller(open);
         let doc_name = gtk::Label::builder()
             .xalign(0.0)
             .ellipsize(gtk::pango::EllipsizeMode::Middle)
@@ -128,21 +141,24 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let doc_labels = gtk::Box::new(gtk::Orientation::Vertical, 2);
         doc_labels.append(&doc_name);
         doc_labels.append(&doc_size);
-        let document = gtk::Box::builder()
+        let document_box = gtk::Box::builder()
             .spacing(10)
             .css_classes(["document"])
-            .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
             .build();
-        document.append(
+        document_box.append(
             &gtk::Image::builder()
                 .icon_name("wassup-document-symbolic")
                 .pixel_size(32)
                 .build(),
         );
-        document.append(&doc_labels);
-        let open_doc = gtk::GestureClick::new();
-        open_doc.connect_released(move |_, _, _, _| on_click());
-        document.add_controller(open_doc);
+        document_box.append(&doc_labels);
+        let document = gtk::Button::builder()
+            .child(&document_box)
+            .halign(gtk::Align::Start)
+            .css_classes(["flat", "media-button"])
+            .cursor(&gdk::Cursor::from_name("pointer", None).unwrap())
+            .build();
+        document.connect_clicked(move |_| on_click());
         let text = gtk::Label::builder()
             .xalign(0.0)
             .wrap(true)
@@ -185,7 +201,7 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         quote.append(&quote_name);
         quote.append(&quote_text);
         bubble.append(&quote);
-        bubble.append(&picture);
+        bubble.append(&media_button);
         bubble.append(&document);
         let voice_icon = gtk::Image::builder()
             .icon_name("wassup-voice-note-symbolic")
@@ -201,6 +217,9 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .hexpand(true)
             .draw_value(false)
             .build();
+        progress.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Playback position",
+        ))]);
         let length = gtk::Label::builder()
             .css_classes(["caption", "dim-label", "numeric"])
             .build();
@@ -268,9 +287,10 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
             .next_sibling()
             .and_downcast::<gtk::Label>()
             .unwrap();
-        let picture = quote.next_sibling().and_downcast::<gtk::Picture>().unwrap();
-        let document = picture.next_sibling().unwrap();
-        let doc_labels = document.last_child().unwrap();
+        let media_button = quote.next_sibling().and_downcast::<gtk::Button>().unwrap();
+        let picture = media_button.child().and_downcast::<gtk::Picture>().unwrap();
+        let document = media_button.next_sibling().unwrap();
+        let doc_labels = document.first_child().and_then(|b| b.last_child()).unwrap();
         let doc_name = doc_labels
             .first_child()
             .and_downcast::<gtk::Label>()
@@ -319,7 +339,13 @@ pub(super) fn message_row_factory(rows: BoundRows, owner: Owner) -> gtk::SignalL
         let is_document = kind == Some(ipc::MediaKind::Document);
         let is_audio = kind == Some(ipc::MediaKind::Audio);
         let is_picture = matches!(kind, Some(ipc::MediaKind::Image | ipc::MediaKind::Sticker));
-        picture.set_visible(is_picture);
+        media_button.set_visible(is_picture);
+        let media_label = if kind == Some(ipc::MediaKind::Sticker) {
+            gettext("Sticker")
+        } else {
+            gettext("Photo")
+        };
+        media_button.update_property(&[gtk::accessible::Property::Label(&media_label)]);
         document.set_visible(is_document);
         audio.set_visible(is_audio);
         if let Some(media) = msg.media.as_ref().filter(|_| is_audio) {

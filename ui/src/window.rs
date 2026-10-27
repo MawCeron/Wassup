@@ -37,6 +37,7 @@ const CSS: &str = "
 .media { border-radius: 8px; background: alpha(currentColor, 0.08); }
 .document { border-radius: 8px; padding: 8px 10px; background: alpha(currentColor, 0.08); }
 .quote { border-left: 3px solid var(--accent-color); border-radius: 6px; padding: 4px 8px; background: alpha(currentColor, 0.06); }
+.media-button { padding: 0; }
 .qr-card { background: white; border-radius: 12px; padding: 12px; }
 .link-step { font-size: 1.15em; }
 .bubble.mine { background: color-mix(in srgb, var(--accent-bg-color) 35%, var(--card-bg-color)); }
@@ -120,6 +121,7 @@ pub struct Window {
     content: adw::NavigationPage,
     chats: gio::ListStore,
     chat_selection: gtk::SingleSelection,
+    chat_list: gtk::ListView,
     chats_loaded: Cell<bool>,
     current_chat: Rc<RefCell<Option<String>>>,
     content_stack: gtk::Stack,
@@ -533,6 +535,7 @@ impl Window {
             content,
             chats,
             chat_selection,
+            chat_list,
             restricted,
             chat_filter,
             shown_chats,
@@ -696,7 +699,28 @@ impl Window {
                 }
             }
         ));
-        // Enter sends; Shift+Enter starts a new line.
+        // Arrow keys in the chat list open each chat but keep the focus
+        // there; Enter or a click moves on to writing.
+        ui.chat_list.connect_activate(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _| {
+                ui.composer.grab_focus();
+            }
+        ));
+        let click = gtk::GestureClick::new();
+        click.connect_released(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _, _, _| {
+                // After the list has handled the click and focused the row.
+                glib::idle_add_local_once(move || {
+                    ui.composer.grab_focus();
+                });
+            }
+        ));
+        ui.chat_list.add_controller(click);
+        // Enter sends; Shift+Enter starts a new line, Escape goes back to the chats.
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         keys.connect_key_pressed(glib::clone!(
@@ -705,6 +729,11 @@ impl Window {
             #[upgrade_or]
             glib::Propagation::Proceed,
             move |_, key, _, modifiers| {
+                if key == gdk::Key::Escape {
+                    ui.split.set_show_content(false);
+                    ui.chat_list.grab_focus();
+                    return glib::Propagation::Stop;
+                }
                 let enter = matches!(key, gdk::Key::Return | gdk::Key::KP_Enter);
                 if enter && !modifiers.contains(gdk::ModifierType::SHIFT_MASK) {
                     ui.send_text();
@@ -817,6 +846,7 @@ impl Window {
             Some(pos) => {
                 self.chat_selection.set_selected(pos);
                 self.split.set_show_content(true);
+                self.composer.grab_focus();
             }
             // Chats are not loaded yet; open it when they are.
             None => {
@@ -996,7 +1026,12 @@ impl Window {
                 self.upsert_chat(chat)
             }
             Some(event::Kind::Messages(list)) => self.add_page(list.messages),
-            Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => self.add_message(msg),
+            Some(event::Kind::MessageReceived(msg)) if self.is_open(&msg) => {
+                if !msg.from_me {
+                    self.announce(&msg);
+                }
+                self.add_message(msg)
+            }
             Some(event::Kind::MessageStatusChanged(change)) => self.update_status(change),
             Some(event::Kind::MediaReady(ready)) => self.media_ready(ready),
             Some(event::Kind::MessagesExpired(gone)) => self.remove_expired(gone),
@@ -1200,6 +1235,28 @@ impl Window {
         dialog.present(Some(&self.window));
     }
 
+    /// Reads a message that arrived in the open chat to screen reader users.
+    fn announce(&self, msg: &ipc::Message) {
+        let what = match msg.media.as_ref() {
+            _ if !msg.text.is_empty() => msg.text.clone(),
+            Some(m) if m.kind() == ipc::MediaKind::Image => gettext("Photo"),
+            Some(m) if m.kind() == ipc::MediaKind::Sticker => gettext("Sticker"),
+            Some(m) if m.kind() == ipc::MediaKind::Document => gettext("Document"),
+            Some(m) if m.voice_note => gettext("Voice message"),
+            Some(m) if m.kind() == ipc::MediaKind::Audio => gettext("Audio"),
+            _ => return,
+        };
+        let text = if msg.sender_name.is_empty() {
+            what
+        } else {
+            format!("{}: {what}", msg.sender_name)
+        };
+        // libadwaita's binding does not list Accessible for its windows.
+        self.window
+            .upcast_ref::<gtk::Widget>()
+            .announce(&text, gtk::AccessibleAnnouncementPriority::Medium);
+    }
+
     fn ask_secret_code(self: &Rc<Self>) {
         let code = gtk::PasswordEntry::builder()
             .show_peek_icon(true)
@@ -1378,7 +1435,6 @@ impl Window {
         self.report_active();
         self.content_stack.set_visible_child_name("messages");
         self.content_view.set_reveal_bottom_bars(true);
-        self.composer.grab_focus();
         self.messages.remove_all();
         self.load_messages(String::new());
         if chat.unread_count > 0 {

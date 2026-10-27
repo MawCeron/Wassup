@@ -187,6 +187,22 @@ icon; WhatsApp does not allow a custom one. The name is sent only when
 linking, so a device linked by an older build keeps its old name until it
 is unlinked and linked again.
 
+## Keyboard and screen readers
+
+| Key | Where | Action |
+|---|---|---|
+| Arrow keys | Chat list | Open each chat while the focus stays in the list |
+| Enter | Chat list | Move to the message box |
+| Enter / Shift+Enter | Message box | Send / new line |
+| Escape | Message box | Back to the chat list |
+| Tab | Conversation | Reach photos, documents and audio controls, which open with Enter or Space |
+| Ctrl+, | Anywhere | Preferences |
+
+Every control has a name for screen readers, and a chat row reads its
+unread count. Messages that arrive in the open chat are announced. To
+check names, list the window's accessibility tree over AT-SPI, for
+example with Accerciser.
+
 ## Locked chats
 
 Chats locked on the phone stay out of the chat list, unread counts

@@ -12,7 +12,7 @@ update)
 	xgettext $common -L Go -k -ktr -j -o po/wassup.pot $(ls daemon/*.go | grep -v _test.go)
 	xgettext $common -L Desktop -j -o po/wassup.pot packaging/io.github.MawCeron.Wassup.desktop
 	for lang in $(cat po/LINGUAS); do
-		msgmerge -q --update --backup=none "po/$lang.po" po/wassup.pot
+		msgmerge -q --no-fuzzy-matching --update --backup=none "po/$lang.po" po/wassup.pot
 	done
 	;;
 install)
