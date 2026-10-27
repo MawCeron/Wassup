@@ -305,8 +305,8 @@ mkdir -p ~/.local/share/wassup/fonts
 cp TwemojiCBDT.ttf ~/.local/share/wassup/fonts/
 ```
 
-The font covers Emoji 17: with it the picker shows all 1910 emoji and the UI
-uses 63 MB after the picker has been opened.
+The font covers Emoji 17: with it the picker shows all 1910 emoji, and the
+UI goes from 37.6 MB to 81.6 MB once the picker has been opened.
 
 A font built from the same artwork with
 [twemoji-colr](https://github.com/mozilla/twemoji-colr) is a COLR font
