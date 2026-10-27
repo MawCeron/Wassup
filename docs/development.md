@@ -85,8 +85,11 @@ Use a secondary number: this is an unofficial client.
 
 ## Configuration
 
-The daemon reads `$XDG_CONFIG_HOME/wassup/config.json` at startup. The
-file is optional; every option defaults to off.
+Preferences (Ctrl+,) edits these options. The daemon owns
+`$XDG_CONFIG_HOME/wassup/config.json`: it reads the file at startup, and
+saves it and applies the change at once when the UI sends new settings,
+except GPU rendering, which the UI reads only when it starts. The file is
+optional; every option defaults to off.
 
 ```json
 {

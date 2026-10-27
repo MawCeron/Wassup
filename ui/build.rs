@@ -1,6 +1,8 @@
 use std::{env, fs, path::Path, process::Command};
 
 fn main() -> std::io::Result<()> {
+    // Listing any file below turns off Cargo's default of rerunning on every change.
+    println!("cargo:rerun-if-changed=../proto/ipc.proto");
     prost_build::Config::new()
         // Generated oneofs hold whole messages; boxing them is not worth it here.
         .enum_attribute(".", "#[allow(clippy::large_enum_variant)]")

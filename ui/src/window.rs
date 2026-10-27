@@ -146,6 +146,8 @@ pub struct Window {
     restricted_back: gtk::Button,
     /// Id of the UnlockChats request awaiting its reply, or 0.
     unlock_request: Cell<u64>,
+    /// Id of the GetSettings request that opens the preferences, or 0.
+    settings_request: Cell<u64>,
     conn: RefCell<Option<ipc::Connection>>,
     account: RefCell<Option<ipc::Account>>,
 }
@@ -283,6 +285,16 @@ impl Window {
             .visible(false)
             .build();
         sidebar_header.pack_start(&restricted_back);
+        let menu = gio::Menu::new();
+        menu.append(Some("_Preferences"), Some("win.preferences"));
+        sidebar_header.pack_end(
+            &gtk::MenuButton::builder()
+                .icon_name("open-menu-symbolic")
+                .tooltip_text("Main Menu")
+                .primary(true)
+                .menu_model(&menu)
+                .build(),
+        );
         let restricted_entry = gtk::Button::builder()
             .child(
                 &adw::ButtonContent::builder()
@@ -524,6 +536,7 @@ impl Window {
             restricted_entry,
             restricted_back,
             unlock_request: Cell::new(0),
+            settings_request: Cell::new(0),
             chats_loaded: Cell::new(false),
             current_chat: Rc::default(),
             content_stack,
@@ -557,6 +570,18 @@ impl Window {
             ui,
             move |_| ui.start_link()
         ));
+        let preferences = gio::SimpleAction::new("preferences", None);
+        preferences.connect_activate(glib::clone!(
+            #[weak]
+            ui,
+            move |_, _| {
+                if let Some(id) = ui.send(request::Kind::GetSettings(ipc::GetSettings {})) {
+                    ui.settings_request.set(id);
+                }
+            }
+        ));
+        ui.window.add_action(&preferences);
+        app.set_accels_for_action("win.preferences", &["<Control>comma"]);
         ui.restricted_entry.connect_clicked(glib::clone!(
             #[weak]
             ui,
@@ -960,6 +985,12 @@ impl Window {
             Some(event::Kind::MediaReady(ready)) => self.media_ready(ready),
             Some(event::Kind::MessagesExpired(gone)) => self.remove_expired(gone),
             Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
+            Some(event::Kind::Settings(settings))
+                if event.request_id != 0 && event.request_id == self.settings_request.get() =>
+            {
+                self.settings_request.set(0);
+                self.show_preferences(settings);
+            }
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
                 self.qr_stack.set_visible_child_name("code");
@@ -1045,6 +1076,74 @@ impl Window {
         });
         self.restricted_entry
             .set_visible(any_locked && !self.restricted.get());
+    }
+
+    fn show_preferences(self: &Rc<Self>, settings: ipc::Settings) {
+        let hide_content = adw::SwitchRow::builder()
+            .title("Hide Message Content")
+            .subtitle("Notifications say who wrote, but not what")
+            .active(settings.hide_notification_content)
+            .build();
+        let notifications = adw::PreferencesGroup::builder()
+            .title("Notifications")
+            .build();
+        notifications.add(&hide_content);
+        let cache = adw::SpinRow::builder()
+            .title("Media Cache Size")
+            .subtitle("Downloaded photos, stickers, documents and audio, in MB. The oldest are deleted first.")
+            .adjustment(&gtk::Adjustment::new(
+                settings.media_cache_mb as f64,
+                50.0,
+                20_000.0,
+                50.0,
+                500.0,
+                0.0,
+            ))
+            .build();
+        let storage = adw::PreferencesGroup::builder().title("Storage").build();
+        storage.add(&cache);
+        let gpu = adw::SwitchRow::builder()
+            .title("GPU Rendering")
+            .subtitle("Smoother animations, but uses about 50 MB more memory. Applies after restarting Wassup.")
+            .active(settings.gpu_rendering)
+            .build();
+        let performance = adw::PreferencesGroup::builder()
+            .title("Performance")
+            .build();
+        performance.add(&gpu);
+        let page = adw::PreferencesPage::new();
+        page.add(&notifications);
+        page.add(&storage);
+        page.add(&performance);
+        let dialog = adw::PreferencesDialog::builder().title("Preferences").build();
+        dialog.add(&page);
+
+        // Every change saves all of them; the daemon writes the file.
+        let save = Rc::new(glib::clone!(
+            #[weak(rename_to = ui)]
+            self,
+            #[weak]
+            hide_content,
+            #[weak]
+            cache,
+            #[weak]
+            gpu,
+            move || {
+                ui.send(request::Kind::SetSettings(ipc::SetSettings {
+                    settings: Some(ipc::Settings {
+                        hide_notification_content: hide_content.is_active(),
+                        media_cache_mb: cache.value() as u32,
+                        gpu_rendering: gpu.is_active(),
+                    }),
+                }));
+            }
+        ));
+        for row in [&hide_content, &gpu] {
+            let save = save.clone();
+            row.connect_active_notify(move |_| save());
+        }
+        cache.connect_value_notify(move |_| save());
+        dialog.present(Some(&self.window));
     }
 
     fn ask_secret_code(self: &Rc<Self>) {
