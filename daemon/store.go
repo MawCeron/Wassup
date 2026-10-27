@@ -79,6 +79,9 @@ CREATE INDEX wassup_messages_by_expiry ON wassup_messages (expires_at_ms) WHERE 
 `, `
 -- Chats locked on the phone, by any of their ids.
 CREATE TABLE wassup_locked_chats (jid TEXT PRIMARY KEY);
+`, `
+-- Link previews, as the waE2E.ExtendedTextMessage fields that make them.
+ALTER TABLE wassup_messages ADD COLUMN link BLOB;
 `}
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -175,6 +178,13 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 		}
 		a.nameQuote(ctx, quote)
 	}
+	var linkBlob []byte
+	if link := linkOf(evt.Message); link != nil {
+		var err error
+		if linkBlob, err = proto.Marshal(link); err != nil {
+			return nil, nil, err
+		}
+	}
 	var mediaBlob []byte
 	if media != nil {
 		var err error
@@ -192,6 +202,7 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 		Text:        text,
 		Media:       a.ipcMedia(mediaBlob),
 		Quote:       quote,
+		Link:        a.ipcLink(linkBlob),
 	}
 	if msg.FromMe {
 		msg.Status = ipc.MessageStatus_MESSAGE_STATUS_SENT
@@ -237,9 +248,9 @@ func (a *account) saveMessage(ctx context.Context, evt *events.Message) (*ipc.Me
 	}
 
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO wassup_messages
-		(chat_jid, id, sender_jid, from_me, timestamp_ms, text, status, media, quote, expires_at_ms)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text, msg.Status, mediaBlob, quoteBlob, expiresAt)
+		(chat_jid, id, sender_jid, from_me, timestamp_ms, text, status, media, quote, expires_at_ms, link)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		msg.ChatJid, msg.Id, msg.SenderJid, msg.FromMe, msg.TimestampMs, msg.Text, msg.Status, mediaBlob, quoteBlob, expiresAt, linkBlob)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -381,13 +392,13 @@ func (a *account) listMessages(ctx context.Context, chatJID, beforeID, fromID st
 	limit = min(limit, maxPageSize)
 	if fromID != "" {
 		return a.queryMessages(ctx, chatJID, `
-			SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote FROM wassup_messages
+			SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote, link FROM wassup_messages
 			WHERE chat_jid = ?1 AND (timestamp_ms, id) >=
 				(SELECT timestamp_ms, id FROM wassup_messages WHERE chat_jid = ?1 AND id = ?2)
 			ORDER BY timestamp_ms DESC, id DESC LIMIT ?3`, chatJID, fromID, maxFromCount)
 	}
 	return a.queryMessages(ctx, chatJID, `
-		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote FROM wassup_messages
+		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote, link FROM wassup_messages
 		WHERE chat_jid = ?1 AND (?2 = '' OR (timestamp_ms, id) <
 			(SELECT timestamp_ms, id FROM wassup_messages WHERE chat_jid = ?1 AND id = ?2))
 		ORDER BY timestamp_ms DESC, id DESC LIMIT ?3`, chatJID, beforeID, limit)
@@ -418,7 +429,7 @@ func (a *account) searchMessages(ctx context.Context, chatJID, query string) ([]
 		return nil, err
 	}
 	return a.queryMessages(ctx, chatJID, `
-		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote FROM wassup_messages
+		SELECT id, sender_jid, from_me, timestamp_ms, text, status, media, quote, link FROM wassup_messages
 		WHERE chat_jid = ? AND id IN (?`+strings.Repeat(", ?", len(ids)-1)+`)
 		ORDER BY timestamp_ms DESC, id DESC`, append([]any{chatJID}, ids...)...)
 }
@@ -433,7 +444,7 @@ func searchFold(text string) string {
 }
 
 // queryMessages reads full messages of a chat from a query that selects
-// id, sender_jid, from_me, timestamp_ms, text, status, media and quote.
+// id, sender_jid, from_me, timestamp_ms, text, status, media, quote and link.
 func (a *account) queryMessages(ctx context.Context, chatJID, query string, args ...any) ([]*ipc.Message, error) {
 	rows, err := a.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -445,10 +456,12 @@ func (a *account) queryMessages(ctx context.Context, chatJID, query string, args
 	for rows.Next() {
 		m := &ipc.Message{AccountId: a.id, ChatJid: chatJID}
 		var mediaBlob, quoteBlob []byte
-		if err := rows.Scan(&m.Id, &m.SenderJid, &m.FromMe, &m.TimestampMs, &m.Text, &m.Status, &mediaBlob, &quoteBlob); err != nil {
+		var linkBlob []byte
+		if err := rows.Scan(&m.Id, &m.SenderJid, &m.FromMe, &m.TimestampMs, &m.Text, &m.Status, &mediaBlob, &quoteBlob, &linkBlob); err != nil {
 			return nil, err
 		}
 		m.Media = a.ipcMedia(mediaBlob)
+		m.Link = a.ipcLink(linkBlob)
 		m.Quote = a.quoteFromBlob(ctx, quoteBlob)
 		if !m.FromMe {
 			name, ok := names[m.SenderJid]

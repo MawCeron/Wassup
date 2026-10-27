@@ -73,7 +73,7 @@ func (a *account) setDisappearing(ctx context.Context, chatJID string, secs uint
 // returns their ids by chat. Stickers stay cached: they are shared with
 // other chats and favorites and say nothing about the conversation.
 func (a *account) expire(ctx context.Context, now time.Time) (map[string][]string, error) {
-	rows, err := a.db.QueryContext(ctx, `SELECT chat_jid, id, media FROM wassup_messages
+	rows, err := a.db.QueryContext(ctx, `SELECT chat_jid, id, media, link FROM wassup_messages
 		WHERE expires_at_ms > 0 AND expires_at_ms <= ?`, now.UnixMilli())
 	if err != nil {
 		return nil, err
@@ -82,12 +82,18 @@ func (a *account) expire(ctx context.Context, now time.Time) (map[string][]strin
 	var files []string
 	for rows.Next() {
 		var chat, id string
-		var blob []byte
-		if err := rows.Scan(&chat, &id, &blob); err != nil {
+		var blob, link []byte
+		if err := rows.Scan(&chat, &id, &blob, &link); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		expired[chat] = append(expired[chat], id)
+		var preview waE2E.ExtendedTextMessage
+		if link != nil && proto.Unmarshal(link, &preview) == nil {
+			if path := a.linkThumbPath(preview.GetJPEGThumbnail()); path != "" {
+				files = append(files, path)
+			}
+		}
 		var m waE2E.Message
 		if blob != nil && proto.Unmarshal(blob, &m) == nil && m.GetStickerMessage() == nil {
 			if path := a.mediaPath(&m); path != "" {

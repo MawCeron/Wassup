@@ -187,6 +187,17 @@ message Message {
   Media media = 10;
   // The message this one replies to, if any.
   Quote quote = 11;
+  // Preview of the first link in the text, if the sender attached one.
+  LinkPreview link = 12;
+}
+
+// What a link looks like, as the sender's phone or Wassup fetched it.
+message LinkPreview {
+  string url = 1;
+  string title = 2;
+  string description = 3;
+  // Small image in the daemon's cache; empty when there is none.
+  string thumbnail_path = 4;
 }
 
 // What a reply shows of the message it quotes.
