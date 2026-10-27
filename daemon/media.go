@@ -58,6 +58,8 @@ func mediaOf(m *waE2E.Message) *waE2E.Message {
 		return &waE2E.Message{DocumentMessage: m.GetDocumentMessage()}
 	case m.GetAudioMessage() != nil:
 		return &waE2E.Message{AudioMessage: m.GetAudioMessage()}
+	case m.GetVideoMessage() != nil:
+		return &waE2E.Message{VideoMessage: m.GetVideoMessage()}
 	}
 	return nil
 }
@@ -73,6 +75,8 @@ func downloadable(m *waE2E.Message) (whatsmeow.DownloadableMessage, string) {
 		return d, extension(d.GetFileName(), d.GetMimetype())
 	case m.GetAudioMessage() != nil:
 		return m.GetAudioMessage(), extension("", m.GetAudioMessage().GetMimetype())
+	case m.GetVideoMessage() != nil:
+		return m.GetVideoMessage(), extension("", m.GetVideoMessage().GetMimetype())
 	}
 	return m.GetStickerMessage(), ".webp"
 }
@@ -122,6 +126,11 @@ func (a *account) ipcMedia(blob []byte) *ipc.Media {
 		au := m.GetAudioMessage()
 		media.Kind, media.Size = ipc.MediaKind_MEDIA_KIND_AUDIO, au.GetFileLength()
 		media.DurationSeconds, media.VoiceNote = au.GetSeconds(), au.GetPTT()
+	case m.GetVideoMessage() != nil:
+		v := m.GetVideoMessage()
+		media.Kind, media.Width, media.Height, media.Size = ipc.MediaKind_MEDIA_KIND_VIDEO, v.GetWidth(), v.GetHeight(), v.GetFileLength()
+		media.DurationSeconds = v.GetSeconds()
+		media.ThumbnailPath = a.videoThumbnail(&m)
 	default:
 		i := m.GetImageMessage()
 		media.Kind, media.Width, media.Height, media.Size = ipc.MediaKind_MEDIA_KIND_IMAGE, i.GetWidth(), i.GetHeight(), i.GetFileLength()
@@ -132,6 +141,38 @@ func (a *account) ipcMedia(blob []byte) *ipc.Media {
 		}
 	}
 	return media
+}
+
+// thumbPath is where a video's preview image is cached, next to the video.
+func (a *account) thumbPath(m *waE2E.Message) string {
+	path := a.mediaPath(m)
+	if path == "" {
+		return ""
+	}
+	return strings.TrimSuffix(path, filepath.Ext(path)) + ".thumb.jpg"
+}
+
+// videoThumbnail writes the small JPEG that comes inside a video message to
+// the cache, once, and returns its path; "" if the message has none.
+func (a *account) videoThumbnail(m *waE2E.Message) string {
+	thumb := m.GetVideoMessage().GetJPEGThumbnail()
+	path := a.thumbPath(m)
+	if len(thumb) == 0 || path == "" {
+		return ""
+	}
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	tmp, err := os.CreateTemp(a.mediaDir, ".thumb-*")
+	if err != nil {
+		return ""
+	}
+	defer os.Remove(tmp.Name())
+	_, err = tmp.Write(thumb)
+	if closeErr := tmp.Close(); err != nil || closeErr != nil || os.Rename(tmp.Name(), path) != nil {
+		return ""
+	}
+	return path
 }
 
 // inBackground runs a download, at most parallelDownloads at a time, and
@@ -294,11 +335,12 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asS
 	n, _ := io.ReadFull(f, head)
 	sniffed := http.DetectContentType(head[:n])
 	photo := !asSticker && (sniffed == "image/jpeg" || sniffed == "image/png")
+	video := !asSticker && sniffed == "video/mp4"
 	if asSticker && sniffed != "image/webp" {
 		return nil, nil, errors.New("stickers must be WebP images")
 	}
 	mimeType := sniffed
-	if byName := mime.TypeByExtension(filepath.Ext(path)); !photo && byName != "" {
+	if byName := mime.TypeByExtension(filepath.Ext(path)); !photo && !video && byName != "" {
 		mimeType = byName
 	}
 
@@ -315,6 +357,8 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asS
 	kind := whatsmeow.MediaDocument
 	if photo || asSticker {
 		kind = whatsmeow.MediaImage // Stickers use the image keys too.
+	} else if video {
+		kind = whatsmeow.MediaVideo
 	}
 	up, err := a.client.UploadReader(ctx, f, tmp, kind)
 	if err != nil {
@@ -344,6 +388,18 @@ func (a *account) sendMedia(ctx context.Context, chat, path, caption string, asS
 			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: &mimeType,
 			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
 			Width: proto.Uint32(uint32(size.Width)), Height: proto.Uint32(uint32(size.Height)), Caption: text,
+		}}
+	} else if video {
+		info, err := f.Stat()
+		if err != nil {
+			return nil, nil, err
+		}
+		seconds, width, height := mp4Info(f, info.Size())
+		// TODO: send a thumbnail; it needs a decoded frame, which the daemon cannot make.
+		content = &waE2E.Message{VideoMessage: &waE2E.VideoMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: &mimeType,
+			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: &up.FileLength,
+			Seconds: &seconds, Width: &width, Height: &height, Caption: text,
 		}}
 	} else {
 		name := filepath.Base(path)

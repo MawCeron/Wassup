@@ -91,7 +91,7 @@ func (a *account) expire(ctx context.Context, now time.Time) (map[string][]strin
 		var m waE2E.Message
 		if blob != nil && proto.Unmarshal(blob, &m) == nil && m.GetStickerMessage() == nil {
 			if path := a.mediaPath(&m); path != "" {
-				files = append(files, path)
+				files = append(files, path, a.thumbPath(&m))
 			}
 		}
 	}

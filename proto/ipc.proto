@@ -195,6 +195,7 @@ enum MediaKind {
   MEDIA_KIND_STICKER = 2;
   MEDIA_KIND_DOCUMENT = 3;
   MEDIA_KIND_AUDIO = 4;
+  MEDIA_KIND_VIDEO = 5;
 }
 
 message Media {
@@ -213,10 +214,13 @@ message Media {
   uint32 duration_seconds = 7;
   // Audio recorded in the chat, rather than an audio file.
   bool voice_note = 8;
+  // Small preview image of a video, cached from the message itself, so it
+  // shows before the video is downloaded. Empty when the sender sent none.
+  string thumbnail_path = 9;
 }
 
-// Sends a local file chosen by the user: JPEG and PNG as a photo, anything
-// else as a document. The reply, message_received with the stored message
+// Sends a local file chosen by the user: JPEG and PNG as a photo, MP4 as a
+// video, anything else as a document. The reply, message_received with the stored message
 // or error, comes once the upload ends; other requests are answered
 // meanwhile.
 message SendMedia {

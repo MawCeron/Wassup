@@ -132,7 +132,7 @@ func messageText(evt *events.Message) string {
 	case m.GetImageMessage() != nil:
 		return m.GetImageMessage().GetCaption() // The image is carried as media.
 	case m.GetVideoMessage() != nil:
-		return label(tr("[Video]"), m.GetVideoMessage().GetCaption())
+		return m.GetVideoMessage().GetCaption() // The video is carried as media.
 	case m.GetAudioMessage() != nil:
 		return "" // Carried as media.
 	case m.GetDocumentMessage() != nil:

@@ -195,6 +195,7 @@ func notificationText(chat *ipc.Chat, msg *ipc.Message, hideContent bool) (title
 			ipc.MediaKind_MEDIA_KIND_STICKER:  tr("Sticker"),
 			ipc.MediaKind_MEDIA_KIND_DOCUMENT: tr("Document"),
 			ipc.MediaKind_MEDIA_KIND_AUDIO:    tr("Audio"),
+			ipc.MediaKind_MEDIA_KIND_VIDEO:    tr("Video"),
 		}[kind]
 		if msg.GetMedia().GetVoiceNote() {
 			label = tr("Voice message")
