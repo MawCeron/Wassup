@@ -128,9 +128,9 @@ pub(super) fn show_audio(row: &gtk::Box, duration: u32, playing: Option<&gtk::Me
     let at = playing.map_or(0.0, |m| m.timestamp() as f64 / 1e6);
     let running = playing.is_some_and(|m| m.is_playing());
     play.set_icon_name(if running {
-        "media-playback-pause-symbolic"
+        "wassup-pause-symbolic"
     } else {
-        "media-playback-start-symbolic"
+        "wassup-play-symbolic"
     });
     play.set_tooltip_text(Some(&if running {
         gettext("Pause")
