@@ -11,6 +11,7 @@ use gtk::{gdk, gio, glib};
 use crate::ipc::{self, event, request};
 
 mod audio;
+mod background;
 mod preview;
 mod qr;
 mod reply;
@@ -22,6 +23,7 @@ mod viewer;
 mod voice;
 
 use audio::*;
+use background::*;
 use qr::*;
 use reply::*;
 use rows::*;
@@ -75,7 +77,8 @@ const CSS: &str = "
    need a darker backdrop than the white view. */
 .chat-bg-light { background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color)) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-light.svg\") repeat; }
 .chat-bg-dark { background: var(--view-bg-color) url(\"resource:///io/github/MawCeron/Wassup/backgrounds/wassup-pattern-dark.svg\") repeat; }
-.chat-bg-light listview, .chat-bg-dark listview { background: none; }
+.chat-bg-plain { background: var(--view-bg-color); }
+.chat-bg listview { background: none; }
 /* Links in own messages take the bubble's color, the accent being too close. */
 .bubble.mine link { color: inherit; text-decoration-line: underline; }
 /* Last, to win over .mine: a search result just jumped to. */
@@ -161,6 +164,9 @@ pub struct Window {
     /// Everything under the photo viewer.
     page: gtk::Box,
     viewer: Rc<Viewer>,
+    /// The chat background chosen in Preferences; see BACKGROUNDS.
+    chat_background: RefCell<String>,
+    background_css: gtk::CssProvider,
     search: MessageSearch,
     reply: ReplyBar,
     voice: VoiceBar,
@@ -608,6 +614,13 @@ impl Window {
             &css,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+        // The user's background picture, which CSS names by its path.
+        let background_css = gtk::CssProvider::new();
+        gtk::style_context_add_provider_for_display(
+            &gdk::Display::default().expect("a display"),
+            &background_css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
 
         let toasts = adw::ToastOverlay::new();
         let banner = adw::Banner::builder()
@@ -695,6 +708,8 @@ impl Window {
             messages,
             page,
             viewer,
+            chat_background: RefCell::default(),
+            background_css,
             search,
             reply,
             voice,
@@ -826,22 +841,13 @@ impl Window {
             }
         ));
         // CSS media queries do not follow libadwaita's color scheme, so the
-        // background tile is switched from here.
-        let style = adw::StyleManager::default();
-        let set_background = glib::clone!(
-            #[weak(rename_to = scroll)]
-            ui.message_scroll,
-            move |style: &adw::StyleManager| {
-                let dark = style.is_dark();
-                scroll.set_css_classes(&[if dark {
-                    "chat-bg-dark"
-                } else {
-                    "chat-bg-light"
-                }]);
-            }
-        );
-        set_background(&style);
-        style.connect_dark_notify(set_background);
+        // background is switched from here.
+        ui.update_chat_background();
+        adw::StyleManager::default().connect_dark_notify(glib::clone!(
+            #[weak]
+            ui,
+            move |_| ui.update_chat_background()
+        ));
         let adj = ui.message_scroll.vadjustment();
         // Rows get their real height only once drawn, so the bottom keeps moving.
         adj.connect_changed(glib::clone!(
@@ -1130,6 +1136,8 @@ impl Window {
             self.show_status(&gettext("Connecting…"), "", false);
         }
         self.send(request::Kind::ListAccounts(ipc::ListAccounts {}));
+        // For the settings the UI applies itself, such as the background.
+        self.send(request::Kind::GetSettings(ipc::GetSettings {}));
 
         let ui = Rc::downgrade(self);
         glib::spawn_future_local(async move {
@@ -1277,11 +1285,16 @@ impl Window {
             Some(event::Kind::MessagesExpired(gone)) => self.remove_expired(gone),
             Some(event::Kind::Stickers(list)) => self.show_stickers(list.stickers),
             Some(event::Kind::ReactionsChanged(changed)) => self.reactions_changed(changed),
-            Some(event::Kind::Settings(settings))
-                if event.request_id != 0 && event.request_id == self.settings_request.get() =>
-            {
-                self.settings_request.set(0);
-                self.show_preferences(settings);
+            Some(event::Kind::Settings(settings)) => {
+                if *self.chat_background.borrow() != settings.chat_background {
+                    self.chat_background
+                        .replace(settings.chat_background.clone());
+                    self.update_chat_background();
+                }
+                if event.request_id != 0 && event.request_id == self.settings_request.get() {
+                    self.settings_request.set(0);
+                    self.show_preferences(settings);
+                }
             }
             Some(event::Kind::QrCode(qr)) if self.is_current(&qr.account_id) => {
                 self.qr.set_paintable(Some(&qr_texture(&qr.code)));
@@ -1468,8 +1481,32 @@ impl Window {
             .build();
         let general = adw::PreferencesGroup::new();
         general.add(&language);
+        let background = adw::ComboRow::builder()
+            .title(gettext("Chat Background"))
+            .model(&gtk::StringList::new(&[
+                &gettext("Doodles"),
+                &gettext("Plain"),
+                &gettext("Your Picture"),
+            ]))
+            .selected(
+                BACKGROUNDS
+                    .iter()
+                    .position(|b| *b == settings.chat_background)
+                    .unwrap_or(0) as u32,
+            )
+            .build();
+        let other_picture = adw::ButtonRow::builder()
+            .title(gettext("Choose Another Picture…"))
+            .visible(settings.chat_background == "picture")
+            .build();
+        let appearance = adw::PreferencesGroup::builder()
+            .title(gettext("Appearance"))
+            .build();
+        appearance.add(&background);
+        appearance.add(&other_picture);
         let page = adw::PreferencesPage::new();
         page.add(&general);
+        page.add(&appearance);
         page.add(&notifications);
         page.add(&messages_group);
         page.add(&storage);
@@ -1493,6 +1530,8 @@ impl Window {
             tray_icon,
             #[weak]
             link_previews,
+            #[weak]
+            background,
             move || {
                 ui.send(request::Kind::SetSettings(ipc::SetSettings {
                     settings: Some(ipc::Settings {
@@ -1502,6 +1541,7 @@ impl Window {
                         language: languages[language.selected() as usize].0.to_owned(),
                         tray_icon: tray_icon.is_active(),
                         link_previews: link_previews.is_active(),
+                        chat_background: BACKGROUNDS[background.selected() as usize].to_owned(),
                     }),
                 }));
             }
@@ -1514,7 +1554,57 @@ impl Window {
             let save = save.clone();
             move |_| save()
         });
-        language.connect_selected_notify(move |_| save());
+        language.connect_selected_notify({
+            let save = save.clone();
+            move |_| save()
+        });
+        // A picture is saved once chosen; cancelling goes back to the choice
+        // before. Going back saves nothing new, as it is already saved.
+        let saved_background = Rc::new(Cell::new(background.selected()));
+        background.connect_selected_notify(glib::clone!(
+            #[weak(rename_to = ui)]
+            self,
+            #[weak]
+            other_picture,
+            #[strong]
+            save,
+            #[strong]
+            saved_background,
+            move |row| {
+                let chosen = row.selected();
+                if chosen == saved_background.get() {
+                    return;
+                }
+                if BACKGROUNDS[chosen as usize] != "picture" {
+                    saved_background.set(chosen);
+                    other_picture.set_visible(false);
+                    return save();
+                }
+                let (save, saved_background, row) =
+                    (save.clone(), saved_background.clone(), row.clone());
+                ui.choose_background(move |ok| {
+                    if ok {
+                        saved_background.set(chosen);
+                        other_picture.set_visible(true);
+                        save();
+                    } else {
+                        row.set_selected(saved_background.get());
+                    }
+                });
+            }
+        ));
+        other_picture.connect_activated(glib::clone!(
+            #[weak(rename_to = ui)]
+            self,
+            move |_| {
+                let ui2 = ui.clone();
+                ui.choose_background(move |ok| {
+                    if ok {
+                        ui2.update_chat_background();
+                    }
+                });
+            }
+        ));
         dialog.present(Some(&self.window));
     }
 

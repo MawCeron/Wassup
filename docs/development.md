@@ -107,6 +107,7 @@ optional; every option defaults to off.
 | `gpu_rendering` | The UI draws with the GPU instead of in software. Off by default; see below. |
 | `hide_tray_icon` | Turns off the status icon with the unread count. |
 | `no_link_previews` | Sends links without a preview, so the daemon never visits them. |
+| `chat_background` | `""` for the doodles, `"plain"`, or `"picture"` for the user's own, kept scaled to at most 1920 px in `$XDG_DATA_HOME/wassup/background/`. |
 | `language` | Language code such as `es` or `pt_BR`; empty or missing follows the system. The daemon switches at once, the UI at its next start. |
 
 An unknown option or a syntax error stops the daemon instead of being
