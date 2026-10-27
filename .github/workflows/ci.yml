@@ -19,7 +19,7 @@ jobs:
         run: >
           dnf install -y --setopt=install_weak_deps=False
           git golang cargo rust rustfmt clippy gtk4-devel libadwaita-devel
-          libwebp-devel glib2-devel protobuf-compiler gettext
+          libwebp-devel fontconfig-devel glib2-devel protobuf-compiler gettext
           desktop-file-utils appstream
       - uses: actions/checkout@v5
 

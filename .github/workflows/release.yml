@@ -21,8 +21,9 @@ jobs:
         run: >
           dnf install -y --setopt=install_weak_deps=False
           git gh rpm-build rpmdevtools golang cargo rust gtk4-devel
-          libadwaita-devel libwebp-devel glib2-devel protobuf-compiler gettext
-          desktop-file-utils appstream systemd-rpm-macros
+          libadwaita-devel libwebp-devel fontconfig-devel glib2-devel
+          protobuf-compiler gettext desktop-file-utils appstream
+          systemd-rpm-macros
       - uses: actions/checkout@v5
 
       - name: Check the tag matches the version

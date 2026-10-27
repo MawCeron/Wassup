@@ -23,6 +23,7 @@ BuildRequires:  rust >= 1.92
 BuildRequires:  pkgconfig(gtk4) >= 4.22
 BuildRequires:  pkgconfig(libadwaita-1) >= 1.9
 BuildRequires:  pkgconfig(libwebp)
+BuildRequires:  pkgconfig(fontconfig)
 BuildRequires:  glib2-devel
 BuildRequires:  protobuf-compiler
 BuildRequires:  gettext
@@ -39,6 +40,10 @@ Requires:       gstreamer1-plugins-good
 # setpriv keeps a recording from outliving the window.
 Requires:       util-linux
 Recommends:     gstreamer1-plugin-openh264
+# Emoji are drawn with Twemoji when it is installed. Without it Pango uses
+# Noto Color Emoji, whose glyph cache makes the UI grow by hundreds of
+# megabytes as soon as emoji are shown. See docs/performance.md.
+Recommends:     twitter-twemoji-fonts
 # GNOME shows the status icon only with this extension.
 Suggests:       gnome-shell-extension-appindicator
 
