@@ -1797,9 +1797,6 @@ impl Window {
             .license_type(gtk::License::Gpl30)
             .copyright("© 2026 Mauricio Cerón Medina")
             .developers(["Mauricio Cerón Medina"])
-            .designers(["Mauricio Cerón Medina"])
-            .artists(["Mauricio Cerón Medina"])
-            .documenters(["Mauricio Cerón Medina"])
             .comments(gettext(
                 "An unofficial WhatsApp client for GNOME. Wassup is not affiliated with WhatsApp or Meta.",
             ))
