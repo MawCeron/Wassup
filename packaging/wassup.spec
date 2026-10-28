@@ -111,5 +111,5 @@ appstreamcli validate --no-net %{buildroot}%{_metainfodir}/io.github.MawCeron.Wa
 %{_datadir}/wassup
 
 %changelog
-* Tue Oct 27 2026 Mauricio Cerón Medina <ceron.maw@gmail.com> - 0.1.0-1
+* Wed Oct 28 2026 Mauricio Cerón Medina <ceron.maw@gmail.com> - 0.1.0-1
 - First release
