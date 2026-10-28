@@ -12,6 +12,13 @@ implementation and low RAM usage.
 
 **Warning:** since this is an unofficial client, Meta could restrict accounts that use it. Try it with a secondary number first.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="data/screenshots/chat-dark.png">
+    <img src="data/screenshots/chat-light.png" alt="A group chat in Wassup with a photo, a link preview, a reply and a mention" width="800">
+  </picture>
+</p>
+
 ## What it does
 
 - Links your account by QR code, as another device of your phone, and

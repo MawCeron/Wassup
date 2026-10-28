@@ -13,8 +13,8 @@
       notifications coming while its window is closed.
     </p>
     <ul>
-      <li>Chats and groups, with photos, videos, documents, stickers and voice notes</li>
-      <li>Replies, reactions and link previews</li>
+      <li>Chats and groups, with photos, videos, documents, stickers, GIFs and voice notes</li>
+      <li>Replies, reactions, mentions and link previews</li>
       <li>Search across chats and inside a chat</li>
       <li>Disappearing messages and chats locked behind your secret code</li>
       <li>History from your phone, loaded as you scroll</li>
@@ -24,6 +24,16 @@
       or Meta.
     </p>
   </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A group chat with a photo, a link preview, a reply and a mention</caption>
+      <image type="source" width="1280" height="720">https://raw.githubusercontent.com/MawCeron/Wassup/main/data/screenshots/chat-light.png</image>
+    </screenshot>
+    <screenshot environment="gnome:dark">
+      <caption>The same chat in the dark style</caption>
+      <image type="source" width="1280" height="720">https://raw.githubusercontent.com/MawCeron/Wassup/main/data/screenshots/chat-dark.png</image>
+    </screenshot>
+  </screenshots>
   <launchable type="desktop-id">io.github.MawCeron.Wassup.desktop</launchable>
   <developer id="io.github.mawceron">
     <name>Mauricio Cerón Medina</name>

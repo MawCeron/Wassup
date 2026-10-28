@@ -388,3 +388,20 @@ at startup and then every minute, and open UIs drop the messages too.
 Stickers stay cached, since other chats and favorites share them. Own
 messages are sent with the chat's timer. Messages stored before Wassup
 learned about timers kept none and do not expire.
+
+## Screenshots
+
+The screenshots in `data/screenshots/`, used by the README and the
+AppStream metadata, show the real UI against an invented account, so no
+real chat appears in them. `daemon/cmd/demodaemon` answers the UI with that
+account, and `packaging/screenshots/screenshots.sh` runs both in a virtual X
+server and captures the window in the light and dark styles. It needs
+`Xvfb`, ImageMagick, `python3-pillow` and the emoji font:
+
+```sh
+sudo dnf install xorg-x11-server-Xvfb ImageMagick python3-pillow
+packaging/screenshots/screenshots.sh
+```
+
+To change what the screenshots show, edit the messages in
+`daemon/cmd/demodaemon/main.go`.
