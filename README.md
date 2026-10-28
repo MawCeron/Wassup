@@ -10,7 +10,8 @@ implementation and low RAM usage.
 > Early development. The first release is an RPM for Fedora 44; other
 > distributions build it from source.
 
-**Warning:** since this is an unofficial client, Meta could restrict accounts that use it. Try it with a secondary number first.
+> [!CAUTION]
+> Since this is an unofficial client, Meta could restrict accounts that use it. Try it with a secondary number first.
 
 <p align="center">
   <picture>
